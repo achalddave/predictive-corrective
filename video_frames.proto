@@ -1,0 +1,22 @@
+message Image {
+  optional int32 channels = 1;
+  optional int32 height = 2;
+  optional int32 width = 3;
+  // The actual image data, in bytes.
+  // This is a (channels, height, width) array stored using C memory order.
+  optional bytes data = 4;
+}
+
+message VideoFrame {
+  optional string video_name = 1;
+  // Index of frame in video. Note that this may not be the exact frame in the
+  // video if, for example, the video was downsampled.
+  optional int64 frame_index = 2;
+  optional Image image = 3;
+}
+
+message LabeledVideoFrame {
+  optional VideoFrame frame = 1;
+  // List of labels.
+  repeated int32 label = 2;
+}
