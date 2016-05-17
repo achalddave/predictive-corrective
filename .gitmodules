@@ -1,0 +1,3 @@
+[submodule "video_util"]
+	path = video_util
+	url = https://github.com/achalddave/video-tools.git
