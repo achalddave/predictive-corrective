@@ -109,6 +109,7 @@ function DataLoader:_load_keys()
     Loads keys from LMDB, using the LMDB that doesn't contain images.
 
     Returns:
+        keys: List of keys.
     ]]--
 
     -- Get LMDB cursor.
