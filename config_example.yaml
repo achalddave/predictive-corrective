@@ -1,0 +1,62 @@
+# Example config for training model.
+
+###
+# General options
+###
+seed: 2
+gpu: 1
+# Options: cudnn, nn
+backend: 'cudnn'
+
+###
+# Data options
+###
+# LMDBs mapping keys to LabeledVideoFrames.
+train_lmdb: ''
+val_lmdb: ''
+
+# LMDBs mapping keys to LabeledVideoFrames, without image bytes. These LMDBs
+# are quick to iterate over for sampling.
+train_lmdb_without_images: ''
+val_lmdb_without_images: ''
+
+# Number of labels
+num_labels: 0
+
+# Images are assumed to be this size in each dimension. (Images must be resized
+# to be square.)
+image_size: 256
+# Size to crop image to before passing to network.
+crop_size: 224
+
+# Mean pixel.
+pixel_mean: [96.8293, 103.073, 101.662]
+
+###
+# Training options
+###
+# Number of total epochs to run.
+num_epochs: 55
+# Number of batches in epoch.
+epoch_size: 10000
+# Specify epoch to start at (e.g. if we are continuing to train a model from
+# earlier).
+init_epoch: 1
+# Number of example in batch.
+batch_size: 64
+
+###
+# Optimization options
+###
+momentum: 0.9
+weight_decay: 5.e-4
+
+###
+# Model options
+###
+# Directory to save model snapshots, logging, etc. to.
+snapshot_dir: ''
+# Lua model file.
+model_layout: ''
+# Torch model to start training with. If specified, model_layout can be omitted.
+model_init: ''
