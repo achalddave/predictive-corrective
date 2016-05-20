@@ -46,8 +46,8 @@ function DataLoader:load_batch(batch_size)
         video_frame:ParseFromString(transaction:get(key):storage():string())
 
         -- Load image and labels.
-        local image, labels = self:load_image_labels(video_frame)
-        table.insert(batch_images, image)
+        local img, labels = self:load_image_labels(video_frame)
+        table.insert(batch_images, img)
         table.insert(batch_labels, labels)
     end
 
@@ -61,11 +61,11 @@ function DataLoader:load_image_labels(video_frame_proto)
     Loads an image tensor and labels for a given key.
 
     Returns:
-        image: (num_channels, height, width) tensor
+        img: (num_channels, height, width) tensor
         labels: Table containing numeric id for each label.
     ]]
 
-    local image = self:_image_proto_to_tensor(video_frame_proto.frame.image)
+    local img = self:_image_proto_to_tensor(video_frame_proto.frame.image)
 
     -- Load labels in an array.
     local labels = {}
@@ -73,7 +73,7 @@ function DataLoader:load_image_labels(video_frame_proto)
         table.insert(labels, label.id)
     end
 
-    return image, labels
+    return img, labels
 end
 
 function DataLoader:_image_proto_to_tensor(image_proto)
