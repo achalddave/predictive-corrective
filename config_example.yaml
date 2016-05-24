@@ -5,8 +5,6 @@
 ###
 seed: 2
 gpu: 1
-# Options: cudnn, nn
-backend: 'cudnn'
 
 ###
 # Data options
