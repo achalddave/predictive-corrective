@@ -208,12 +208,12 @@ function Trainer:_epoch_regime(epoch)
     TODO(achald): Allow this to be configured from outside Trainer.
     --]]
     local regimes = {
-        -- start, LR,   WD,
-        {  1,     5e-4,   5e-4, },
-        {  2,     1e-4,   5e-4  },
-        {  3,     5e-5,   0 },
-        {  4,     1e-5,   0 },
-        {  5,     1e-6,   0 },
+        -- start,                    LR,   WD,
+        {  1,    self.num_labels * 1e-3,   5e-4, },
+        {  2,    self.num_labels * 1e-4,   5e-4  },
+        {  4,    self.num_labels * 1e-5,   5e-4 },
+        {  5,    self.num_labels * 1e-6,   5e-4 },
+        {  6,    self.num_labels * 1e-7,   5e-4 },
     }
 
     local regime
