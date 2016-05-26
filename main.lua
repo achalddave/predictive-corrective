@@ -75,7 +75,7 @@ local evaluator = evaluate.Evaluator {
     num_labels = config.num_labels
 }
 
-print('Initialized trainer.')
+print('Initialized trainer and evaluator.')
 for i = 1, config.num_epochs do
     print(('Training epoch %d'):format(i))
     epoch = config.init_epoch + i - 1
