@@ -120,6 +120,7 @@ function Evaluator:_process(img)
     return img
 end
 
+-- TODO(achald): Move this to a separate util file.
 function compute_mean_average_precision(predictions, groundtruth)
     --[[
     Compute mean average prediction.
