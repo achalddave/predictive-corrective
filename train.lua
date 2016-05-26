@@ -161,6 +161,9 @@ function Trainer:save(directory)
 end
 
 function Trainer:_process(img)
+    -- Avoid wrap around for ByteTensors, which are unsigned.
+    assert(img:type() ~= torch.ByteTensor():type())
+
     local width = img:size(3)
     local height = img:size(2)
 
