@@ -164,16 +164,13 @@ function Trainer:_process(img)
     -- Avoid wrap around for ByteTensors, which are unsigned.
     assert(img:type() ~= torch.ByteTensor():type())
 
+    -- Randomly crop.
     local width = img:size(3)
     local height = img:size(2)
-
-    -- Randomly crop.
     local x_origin = math.random(width - self.crop_size)
     local y_origin = math.random(height - self.crop_size)
     img = image.crop(img, x_origin, y_origin,
                      x_origin + self.crop_size, y_origin + self.crop_size)
-    assert(img:size(3) == self.crop_size)
-    assert(img:size(2) == self.crop_size)
 
     -- Mirror horizontally with probability 0.5.
     if torch.uniform() > 0.5 then
