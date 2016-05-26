@@ -63,8 +63,7 @@ local trainer = train.Trainer {
     batch_size = config.batch_size,
     crop_size = config.crop_size,
     num_labels = config.num_labels,
-    momentum = config.momentum,
-    weight_decay = config.weight_decay
+    momentum = config.momentum
 }
 local evaluator = evaluate.Evaluator {
     model = model,

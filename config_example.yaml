@@ -47,7 +47,6 @@ batch_size: 64
 # Optimization options
 ###
 momentum: 0.9
-weight_decay: 5.e-4
 
 ###
 # Model options

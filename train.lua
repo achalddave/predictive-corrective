@@ -22,7 +22,6 @@ function Trainer:__init(args)
         crop_size
         num_labels
         momentum
-        weight_decay
     ]]--
     self.model = args.model
     self.criterion = args.criterion
@@ -37,7 +36,7 @@ function Trainer:__init(args)
         learningRateDecay = 0.0,
         momentum = args.momentum,
         dampening = 0.0,
-        weightDecay = args.weight_decay
+        weightDecay = nil
     }
 
     -- Preallocate GPU inputs.
