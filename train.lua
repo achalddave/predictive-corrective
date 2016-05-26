@@ -73,7 +73,9 @@ function Trainer:train_batch()
                                 self.crop_size, self.crop_size)
     local labels = torch.ByteTensor(#labels_table, self.num_labels)
     for i, img in ipairs(images_table) do
-        images[i] = self:_process(img)
+        -- Process image after converting to the default Tensor type.
+        -- (Originally, it is a ByteTensor).
+        images[i] = self:_process(img:typeAs(images))
         labels[i] = self.data_loader:labels_to_tensor(
             labels_table[i], self.num_labels)
     end
