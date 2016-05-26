@@ -132,17 +132,18 @@ function Trainer:train_epoch(epoch, num_batches)
                       {}}] = curr_groundtruth
 
         print(string.format(
-              'Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f LR %.0e',
-              epoch, batch_index, num_batches, batch_timer:time().real, loss,
+              '%s: Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f LR %.0e',
+              os.date('%X'), epoch, batch_index, num_batches,
+              batch_timer:time().real, loss,
               self.optimization_config.learningRate))
     end
 
     local mean_average_precision = evaluate.compute_mean_average_precision(
         predictions, groundtruth)
     print(string.format(
-        'Epoch: [%d][TRAINING SUMMARY] Total Time(s): %.2f\t' ..
+        '%s: Epoch: [%d][TRAINING SUMMARY] Total Time(s): %.2f\t' ..
         'average loss (per batch): %.2f \t mAP: %.5f',
-        epoch, epoch_timer:time().real, loss_epoch / num_batches,
+        os.date('%X'), epoch, epoch_timer:time().real, loss_epoch / num_batches,
         mean_average_precision))
     collectgarbage()
 end

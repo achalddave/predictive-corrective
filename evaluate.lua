@@ -89,9 +89,9 @@ function Evaluator:evaluate_epoch(epoch, num_batches)
     local mean_average_precision = compute_mean_average_precision(
         predictions, groundtruth)
     print(string.format(
-        'Epoch: [%d][VALIDATION SUMMARY] Total Time(s): %.2f\t' ..
+        '%s: Epoch: [%d][VALIDATION SUMMARY] Total Time(s): %.2f\t' ..
         'average loss per batch: %.2f \t mAP: %.5f',
-        epoch, epoch_timer:time().real, loss_epoch / num_batches,
+        os.date('%X'), epoch, epoch_timer:time().real, loss_epoch / num_batches,
         mean_average_precision))
     collectgarbage()
 end
