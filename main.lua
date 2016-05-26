@@ -11,8 +11,8 @@ local torch = require 'torch'
 local yaml = require 'yaml'
 
 local data_loader = require 'data_loader'
-local evaluate = require 'evaluate'
-local train = require 'train'
+local evaluator = require 'evaluator'
+local trainer = require 'trainer'
 
 local parser = argparse() {
     description = 'Fine tune ImageNet-pretrained VGG-16 network on MultiTHUMOS.'
@@ -54,7 +54,7 @@ local train_loader = data_loader.DataLoader(
 local val_loader = data_loader.DataLoader(
     config.val_lmdb, config.val_lmdb_without_images)
 
-local trainer = train.Trainer {
+local trainer = trainer.Trainer {
     model = model,
     criterion = criterion,
     data_loader = train_loader,
@@ -65,7 +65,7 @@ local trainer = train.Trainer {
     num_labels = config.num_labels,
     momentum = config.momentum
 }
-local evaluator = evaluate.Evaluator {
+local evaluator = evaluator.Evaluator {
     model = model,
     criterion = criterion,
     data_loader = val_loader,

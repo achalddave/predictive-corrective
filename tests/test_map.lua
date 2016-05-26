@@ -2,13 +2,13 @@ package.path = package.path .. ";../?.lua"
 
 local torch = require 'torch'
 
-local evaluate = require 'evaluate'
+local evaluator = require 'evaluator'
 
 function test_map1()
     local scores = torch.range(10, 1, -1):resize(10, 1)
     local labels = torch.ByteTensor(
         {1, 0, 1, 1, 1, 1, 0, 0, 0, 1}):resizeAs(scores:byte())
-    ap = evaluate.compute_mean_average_precision(scores, labels)
+    ap = evaluator.compute_mean_average_precision(scores, labels)
     ap_true = (1 + 2/3 + 3/4 + 4/5 + 5/6 + 6/10) / 6
     assert(ap == ap_true,
            string.format('Expected %.5f, received %.5f', ap_true, ap))
@@ -18,7 +18,7 @@ function test_map2()
     local scores = torch.range(10, 1, -1):resize(10, 1)
     local labels = torch.ByteTensor(
         {1, 0, 0, 0, 1, 1, 0, 0, 0, 1}):resizeAs(scores:byte())
-    ap = evaluate.compute_mean_average_precision(scores, labels)
+    ap = evaluator.compute_mean_average_precision(scores, labels)
     ap_true = (1 + 2/5 + 3/6 + 4/10) / 4
     assert(ap == ap_true,
            string.format('Expected %.5f, received %.5f', ap_true, ap))
@@ -29,7 +29,7 @@ function test_map3()
     local labels = torch.ByteTensor(
         {{1, 0, 0, 0, 1, 1, 0, 0, 0, 1},
          {1, 0, 0, 0, 1, 1, 0, 0 ,0, 1}}):t()
-    ap = evaluate.compute_mean_average_precision(scores, labels)
+    ap = evaluator.compute_mean_average_precision(scores, labels)
     ap_true = (1 + 2/5 + 3/6 + 4/10) / 4
     assert(ap == ap_true,
            string.format('Expected %.5f, received %.5f', ap_true, ap))
