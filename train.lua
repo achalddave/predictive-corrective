@@ -51,7 +51,6 @@ end
 function Trainer:update_regime(epoch)
     regime, regime_was_updated = self:_epoch_regime(epoch)
     if regime_was_updated then
-        print('New regime')
         self.optimization_config.learningRate = regime.learning_rate
         self.optimization_config.weightDecay = regime.weight_decay
         self.optimization_state = {}
@@ -77,7 +76,6 @@ function Trainer:train_batch()
         images[i] = self:_process(img)
         labels[i] = self.data_loader:labels_to_tensor(
             labels_table[i], self.num_labels)
-        -- print(labels[i]:nonzero())
     end
 
     self.gpu_inputs:resize(images:size()):copy(images)
@@ -93,8 +91,8 @@ function Trainer:train_batch()
         self.model:backward(self.gpu_inputs, criterion_gradients)
         return loss, self.model_grad_parameters
     end
-    -- Updates self.model_parameters (and in turn, the parameters of self.model)
-    -- in place.
+    -- Updates self.model_parameters (and, in turn, the parameters of
+    -- self.model) in place.
     optim.sgd(model_forward_backward, self.model_parameters,
               self.optimization_config, self.optimization_state)
     return loss, outputs, labels
