@@ -17,7 +17,6 @@ function Trainer:__init(args)
         criterion
         data_loader
         pixel_mean
-        image_mean
         batch_size
         crop_size
         num_labels
@@ -27,7 +26,6 @@ function Trainer:__init(args)
     self.criterion = args.criterion
     self.data_loader = args.data_loader
     self.pixel_mean = torch.Tensor(args.pixel_mean)
-    self.image_mean = args.image_mean
     self.batch_size = args.batch_size
     self.crop_size = args.crop_size
     self.num_labels = args.num_labels
