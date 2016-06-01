@@ -97,14 +97,8 @@ function Evaluator:evaluate_epoch(epoch, num_batches)
 end
 
 function Evaluator:_process(img)
-    local width = img:size(3)
-    local height = img:size(2)
-
     -- Take center crop.
-    local x_origin = (width - self.crop_size) / 2
-    local y_origin = (height - self.crop_size) / 2
-    img = image.crop(img, x_origin, y_origin,
-                     x_origin + self.crop_size, y_origin + self.crop_size)
+    img = image.crop(img, "c" --[[center crop]], self.crop_size, self.crop_size)
     assert(img:size(3) == self.crop_size)
     assert(img:size(2) == self.crop_size)
 
