@@ -160,7 +160,12 @@ function compute_mean_average_precision(predictions, groundtruth)
     end
     -- Return mean of average precisions for labels which had at least 1 sample
     -- in the provided data.
-    return torch.mean(average_precisions[torch.eq(label_has_sample, 1)])
+    average_precisions = average_precisions[torch.eq(label_has_sample, 1)]
+    if average_precisions:nElement() == 0 then
+        print('No positive labels! Returning -1.')
+        return -1
+    end
+    return torch.mean(average_precisions)
 end
 
 return {
