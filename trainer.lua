@@ -6,7 +6,7 @@ local image = require 'image'
 local optim = require 'optim'
 local paths = require 'paths'
 
-local evaluate = require 'evaluate'
+local evaluator = require 'evaluator'
 
 local Trainer = class('Trainer')
 
@@ -136,7 +136,7 @@ function Trainer:train_epoch(epoch, num_batches)
               self.optimization_config.learningRate))
     end
 
-    local mean_average_precision = evaluate.compute_mean_average_precision(
+    local mean_average_precision = evaluator.compute_mean_average_precision(
         predictions, groundtruth)
     print(string.format(
         '%s: Epoch: [%d][TRAINING SUMMARY] Total Time(s): %.2f\t' ..
