@@ -30,11 +30,11 @@ function Trainer:__init(args)
     self.crop_size = args.crop_size
     self.num_labels = args.num_labels
     self.optimization_config = {
-        learningRate = nil,
+        learningRate = nil, -- set by _epoch_regime
         learningRateDecay = 0.0,
         momentum = args.momentum,
         dampening = 0.0,
-        weightDecay = nil
+        weightDecay = nil -- set by _epoch_regime
     }
 
     -- Preallocate GPU inputs.
