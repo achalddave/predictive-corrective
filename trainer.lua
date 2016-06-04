@@ -46,6 +46,9 @@ function Trainer:__init(args)
     -- model's parameters are automatically reflected in them, and vice versa.
     self.model_parameters, self.model_grad_parameters =
         self.model:getParameters()
+
+    -- Prefetch the next batch.
+    self.data_loader:fetch_batch_async(self.batch_size)
 end
 
 function Trainer:update_regime(epoch)
@@ -69,6 +72,9 @@ function Trainer:train_batch()
     ]]--
     local images_table, labels_table = self.data_loader:load_batch(
         self.batch_size)
+
+    -- Fetch the next batch.
+    self.data_loader:fetch_batch_async(self.batch_size)
     local images = torch.Tensor(#images_table, images_table[1]:size(1),
                                 self.crop_size, self.crop_size)
     local labels = torch.ByteTensor(#labels_table, self.num_labels)

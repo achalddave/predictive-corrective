@@ -29,6 +29,9 @@ function Evaluator:__init(args)
 
     self.gpu_inputs = torch.CudaTensor()
     self.gpu_labels = torch.CudaTensor()
+
+    -- Prefetch the next batch.
+    self.data_loader:fetch_batch_async(self.batch_size)
 end
 
 function Evaluator:evaluate_batch()
@@ -40,6 +43,10 @@ function Evaluator:evaluate_batch()
     ]]--
     local images_table, labels_table = self.data_loader:load_batch(
         self.batch_size)
+
+    -- Fetch the next batch.
+    self.data_loader:fetch_batch_async(self.batch_size)
+
     local images = torch.Tensor(#images_table, images_table[1]:size(1),
                                 self.crop_size, self.crop_size)
     local labels = torch.ByteTensor(#labels_table, self.num_labels)
