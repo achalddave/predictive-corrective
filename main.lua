@@ -6,6 +6,7 @@ local argparse = require 'argparse'
 local class = require 'class'
 local cudnn = require 'cudnn'
 local cutorch = require 'cutorch'
+local paths = require 'paths'
 local nn = require 'nn'
 local torch = require 'torch'
 local yaml = require 'yaml'
@@ -18,10 +19,36 @@ local parser = argparse() {
     description = 'Fine tune ImageNet-pretrained VGG-16 network on MultiTHUMOS.'
 }
 parser:argument('config', 'Config file')
+parser:argument('cache_base',
+                'Directory to save model snapshots, logging, etc. to.')
 
 local args = parser:parse()
 local config = yaml.loadpath(args.config)
 -- TODO(achald): Validate config.
+
+-- Create cache_base
+if not paths.dirp(args.cache_base) and not paths.mkdir(args.cache_base) then
+    print('Error creating cache base dir:', args.cache_base)
+    os.exit()
+end
+local cache_dir = paths.concat(args.cache_base, os.date('%X'))
+if not paths.mkdir(cache_dir) then
+    print('Error making cache dir:', cache_dir)
+    os.exit()
+end
+print('Saving run information to', cache_dir)
+
+-- Save config to cache_dir
+function copy_file_naive(in_path, out_path)
+    -- TODO(achald): Use a library function, if one exists.
+    local in_file = io.open(in_path, 'r')
+    local in_contents = in_file:read('*all')
+    in_file:close()
+    local out_file = io.open(out_path, 'w')
+    out_file:write(in_contents)
+    out_file:close()
+end
+copy_file_naive(args.config, paths.concat(cache_dir, 'config.yaml'))
 
 cutorch.setDevice(config.gpu or 1)
 torch.manualSeed(config.seed)
@@ -80,6 +107,6 @@ for i = 1, config.num_epochs do
     print(('Training epoch %d'):format(i))
     epoch = config.init_epoch + i - 1
     trainer:train_epoch(epoch, config.epoch_size)
-    trainer:save(config.cache_dir)
+    trainer:save(cache_dir)
     evaluator:evaluate_epoch(epoch, config.epoch_size)
 end
