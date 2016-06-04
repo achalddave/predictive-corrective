@@ -28,9 +28,4 @@ local new_fc8 = nn.Linear(4096, args.num_classes)
 new_fc8.name = 'fc8'
 model:add(new_fc8)
 
--- Add sigmoid layer.
-local sigmoid = nn.Sigmoid()
-sigmoid.name = 'sigmoid'
-model:add(sigmoid)
-
 torch.save(args.output_model, model)
