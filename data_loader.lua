@@ -138,6 +138,7 @@ function DataLoader:load_image_labels(video_frame_proto)
     return img, labels
 end
 
+-- Does not need self.
 function DataLoader:labels_to_tensor(labels, num_labels)
     --[[
     Convert an array of label ids into a 1-hot encoding in a binary Tensor.
@@ -150,6 +151,7 @@ function DataLoader:labels_to_tensor(labels, num_labels)
     return labels_tensor
 end
 
+-- Does not need self.
 function DataLoader:_image_proto_to_tensor(image_proto)
     local image_storage = torch.ByteStorage()
     image_storage:string(image_proto.data)
