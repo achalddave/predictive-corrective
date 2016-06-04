@@ -5,6 +5,8 @@ as values.
 
 local class = require 'class'
 local lmdb = require 'lmdb'
+local threads = require 'threads'
+
 local video_frame_proto = require 'video_util.video_frames_pb'
 
 local DataLoader = class('DataLoader')
@@ -21,6 +23,17 @@ function DataLoader:__init(lmdb_path, lmdb_without_images_path, num_labels)
     self.path = lmdb_path
     self.imageless_path = lmdb_without_images_path
     self.keys = self:_load_keys()
+    self._prefetched_data = {
+        batch_images = nil,
+        batch_labels = nil
+    }
+    self._permuted_keys = self:_permute_keys()
+    self._key_index = 1
+    self._prefetching_thread = threads.Threads(1)
+end
+
+function DataLoader:num_samples()
+    return #self.keys
 end
 
 function DataLoader:load_batch(batch_size)
@@ -31,31 +44,79 @@ function DataLoader:load_batch(batch_size)
         batch_images: Array of ByteTensors
         batch_labels: Array of arrays containing label ids.
     ]]--
-    -- Open database
-    local db = lmdb.env { Path = self.path }
-    db:open()
-    local transaction = db:txn(true --[[readonly]])
-
-    local batch_labels = {}
-    local batch_images = {}
-    local batch_keys = self:_sample_keys_batch(batch_size)
-    for i = 1, batch_size do
-        -- Load LabeledVideoFrame.
-        local key = batch_keys[i]
-        local video_frame = video_frame_proto.LabeledVideoFrame()
-        video_frame:ParseFromString(transaction:get(key):storage():string())
-
-        -- Load image and labels.
-        local img, labels = self:load_image_labels(video_frame)
-        table.insert(batch_images, img)
-        table.insert(batch_labels, labels)
+    if self._prefetched_data.batch_images == nil then
+        -- Thread has not fetched data
+        self._prefetching_thread:synchronize()
+        if self._prefetched_data.batch_images == nil then
+            self:fetch_batch_async(batch_size)
+            self._prefetching_thread:synchronize()
+        end
     end
 
-    transaction:abort()
-    db:close()
+    local batch_images = self._prefetched_data.batch_images
+    local batch_labels = self._prefetched_data.batch_labels
+    self._prefetched_data.batch_images = nil
+    self._prefetched_data.batch_labels = nil
     return batch_images, batch_labels
 end
 
+function DataLoader:fetch_batch_async(batch_size)
+    --[[ Load a batch, store it for returning in next call to load_batch. ]]--
+    local batch_keys = {}
+    for _ = 1, batch_size do
+        if self._key_index > #self._permuted_keys then
+            print(string.format(
+                '%s: Finished pass through data, repermuting!', os.date('%X')))
+            self._permuted_keys = self:_permute_keys()
+            self._key_index = 1
+        end
+        table.insert(batch_keys, self._permuted_keys[self._key_index])
+        self._key_index = self._key_index + 1
+    end
+    self._prefetching_thread:addjob(
+        function(path, batch_keys)
+            -- Open database
+            local torch = require 'torch'
+            local lmdb = require 'lmdb'
+            local video_frame_proto = require 'video_util.video_frames_pb'
+            local DataLoader = require('data_loader').DataLoader
+
+            local db = lmdb.env { Path = path }
+            db:open()
+            local transaction = db:txn(true --[[readonly]])
+
+            local batch_labels = {}
+            local batch_images = {}
+            for i = 1, batch_size do
+                -- Load LabeledVideoFrame.
+                local key = batch_keys[i]
+                local video_frame = video_frame_proto.LabeledVideoFrame()
+                video_frame:ParseFromString(
+                    transaction:get(key):storage():string())
+
+                -- Load image and labels.
+                -- We don't have access to self, so we have to call
+                -- load_image_labels using the metatable.
+                local img, labels = getmetatable(DataLoader).load_image_labels(
+                    {}, video_frame)
+                table.insert(batch_images, img)
+                table.insert(batch_labels, labels)
+            end
+
+            transaction:abort()
+            db:close()
+
+            output = {}
+            output.batch_images = batch_images
+            output.batch_labels = batch_labels
+            return output
+        end,
+        function(output)
+            self._prefetched_data = output
+        end, self.path, batch_keys)
+end
+
+-- Does not need self.
 function DataLoader:load_image_labels(video_frame_proto)
     --[[
     Loads an image tensor and labels for a given key.
@@ -65,7 +126,8 @@ function DataLoader:load_image_labels(video_frame_proto)
         labels: Table containing numeric id for each label.
     ]]
 
-    local img = self:_image_proto_to_tensor(video_frame_proto.frame.image)
+    local img = getmetatable(DataLoader)._image_proto_to_tensor(
+        {}, video_frame_proto.frame.image)
 
     -- Load labels in an array.
     local labels = {}
@@ -95,13 +157,13 @@ function DataLoader:_image_proto_to_tensor(image_proto)
         image_proto.channels, image_proto.height, image_proto.width)
 end
 
-function DataLoader:_sample_keys_batch(batch_size)
-    -- TODO(achald): Allow other ways of sampling keys.
-    local batch_keys = {}
-    for _ = 1, batch_size do
-        table.insert(batch_keys, self.keys[math.random(#self.keys)])
+function DataLoader:_permute_keys()
+    local permuted_keys = {}
+    local permutation = torch.randperm(#self.keys)
+    for i = 1, permutation:nElement() do
+        table.insert(permuted_keys, self.keys[permutation[i]])
     end
-    return batch_keys
+    return permuted_keys
 end
 
 function DataLoader:_load_keys()
