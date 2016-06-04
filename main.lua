@@ -97,7 +97,9 @@ local evaluator = evaluator.Evaluator {
     criterion = criterion,
     data_loader = val_loader,
     pixel_mean = config.pixel_mean,
-    batch_size = config.batch_size,
+    -- During evaluation, we can handle a slightly larger batch size since we
+    -- don't use as much memory.
+    batch_size = torch.round(1.5 * config.batch_size),
     crop_size = config.crop_size,
     num_labels = config.num_labels
 }
