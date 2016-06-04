@@ -64,7 +64,7 @@ else
 end
 -- https://groups.google.com/forum/#!topic/torch7/HiBymc9NfIY
 model = model:cuda()
-local criterion = nn.BCECriterion():cuda()
+local criterion = nn.MultiLabelSoftMarginCriterion():cuda()
 print 'Loaded model'
 
 local optimization_config = {
