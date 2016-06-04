@@ -44,7 +44,7 @@ function Evaluator:evaluate_batch()
                                 self.crop_size, self.crop_size)
     local labels = torch.ByteTensor(#labels_table, self.num_labels)
     for i, img in ipairs(images_table) do
-        images[i] = self:_process(img)
+        images[i] = self:_process(img:typeAs(images))
         labels[i] = self.data_loader:labels_to_tensor(
             labels_table[i], self.num_labels)
     end
@@ -90,13 +90,16 @@ function Evaluator:evaluate_epoch(epoch, num_batches)
         predictions, groundtruth)
     print(string.format(
         '%s: Epoch: [%d][VALIDATION SUMMARY] Total Time(s): %.2f\t' ..
-        'average loss per batch: %.2f \t mAP: %.5f',
+        'average loss (per batch): %.5f \t mAP: %.5f',
         os.date('%X'), epoch, epoch_timer:time().real, loss_epoch / num_batches,
         mean_average_precision))
     collectgarbage()
 end
 
 function Evaluator:_process(img)
+    -- Avoid wrap around for ByteTensors, which are unsigned.
+    assert(img:type() ~= torch.ByteTensor():type())
+
     -- Take center crop.
     img = image.crop(img, "c" --[[center crop]], self.crop_size, self.crop_size)
     assert(img:size(3) == self.crop_size)
