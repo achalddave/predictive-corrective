@@ -146,7 +146,7 @@ function Trainer:train_epoch(epoch, num_batches)
         predictions, groundtruth)
     print(string.format(
         '%s: Epoch: [%d][TRAINING SUMMARY] Total Time(s): %.2f\t' ..
-        'average loss (per batch): %.2f \t mAP: %.5f',
+        'average loss (per batch): %.5f \t mAP: %.5f',
         os.date('%X'), epoch, epoch_timer:time().real, loss_epoch / num_batches,
         mean_average_precision))
     collectgarbage()
