@@ -86,8 +86,6 @@ function DataLoader:fetch_batch_async(batch_size)
                     transaction:get(key):storage():string())
 
                 -- Load image and labels.
-                -- We don't have access to self, so we have to call
-                -- load_image_labels using the metatable.
                 local img, labels = DataLoader.load_image_labels(video_frame)
                 table.insert(batch_images, img)
                 table.insert(batch_labels, labels)
