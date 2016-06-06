@@ -4,6 +4,8 @@ local cunn = require 'cunn'
 local cutorch = require 'cutorch'
 local image = require 'image'
 
+local DataLoader = require('data_loader').DataLoader
+
 local Evaluator = class('Evaluator')
 
 function Evaluator:__init(args)
@@ -52,7 +54,7 @@ function Evaluator:evaluate_batch()
     local labels = torch.ByteTensor(#labels_table, self.num_labels)
     for i, img in ipairs(images_table) do
         images[i] = self:_process(img:typeAs(images))
-        labels[i] = self.data_loader:labels_to_tensor(
+        labels[i] = DataLoader.labels_to_tensor(
             labels_table[i], self.num_labels)
     end
 

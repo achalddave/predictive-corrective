@@ -7,6 +7,7 @@ local optim = require 'optim'
 local paths = require 'paths'
 
 local evaluator = require 'evaluator'
+local DataLoader = require('data_loader').DataLoader
 
 local Trainer = class('Trainer')
 
@@ -82,7 +83,7 @@ function Trainer:train_batch()
         -- Process image after converting to the default Tensor type.
         -- (Originally, it is a ByteTensor).
         images[i] = self:_process(img:typeAs(images))
-        labels[i] = self.data_loader:labels_to_tensor(
+        labels[i] = DataLoader.labels_to_tensor(
             labels_table[i], self.num_labels)
     end
 

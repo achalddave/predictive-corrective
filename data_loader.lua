@@ -3,15 +3,15 @@ Helper class to load data and labels from an LMDB containing LabeledVideoFrames
 as values.
 ]]--
 
-local class = require 'class'
+local classic = require 'classic'
 local lmdb = require 'lmdb'
 local threads = require 'threads'
 
 local video_frame_proto = require 'video_util.video_frames_pb'
 
-local DataLoader = class('DataLoader')
+local DataLoader = classic.class('DataLoader')
 
-function DataLoader:__init(lmdb_path, lmdb_without_images_path, num_labels)
+function DataLoader:_init(lmdb_path, lmdb_without_images_path, num_labels)
     --[[
     Args:
         lmdb_path (str): Path to LMDB containing LabeledVideoFrames as values.
@@ -88,8 +88,7 @@ function DataLoader:fetch_batch_async(batch_size)
                 -- Load image and labels.
                 -- We don't have access to self, so we have to call
                 -- load_image_labels using the metatable.
-                local img, labels = getmetatable(DataLoader).load_image_labels(
-                    {}, video_frame)
+                local img, labels = DataLoader.load_image_labels(video_frame)
                 table.insert(batch_images, img)
                 table.insert(batch_labels, labels)
             end
@@ -107,8 +106,7 @@ function DataLoader:fetch_batch_async(batch_size)
         end, self.path, batch_keys)
 end
 
--- Does not need self.
-function DataLoader:load_image_labels(video_frame_proto)
+function DataLoader.static.load_image_labels(video_frame_proto)
     --[[
     Loads an image tensor and labels for a given key.
 
@@ -117,8 +115,7 @@ function DataLoader:load_image_labels(video_frame_proto)
         labels: Table containing numeric id for each label.
     ]]
 
-    local img = getmetatable(DataLoader)._image_proto_to_tensor(
-        {}, video_frame_proto.frame.image)
+    local img = DataLoader._image_proto_to_tensor(video_frame_proto.frame.image)
 
     -- Load labels in an array.
     local labels = {}
@@ -129,8 +126,7 @@ function DataLoader:load_image_labels(video_frame_proto)
     return img, labels
 end
 
--- Does not need self.
-function DataLoader:labels_to_tensor(labels, num_labels)
+function DataLoader.static.labels_to_tensor(labels, num_labels)
     --[[
     Convert an array of label ids into a 1-hot encoding in a binary Tensor.
     ]]--
@@ -157,8 +153,7 @@ function DataLoader:_get_batch_keys(batch_size)
     return batch_keys
 end
 
--- Does not need self.
-function DataLoader:_image_proto_to_tensor(image_proto)
+function DataLoader.static._image_proto_to_tensor(image_proto)
     local image_storage = torch.ByteStorage()
     image_storage:string(image_proto.data)
     return torch.ByteTensor(image_storage):reshape(
