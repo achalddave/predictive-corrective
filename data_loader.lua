@@ -62,17 +62,8 @@ end
 
 function DataLoader:fetch_batch_async(batch_size)
     --[[ Load a batch, store it for returning in next call to load_batch. ]]--
-    local batch_keys = {}
-    for _ = 1, batch_size do
-        if self._key_index > #self._permuted_keys then
-            print(string.format(
-                '%s: Finished pass through data, repermuting!', os.date('%X')))
-            self._permuted_keys = self:_permute_keys()
-            self._key_index = 1
-        end
-        table.insert(batch_keys, self._permuted_keys[self._key_index])
-        self._key_index = self._key_index + 1
-    end
+    local batch_keys = self:_get_batch_keys(batch_size)
+
     self._prefetching_thread:addjob(
         function(path, batch_keys)
             -- Open database
@@ -149,6 +140,21 @@ function DataLoader:labels_to_tensor(labels, num_labels)
         labels_tensor[label + 1] = 1
     end
     return labels_tensor
+end
+
+function DataLoader:_get_batch_keys(batch_size)
+    local batch_keys = {}
+    for _ = 1, batch_size do
+        if self._key_index > #self._permuted_keys then
+            print(string.format('%s: Finished pass through data, repermuting!',
+                                os.date('%X')))
+            self._permuted_keys = self:_permute_keys()
+            self._key_index = 1
+        end
+        table.insert(batch_keys, self._permuted_keys[self._key_index])
+        self._key_index = self._key_index + 1
+    end
+    return batch_keys
 end
 
 -- Does not need self.
