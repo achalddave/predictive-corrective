@@ -76,9 +76,9 @@ local optimization_config = {
 local optimization_state
 
 local train_loader = data_loader.DataLoader(
-    config.train_lmdb, config.train_lmdb_without_images)
+    config.train_lmdb, config.train_lmdb_without_images, config.num_labels)
 local val_loader = data_loader.DataLoader(
-    config.val_lmdb, config.val_lmdb_without_images)
+    config.val_lmdb, config.val_lmdb_without_images, config.num_labels)
 
 local trainer = trainer.Trainer {
     model = model,

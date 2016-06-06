@@ -75,7 +75,7 @@ while true do
             img[{{channel}, {}, {}}]:add(-MEANS[channel])
         end
         images[i] = img
-        labels[i] = data_loader:labels_to_tensor(labels_table[i], NUM_LABELS)
+        labels[i] = labels_table[i]
     end
 
     gpu_inputs:resize(images:size()):copy(images)

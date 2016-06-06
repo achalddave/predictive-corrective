@@ -54,8 +54,8 @@ function Evaluator:evaluate_batch()
     local labels = torch.ByteTensor(#labels_table, self.num_labels)
     for i, img in ipairs(images_table) do
         images[i] = self:_process(img:typeAs(images))
-        labels[i] = DataLoader.labels_to_tensor(
-            labels_table[i], self.num_labels)
+        -- TODO(achald): Convert table to tensor using torch.cat
+        labels[i] = labels_table[i]
     end
 
     self.gpu_inputs:resize(images:size()):copy(images)

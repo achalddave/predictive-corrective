@@ -30,6 +30,7 @@ function DataLoader:_init(lmdb_path, lmdb_without_images_path, num_labels)
     self._permuted_keys = self:_permute_keys()
     self._key_index = 1
     self._prefetching_thread = threads.Threads(1)
+    self.num_labels = num_labels
 end
 
 function DataLoader:num_samples()
@@ -69,19 +70,7 @@ function DataLoader:fetch_batch_async(batch_size)
         function(output)
             self._prefetched_data = output
         end,
-        self.path, batch_keys)
-end
-
-function DataLoader.static.labels_to_tensor(labels, num_labels)
-    --[[
-    Convert an array of label ids into a 1-hot encoding in a binary Tensor.
-    ]]--
-    local labels_tensor = torch.ByteTensor(num_labels):zero()
-    for _, label in ipairs(labels) do
-        -- Label ids start at 0.
-        labels_tensor[label + 1] = 1
-    end
-    return labels_tensor
+        self.path, batch_keys, self.num_labels)
 end
 
 function DataLoader.static.load_image_labels_from_proto(video_frame_proto)
@@ -161,6 +150,17 @@ function DataLoader:_load_keys()
     return keys
 end
 
+function DataLoader.static._labels_to_tensor(labels, num_labels)
+    --[[
+    Convert an array of label ids into a 1-hot encoding in a binary Tensor.
+    ]]--
+    local labels_tensor = torch.ByteTensor(num_labels):zero()
+    for _, label in ipairs(labels) do
+        -- Label ids start at 0.
+        labels_tensor[label + 1] = 1
+    end
+    return labels_tensor
+end
 function DataLoader.static._image_proto_to_tensor(image_proto)
     local image_storage = torch.ByteStorage()
     image_storage:string(image_proto.data)
@@ -168,18 +168,20 @@ function DataLoader.static._image_proto_to_tensor(image_proto)
         image_proto.channels, image_proto.height, image_proto.width)
 end
 
-function DataLoader.static._load_image_labels_from_path(lmdb_path, keys)
+function DataLoader.static._load_image_labels_from_path(
+    lmdb_path, keys, num_labels)
     --[[
     Load images and labels for a set of keys from the LMDB.
 
     Args:
         lmdb_path (str): Path to an LMDB of LabeledVideoFrames
         keys (list): List of string keys.
+        num_labels (num): Number of total labels.
 
     Returns:
         images_and_labels (table): Contains
             batch_images: Array of ByteTensors
-            batch_labels: Array of arrays containing label ids.
+            batch_labels: Array of ByteTensors
     ]]--
     -- Open database
     local torch = require 'torch'
@@ -203,6 +205,7 @@ function DataLoader.static._load_image_labels_from_path(lmdb_path, keys)
         -- Load image and labels.
         local img, labels = DataLoader.load_image_labels_from_proto(
             video_frame)
+        labels = DataLoader._labels_to_tensor(labels, num_labels)
         table.insert(batch_images, img)
         table.insert(batch_labels, labels)
     end

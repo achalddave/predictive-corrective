@@ -83,8 +83,8 @@ function Trainer:train_batch()
         -- Process image after converting to the default Tensor type.
         -- (Originally, it is a ByteTensor).
         images[i] = self:_process(img:typeAs(images))
-        labels[i] = DataLoader.labels_to_tensor(
-            labels_table[i], self.num_labels)
+        -- TODO(achald): Convert table to tensor using torch.cat
+        labels[i] = labels_table[i]
     end
 
     self.gpu_inputs:resize(images:size()):copy(images)
