@@ -65,43 +65,11 @@ function DataLoader:fetch_batch_async(batch_size)
     local batch_keys = self:_get_batch_keys(batch_size)
 
     self._prefetching_thread:addjob(
-        function(path, batch_keys)
-            -- Open database
-            local torch = require 'torch'
-            local lmdb = require 'lmdb'
-            local video_frame_proto = require 'video_util.video_frames_pb'
-            local DataLoader = require('data_loader').DataLoader
-
-            local db = lmdb.env { Path = path }
-            db:open()
-            local transaction = db:txn(true --[[readonly]])
-
-            local batch_labels = {}
-            local batch_images = {}
-            for i = 1, batch_size do
-                -- Load LabeledVideoFrame.
-                local key = batch_keys[i]
-                local video_frame = video_frame_proto.LabeledVideoFrame()
-                video_frame:ParseFromString(
-                    transaction:get(key):storage():string())
-
-                -- Load image and labels.
-                local img, labels = DataLoader.load_image_labels(video_frame)
-                table.insert(batch_images, img)
-                table.insert(batch_labels, labels)
-            end
-
-            transaction:abort()
-            db:close()
-
-            output = {}
-            output.batch_images = batch_images
-            output.batch_labels = batch_labels
-            return output
-        end,
+        DataLoader._load_image_labels_from_path,
         function(output)
             self._prefetched_data = output
-        end, self.path, batch_keys)
+        end,
+        self.path, batch_keys)
 end
 
 function DataLoader.static.labels_to_tensor(labels, num_labels)
@@ -116,7 +84,7 @@ function DataLoader.static.labels_to_tensor(labels, num_labels)
     return labels_tensor
 end
 
-function DataLoader.static.load_image_labels(video_frame_proto)
+function DataLoader.static.load_image_labels_from_proto(video_frame_proto)
     --[[
     Loads an image tensor and labels for a given key.
 
@@ -200,4 +168,54 @@ function DataLoader.static._image_proto_to_tensor(image_proto)
         image_proto.channels, image_proto.height, image_proto.width)
 end
 
-return {DataLoader = DataLoader}
+function DataLoader.static._load_image_labels_from_path(lmdb_path, keys)
+    --[[
+    Load images and labels for a set of keys from the LMDB.
+
+    Args:
+        lmdb_path (str): Path to an LMDB of LabeledVideoFrames
+        keys (list): List of string keys.
+
+    Returns:
+        images_and_labels (table): Contains
+            batch_images: Array of ByteTensors
+            batch_labels: Array of arrays containing label ids.
+    ]]--
+    -- Open database
+    local torch = require 'torch'
+    local lmdb = require 'lmdb'
+    local video_frame_proto = require 'video_util.video_frames_pb'
+    local DataLoader = require('data_loader').DataLoader
+
+    local db = lmdb.env { Path = lmdb_path }
+    db:open()
+    local transaction = db:txn(true --[[readonly]])
+
+    local batch_labels = {}
+    local batch_images = {}
+    for i = 1, #keys do
+        -- Load LabeledVideoFrame.
+        local key = keys[i]
+        local video_frame = video_frame_proto.LabeledVideoFrame()
+        video_frame:ParseFromString(
+            transaction:get(key):storage():string())
+
+        -- Load image and labels.
+        local img, labels = DataLoader.load_image_labels_from_proto(
+            video_frame)
+        table.insert(batch_images, img)
+        table.insert(batch_labels, labels)
+    end
+
+    transaction:abort()
+    db:close()
+
+    return {
+        batch_images = batch_images,
+        batch_labels = batch_labels
+    }
+end
+
+return {
+    DataLoader = DataLoader
+}
