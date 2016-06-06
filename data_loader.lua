@@ -9,6 +9,79 @@ local threads = require 'threads'
 
 local video_frame_proto = require 'video_util.video_frames_pb'
 
+local Sampler = classic.class('Sampler')
+Sampler:mustHave('sample_keys')
+function Sampler.static.permute(list)
+    local permuted_list = {}
+    local permutation = torch.randperm(#list)
+    for i = 1, permutation:nElement() do
+        table.insert(permuted_list, list[permutation[i]])
+    end
+    return permuted_list
+end
+
+local UniformSampler = classic.class('UniformSampler', Sampler)
+function UniformSampler:_init(lmdb_without_images_path, num_labels)
+    --[[
+    Sampler that samples random keys, regardless of labels.
+    ]]--
+    self.imageless_path = lmdb_without_images_path
+    self.keys = UniformSampler.load_lmdb_keys(lmdb_without_images_path)
+    self.permuted_keys = Sampler.permute(self.keys)
+    self.key_index = 1
+end
+
+function UniformSampler:sample_keys(num_keys)
+    --[[
+    Sample the next set of keys.
+    ]]--
+    local batch_keys = {}
+    for _ = 1, num_keys do
+        if self.key_index > #self.permuted_keys then
+            print(string.format('%s: Finished pass through data, repermuting!',
+                                os.date('%X')))
+            self.permuted_keys = Sampler.permute(self.keys)
+            self.key_index = 1
+        end
+        table.insert(batch_keys, self.permuted_keys[self.key_index])
+        self.key_index = self.key_index + 1
+    end
+    return batch_keys
+end
+
+function UniformSampler:num_samples()
+    return #self.keys
+end
+
+function UniformSampler.static.load_lmdb_keys(lmdb_path)
+    --[[
+    Loads keys from LMDB, using the LMDB that doesn't contain images.
+
+    Returns:
+        keys: List of keys.
+    ]]--
+
+    -- Get LMDB cursor.
+    local db = lmdb.env { Path = lmdb_path }
+    db:open()
+    local transaction = db:txn(true --[[readonly]])
+    local cursor = transaction:cursor()
+
+    local keys = {}
+    for i = 1, db:stat().entries do
+        local key, _ = cursor:get('MDB_GET_CURRENT')
+        table.insert(keys, key)
+        if i ~= db:stat().entries then cursor:next() end
+    end
+
+    -- Cleanup.
+    cursor:close()
+    transaction:abort()
+    db:close()
+
+    return keys
+end
+
 local DataLoader = classic.class('DataLoader')
 
 function DataLoader:_init(lmdb_path, lmdb_without_images_path, num_labels)
@@ -21,20 +94,17 @@ function DataLoader:_init(lmdb_path, lmdb_without_images_path, num_labels)
             sample.
     ]]--
     self.path = lmdb_path
-    self.imageless_path = lmdb_without_images_path
-    self.keys = self:_load_keys()
+    self.sampler = UniformSampler(lmdb_without_images_path, num_labels)
     self._prefetched_data = {
         batch_images = nil,
         batch_labels = nil
     }
-    self._permuted_keys = self:_permute_keys()
-    self._key_index = 1
     self._prefetching_thread = threads.Threads(1)
     self.num_labels = num_labels
 end
 
 function DataLoader:num_samples()
-    return #self.keys
+    return self.sampler:num_samples()
 end
 
 function DataLoader:load_batch(batch_size)
@@ -63,7 +133,7 @@ end
 
 function DataLoader:fetch_batch_async(batch_size)
     --[[ Load a batch, store it for returning in next call to load_batch. ]]--
-    local batch_keys = self:_get_batch_keys(batch_size)
+    local batch_keys = self.sampler:sample_keys(batch_size)
 
     self._prefetching_thread:addjob(
         DataLoader._load_image_labels_from_path,
@@ -73,7 +143,7 @@ function DataLoader:fetch_batch_async(batch_size)
         self.path, batch_keys, self.num_labels)
 end
 
-function DataLoader.static.load_image_labels_from_proto(video_frame_proto)
+function DataLoader.static._load_image_labels_from_proto(video_frame_proto)
     --[[
     Loads an image tensor and labels for a given key.
 
@@ -96,59 +166,6 @@ end
 -- ###
 -- Private methods.
 -- ###
-
-function DataLoader:_get_batch_keys(batch_size)
-    local batch_keys = {}
-    for _ = 1, batch_size do
-        if self._key_index > #self._permuted_keys then
-            print(string.format('%s: Finished pass through data, repermuting!',
-                                os.date('%X')))
-            self._permuted_keys = self:_permute_keys()
-            self._key_index = 1
-        end
-        table.insert(batch_keys, self._permuted_keys[self._key_index])
-        self._key_index = self._key_index + 1
-    end
-    return batch_keys
-end
-
-function DataLoader:_permute_keys()
-    local permuted_keys = {}
-    local permutation = torch.randperm(#self.keys)
-    for i = 1, permutation:nElement() do
-        table.insert(permuted_keys, self.keys[permutation[i]])
-    end
-    return permuted_keys
-end
-
-function DataLoader:_load_keys()
-    --[[
-    Loads keys from LMDB, using the LMDB that doesn't contain images.
-
-    Returns:
-        keys: List of keys.
-    ]]--
-
-    -- Get LMDB cursor.
-    local db = lmdb.env { Path = self.imageless_path }
-    db:open()
-    local transaction = db:txn(true --[[readonly]])
-    local cursor = transaction:cursor()
-
-    local keys = {}
-    for i = 1, db:stat().entries do
-        local key, _ = cursor:get('MDB_GET_CURRENT')
-        table.insert(keys, key)
-        if i ~= db:stat().entries then cursor:next() end
-    end
-
-    -- Cleanup.
-    cursor:close()
-    transaction:abort()
-    db:close()
-
-    return keys
-end
 
 function DataLoader.static._labels_to_tensor(labels, num_labels)
     --[[
@@ -203,7 +220,7 @@ function DataLoader.static._load_image_labels_from_path(
             transaction:get(key):storage():string())
 
         -- Load image and labels.
-        local img, labels = DataLoader.load_image_labels_from_proto(
+        local img, labels = DataLoader._load_image_labels_from_proto(
             video_frame)
         labels = DataLoader._labels_to_tensor(labels, num_labels)
         table.insert(batch_images, img)
