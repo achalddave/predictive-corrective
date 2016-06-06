@@ -1,4 +1,4 @@
-local class = require 'class'
+local classic = require 'classic'
 local cudnn = require 'cudnn'
 local cunn = require 'cunn'
 local cutorch = require 'cutorch'
@@ -6,9 +6,9 @@ local image = require 'image'
 
 local DataLoader = require('data_loader').DataLoader
 
-local Evaluator = class('Evaluator')
+local Evaluator = classic.class('Evaluator')
 
-function Evaluator:__init(args)
+function Evaluator:_init(args)
     --[[
     Used to evaluate the model on validation data.
 

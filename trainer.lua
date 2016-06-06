@@ -1,4 +1,4 @@
-local class = require 'class'
+local classic = require 'classic'
 local cudnn = require 'cudnn'
 local cunn = require 'cunn'
 local cutorch = require 'cutorch'
@@ -9,9 +9,9 @@ local paths = require 'paths'
 local evaluator = require 'evaluator'
 local DataLoader = require('data_loader').DataLoader
 
-local Trainer = class('Trainer')
+local Trainer = classic.class('Trainer')
 
-function Trainer:__init(args)
+function Trainer:_init(args)
     --[[
     Args:
         model
