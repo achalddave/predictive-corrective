@@ -3,7 +3,6 @@
 --]]
 
 local argparse = require 'argparse'
-local class = require 'class'
 local cudnn = require 'cudnn'
 local cutorch = require 'cutorch'
 local paths = require 'paths'
