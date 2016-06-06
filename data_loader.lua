@@ -106,6 +106,18 @@ function DataLoader:fetch_batch_async(batch_size)
         end, self.path, batch_keys)
 end
 
+function DataLoader.static.labels_to_tensor(labels, num_labels)
+    --[[
+    Convert an array of label ids into a 1-hot encoding in a binary Tensor.
+    ]]--
+    local labels_tensor = torch.ByteTensor(num_labels):zero()
+    for _, label in ipairs(labels) do
+        -- Label ids start at 0.
+        labels_tensor[label + 1] = 1
+    end
+    return labels_tensor
+end
+
 function DataLoader.static.load_image_labels(video_frame_proto)
     --[[
     Loads an image tensor and labels for a given key.
@@ -126,17 +138,9 @@ function DataLoader.static.load_image_labels(video_frame_proto)
     return img, labels
 end
 
-function DataLoader.static.labels_to_tensor(labels, num_labels)
-    --[[
-    Convert an array of label ids into a 1-hot encoding in a binary Tensor.
-    ]]--
-    local labels_tensor = torch.ByteTensor(num_labels):zero()
-    for _, label in ipairs(labels) do
-        -- Label ids start at 0.
-        labels_tensor[label + 1] = 1
-    end
-    return labels_tensor
-end
+-- ###
+-- Private methods.
+-- ###
 
 function DataLoader:_get_batch_keys(batch_size)
     local batch_keys = {}
@@ -151,13 +155,6 @@ function DataLoader:_get_batch_keys(batch_size)
         self._key_index = self._key_index + 1
     end
     return batch_keys
-end
-
-function DataLoader.static._image_proto_to_tensor(image_proto)
-    local image_storage = torch.ByteStorage()
-    image_storage:string(image_proto.data)
-    return torch.ByteTensor(image_storage):reshape(
-        image_proto.channels, image_proto.height, image_proto.width)
 end
 
 function DataLoader:_permute_keys()
@@ -196,6 +193,13 @@ function DataLoader:_load_keys()
     db:close()
 
     return keys
+end
+
+function DataLoader.static._image_proto_to_tensor(image_proto)
+    local image_storage = torch.ByteStorage()
+    image_storage:string(image_proto.data)
+    return torch.ByteTensor(image_storage):reshape(
+        image_proto.channels, image_proto.height, image_proto.width)
 end
 
 return {DataLoader = DataLoader}
