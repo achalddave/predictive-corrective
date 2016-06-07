@@ -21,18 +21,20 @@ function Sampler.static.permute(list)
     return permuted_list
 end
 
-local UniformSampler = classic.class('UniformSampler', Sampler)
-function UniformSampler:_init(lmdb_without_images_path, num_labels)
+local PermutedSampler = classic.class('PermutedSampler', Sampler)
+function PermutedSampler:_init(lmdb_without_images_path, num_labels)
     --[[
-    Sampler that samples random keys, regardless of labels.
+    Returns consecutive batches from a permuted list of keys.
+
+    Once the list has been exhausted, we generate a new permutation.
     ]]--
     self.imageless_path = lmdb_without_images_path
-    self.keys = UniformSampler.load_lmdb_keys(lmdb_without_images_path)
+    self.keys = PermutedSampler.load_lmdb_keys(lmdb_without_images_path)
     self.permuted_keys = Sampler.permute(self.keys)
     self.key_index = 1
 end
 
-function UniformSampler:sample_keys(num_keys)
+function PermutedSampler:sample_keys(num_keys)
     --[[
     Sample the next set of keys.
     ]]--
@@ -50,11 +52,11 @@ function UniformSampler:sample_keys(num_keys)
     return batch_keys
 end
 
-function UniformSampler:num_samples()
+function PermutedSampler:num_samples()
     return #self.keys
 end
 
-function UniformSampler.static.load_lmdb_keys(lmdb_path)
+function PermutedSampler.static.load_lmdb_keys(lmdb_path)
     --[[
     Loads keys from LMDB, using the LMDB that doesn't contain images.
 
@@ -95,7 +97,7 @@ function DataLoader:_init(lmdb_path, lmdb_without_images_path, num_labels)
             sample.
     ]]--
     self.path = lmdb_path
-    self.sampler = UniformSampler(lmdb_without_images_path, num_labels)
+    self.sampler = PermutedSampler(lmdb_without_images_path, num_labels)
     self._prefetched_data = {
         batch_images = nil,
         batch_labels = nil
