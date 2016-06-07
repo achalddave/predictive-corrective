@@ -162,7 +162,8 @@ end
 
 local DataLoader = classic.class('DataLoader')
 
-function DataLoader:_init(lmdb_path, lmdb_without_images_path, num_labels)
+function DataLoader:_init(
+    lmdb_path, lmdb_without_images_path, sampler_class, num_labels)
     --[[
     Args:
         lmdb_path (str): Path to LMDB containing LabeledVideoFrames as values.
@@ -170,15 +171,17 @@ function DataLoader:_init(lmdb_path, lmdb_without_images_path, num_labels)
             LabeledVideoFrames as values, but without any raw image data. This
             is easy to iterate over, and can be used to decide which images to
             sample.
+        sampler_class (Sampler): Type of sampler used for batches.
+        num_labels (num): Number of total labels.
     ]]--
     self.path = lmdb_path
-    self.sampler = PermutedSampler(lmdb_without_images_path, num_labels)
+    self.sampler = sampler_class(lmdb_without_images_path, num_labels)
+    self.num_labels = num_labels
     self._prefetched_data = {
         batch_images = nil,
         batch_labels = nil
     }
     self._prefetching_thread = threads.Threads(1)
-    self.num_labels = num_labels
 end
 
 function DataLoader:num_samples()
@@ -315,5 +318,7 @@ function DataLoader.static._load_image_labels_from_path(
 end
 
 return {
-    DataLoader = DataLoader
+    DataLoader = DataLoader,
+    PermutedSampler = PermutedSampler,
+    BalancedSampler = BalancedSampler
 }
