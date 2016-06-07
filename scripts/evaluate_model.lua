@@ -10,7 +10,7 @@ local argparse = require 'argparse'
 local lmdb = require 'lmdb'
 local torch = require 'torch'
 
-local DataLoader = require('data_loader').DataLoader
+local data_loader = require 'data_loader'
 local evaluator = require 'evaluator'
 local video_frame_proto = require 'video_util.video_frames_pb'
 
@@ -39,9 +39,11 @@ torch.setdefaulttensortype('torch.FloatTensor')
 local model = torch.load(args.model)
 
 -- Open database.
-local data_loader = DataLoader(args.labeled_video_frames_lmdb,
-                               args.labeled_video_frames_without_images_lmdb,
-                               NUM_LABELS)
+local data_loader = data_loader.DataLoader(
+    args.labeled_video_frames_lmdb,
+    args.labeled_video_frames_without_images_lmdb,
+    data_loader.PermutedSampler,
+    NUM_LABELS)
 
 -- Pass each image in the database through the model, collect predictions and
 -- groundtruth.
