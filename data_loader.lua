@@ -11,6 +11,7 @@ local video_frame_proto = require 'video_util.video_frames_pb'
 
 local Sampler = classic.class('Sampler')
 Sampler:mustHave('sample_keys')
+Sampler:mustHave('num_samples')
 function Sampler.static.permute(list)
     local permuted_list = {}
     local permutation = torch.randperm(#list)
