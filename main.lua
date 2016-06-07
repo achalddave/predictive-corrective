@@ -66,15 +66,6 @@ model = model:cuda()
 local criterion = nn.MultiLabelSoftMarginCriterion():cuda()
 print 'Loaded model'
 
-local optimization_config = {
-    learningRate = config.learning_rate,
-    learningRateDecay = 0.0,
-    momentum = config.momentum,
-    dampening = 0.0,
-    weightDecay = config.weight_decay
-}
-local optimization_state
-
 local sampling_strategies = {
     permuted = data_loader.PermutedSampler,
     balanced = data_loader.BalancedSampler
