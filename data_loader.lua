@@ -85,6 +85,81 @@ function PermutedSampler.static.load_lmdb_keys(lmdb_path)
     return keys
 end
 
+local BalancedSampler = classic.class('BalancedSampler', Sampler)
+function BalancedSampler:_init(lmdb_without_images_path, num_labels)
+    --[[
+    Samples from each class a balanced number of times, so that the model should
+    see approximately the same amount of data from each class.
+    ]]--
+    self.imageless_path = lmdb_without_images_path
+    self.num_labels = num_labels
+    self.label_keys, self.num_keys = self:_load_label_key_mapping()
+    -- For each label, maintain an index of the next data point to output.
+    self.label_indices = {}
+    self:_permute_keys()
+end
+
+function BalancedSampler:sample_keys(num_keys)
+    local keys = {}
+    for i = 1, num_keys do
+        local label = math.random(self.num_labels)
+        table.insert(keys, self.label_keys[label][self.label_indices[label]])
+        self:_advance_label_index(label)
+    end
+    return keys
+end
+
+function BalancedSampler:num_samples()
+    return self.num_keys
+end
+
+function BalancedSampler:_advance_label_index(label)
+    if self.label_indices[label] + 1 <= #self.label_keys[label] then
+        self.label_indices[label] = self.label_indices[label] + 1
+    else
+        self.label_indices[label] = 1
+    end
+end
+
+function BalancedSampler:_permute_keys()
+    for i = 1, self.num_labels do
+        self.label_keys[i] = Sampler.permute(self.label_keys[i])
+        self.label_indices[i] = 1
+    end
+end
+
+function BalancedSampler:_load_label_key_mapping()
+    -- Get LMDB cursor.
+    local db = lmdb.env { Path = self.imageless_path }
+    db:open()
+    local transaction = db:txn(true --[[readonly]])
+    local cursor = transaction:cursor()
+
+    local label_keys = {}
+    for i = 1, self.num_labels do
+        label_keys[i] = {}
+    end
+
+    local num_keys = db:stat().entries
+    for i = 1, num_keys do
+        local key, value = cursor:get('MDB_GET_CURRENT')
+        local video_frame = video_frame_proto.LabeledVideoFrame()
+        video_frame:ParseFromString(value:storage():string())
+        for _, label in ipairs(video_frame.label) do
+            -- Label ids start at 0.
+            table.insert(label_keys[label.id + 1], key)
+        end
+        if i ~= db:stat().entries then cursor:next() end
+    end
+
+    -- Cleanup.
+    cursor:close()
+    transaction:abort()
+    db:close()
+
+    return label_keys, num_keys
+end
+
 local DataLoader = classic.class('DataLoader')
 
 function DataLoader:_init(lmdb_path, lmdb_without_images_path, num_labels)
