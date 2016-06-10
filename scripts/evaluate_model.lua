@@ -51,7 +51,7 @@ local gpu_inputs = torch.CudaTensor()
 local all_predictions
 local all_labels
 local samples_complete = 0
--- TODO(achald): Remove this
+
 while true do
     if samples_complete == data_loader:num_samples() then
         break
