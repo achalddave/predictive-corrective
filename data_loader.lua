@@ -188,14 +188,21 @@ function DataLoader:num_samples()
     return self.sampler:num_samples()
 end
 
-function DataLoader:load_batch(batch_size)
+function DataLoader:load_batch(batch_size, return_keys)
     --[[
     Load a batch of images and labels.
 
+    Args:
+        batch_size (num)
+        return_keys (bool): Whether to return the keys from the batch.
+            Default false.
+
     Returns:
-        batch_images: Array of ByteTensors
-        batch_labels: Array of arrays containing label ids.
+        batch_images (Array of ByteTensors)
+        batch_labels (Array of arrays): Containing label ids.
+        batch_keys (Array of strings): Only returned if return_keys is True.
     ]]--
+    return_keys = return_keys == nil and false or return_keys
     if self._prefetched_data.batch_images == nil then
         -- Thread has not fetched data
         self._prefetching_thread:synchronize()
@@ -207,9 +214,15 @@ function DataLoader:load_batch(batch_size)
 
     local batch_images = self._prefetched_data.batch_images
     local batch_labels = self._prefetched_data.batch_labels
+    local batch_keys = self._prefetched_data.batch_keys
     self._prefetched_data.batch_images = nil
     self._prefetched_data.batch_labels = nil
-    return batch_images, batch_labels
+    self._prefetched_data.batch_keys = nil
+    if return_keys then
+        return batch_images, batch_labels, batch_keys
+    else
+        return batch_images, batch_labels
+    end
 end
 
 function DataLoader:fetch_batch_async(batch_size)
@@ -280,6 +293,7 @@ function DataLoader.static._load_image_labels_from_path(
         images_and_labels (table): Contains
             batch_images: Array of ByteTensors
             batch_labels: Array of ByteTensors
+            batch_keys: Same as keys argument.
     ]]--
     -- Open database
     local torch = require 'torch'
@@ -313,7 +327,8 @@ function DataLoader.static._load_image_labels_from_path(
 
     return {
         batch_images = batch_images,
-        batch_labels = batch_labels
+        batch_labels = batch_labels,
+        batch_keys = keys
     }
 end
 
