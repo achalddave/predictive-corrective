@@ -168,5 +168,5 @@ for key, prediction in pairs(predictions_by_keys) do
     predictions_by_filename[filename][frame_number] = prediction
 end
 for filename, predictions_table in pairs(predictions_by_filename) do
-    output_file:write(filename, torch.cat(predictions_table, 1))
+    output_file:write(filename, torch.cat(predictions_table, 2):t())
 end
