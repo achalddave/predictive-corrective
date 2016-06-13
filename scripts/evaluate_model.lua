@@ -132,14 +132,17 @@ while true do
     collectgarbage()
     samples_complete = samples_complete + to_load
 end
+
+-- Compute AP for each class.
+local aps = torch.zeros(all_predictions:size(2))
 for i = 1, all_predictions:size(2) do
     local ap = evaluator.compute_mean_average_precision(
         all_predictions[{{}, {i}}], all_labels[{{}, {i}}])
+    aps[i] = ap
     print(string.format('Class %d\t AP: %.5f', i, ap))
 end
 
-local map = evaluator.compute_mean_average_precision(
-    all_predictions, all_labels)
+local map = torch.mean(aps[torch.ne(aps, -1)])
 print('mAP: ', map)
 
 -- Save predictions to HDF5.
