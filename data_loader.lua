@@ -92,7 +92,8 @@ function BalancedSampler:_init(lmdb_without_images_path, num_labels)
     see approximately the same amount of data from each class.
     ]]--
     self.imageless_path = lmdb_without_images_path
-    self.num_labels = num_labels
+    self.num_labels_without_background = num_labels
+    self.num_labels_with_background = num_labels + 1
     self.label_keys, self.num_keys = self:_load_label_key_mapping()
     -- For each label, maintain an index of the next data point to output.
     self.label_indices = {}
@@ -102,7 +103,7 @@ end
 function BalancedSampler:sample_keys(num_keys)
     local keys = {}
     for i = 1, num_keys do
-        local label = math.random(self.num_labels)
+        local label = math.random(self.num_labels_with_background)
         table.insert(keys, self.label_keys[label][self.label_indices[label]])
         self:_advance_label_index(label)
     end
@@ -122,7 +123,7 @@ function BalancedSampler:_advance_label_index(label)
 end
 
 function BalancedSampler:_permute_keys()
-    for i = 1, self.num_labels do
+    for i = 1, self.num_labels_with_background do
         self.label_keys[i] = Sampler.permute(self.label_keys[i])
         self.label_indices[i] = 1
     end
@@ -136,7 +137,7 @@ function BalancedSampler:_load_label_key_mapping()
     local cursor = transaction:cursor()
 
     local label_keys = {}
-    for i = 1, self.num_labels do
+    for i = 1, self.num_labels_with_background do
         label_keys[i] = {}
     end
 
@@ -145,9 +146,15 @@ function BalancedSampler:_load_label_key_mapping()
         local key, value = cursor:get('MDB_GET_CURRENT')
         local video_frame = video_frame_proto.LabeledVideoFrame()
         video_frame:ParseFromString(value:storage():string())
-        for _, label in ipairs(video_frame.label) do
-            -- Label ids start at 0.
-            table.insert(label_keys[label.id + 1], key)
+        local num_frame_labels = #video_frame.label
+        if num_frame_labels == 0 then
+            -- Add frame to list of background frames.
+            table.insert(label_keys[#label_keys], key)
+        else
+            for _, label in ipairs(video_frame.label) do
+                -- Label ids start at 0.
+                table.insert(label_keys[label.id + 1], key)
+            end
         end
         if i ~= db:stat().entries then cursor:next() end
     end
