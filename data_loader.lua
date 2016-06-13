@@ -227,6 +227,10 @@ end
 
 function DataLoader:fetch_batch_async(batch_size)
     --[[ Load a batch, store it for returning in next call to load_batch. ]]--
+    if self._prefetched_data.batch_images ~= nil then
+        -- We've already fetched this batch.
+        return
+    end
     local batch_keys = self.sampler:sample_keys(batch_size)
 
     self._prefetching_thread:addjob(
