@@ -29,10 +29,12 @@ local args = parser:parse()
 
 -- More config variables.
 local NUM_LABELS = 65
-local BATCH_SIZE = 96
+local NETWORK_BATCH_SIZE = 384
 local GPU = 2
 local MEANS = {96.8293, 103.073, 101.662}
 local CROP_SIZE = 224
+local CROPS = {'c'}
+local IMAGES_IN_BATCH = math.floor(NETWORK_BATCH_SIZE / #CROPS)
 
 cutorch.setDevice(GPU)
 torch.setdefaulttensortype('torch.FloatTensor')
@@ -59,8 +61,8 @@ while true do
     if samples_complete == data_loader:num_samples() then
         break
     end
-    local to_load = BATCH_SIZE
-    if samples_complete + BATCH_SIZE > data_loader:num_samples() then
+    local to_load = IMAGES_IN_BATCH
+    if samples_complete + IMAGES_IN_BATCH > data_loader:num_samples() then
         to_load = data_loader:num_samples() - samples_complete
     end
     images_table, labels_table, batch_keys = data_loader:load_batch(
@@ -68,27 +70,36 @@ while true do
     data_loader:fetch_batch_async(to_load)
 
     local images = torch.Tensor(
-        #images_table, images_table[1]:size(1), CROP_SIZE, CROP_SIZE)
-    local labels = torch.ByteTensor(#labels_table, NUM_LABELS)
+        #images_table * #CROPS, images_table[1]:size(1), CROP_SIZE, CROP_SIZE)
+    local labels = torch.ByteTensor(#images_table, NUM_LABELS)
+    local next_index = 1
     for i, img in ipairs(images_table) do
         -- Process image after converting to the default Tensor type.
         -- (Originally, it is a ByteTensor).
         img = img:typeAs(images)
-        local x_origin = (img:size(3) - CROP_SIZE) / 2
-        local y_origin = (img:size(2) - CROP_SIZE) / 2
-        img = image.crop(img, x_origin, y_origin, x_origin + CROP_SIZE, y_origin + CROP_SIZE)
         for channel = 1, 3 do
             img[{{channel}, {}, {}}]:add(-MEANS[channel])
         end
-        images[i] = img
+        for _, crop in ipairs(CROPS) do
+            images[next_index] = image.crop(img, crop, CROP_SIZE, CROP_SIZE)
+            next_index = next_index + 1
+        end
         labels[i] = labels_table[i]
     end
+    labels = labels:type('torch.ByteTensor')
 
     gpu_inputs:resize(images:size()):copy(images)
 
-    local predictions = model:forward(gpu_inputs):type(
+    -- (#images_table, num_labels) array
+    local crop_predictions = model:forward(gpu_inputs):type(
         torch.getdefaulttensortype())
-    labels = labels:type('torch.ByteTensor')
+    local predictions = torch.Tensor(#images_table, NUM_LABELS)
+    for i = 1, #images_table do
+        local start_crops = (i - 1) * #CROPS + 1
+        local end_crops = i * #CROPS
+        predictions[i] = torch.sum(
+            crop_predictions[{{start_crops, end_crops}, {}}], 1) / #CROPS
+    end
     for i = 1, #images_table do
         predictions_by_keys[batch_keys[i]] = predictions[i]
     end
