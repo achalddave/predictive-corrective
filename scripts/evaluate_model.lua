@@ -30,17 +30,24 @@ local args = parser:parse()
 -- More config variables.
 local NUM_LABELS = 65
 local NETWORK_BATCH_SIZE = 384
-local GPU = 2
+local GPUS = {1, 2, 3, 4}
 local MEANS = {96.8293, 103.073, 101.662}
 local CROP_SIZE = 224
 local CROPS = {'c'}
 local IMAGES_IN_BATCH = math.floor(NETWORK_BATCH_SIZE / #CROPS)
 
-cutorch.setDevice(GPU)
+cutorch.setDevice(GPUS[1])
 torch.setdefaulttensortype('torch.FloatTensor')
 
 -- Load model.
-local model = torch.load(args.model)
+local single_model = torch.load(args.model)
+local model = nn.DataParallelTable(1)
+for _, gpu in ipairs(GPUS) do
+    cutorch.setDevice(gpu)
+    model:add(single_model:clone():cuda(), gpu)
+end
+cutorch.setDevice(GPUS[1])
+model:evaluate()
 
 -- Open database.
 local data_loader = data_loader.DataLoader(
