@@ -7,6 +7,7 @@
 package.path = package.path .. ";../?.lua"
 
 local argparse = require 'argparse'
+local hdf5 = require 'hdf5'
 local lmdb = require 'lmdb'
 local torch = require 'torch'
 
@@ -22,6 +23,7 @@ parser:argument('labeled_video_frames_lmdb',
                 'LMDB containing LabeledVideoFrames to evaluate.')
 parser:argument('labeled_video_frames_without_images_lmdb',
                 'LMDB containing LabeledVideoFrames without images.')
+parser:argument('output_hdf5', 'HDF5 to output predictions to')
 
 local args = parser:parse()
 
@@ -50,6 +52,7 @@ local data_loader = data_loader.DataLoader(
 local gpu_inputs = torch.CudaTensor()
 local all_predictions
 local all_labels
+local predictions_by_keys = {}
 local samples_complete = 0
 
 while true do
@@ -60,7 +63,8 @@ while true do
     if samples_complete + BATCH_SIZE > data_loader:num_samples() then
         to_load = data_loader:num_samples() - samples_complete
     end
-    images_table, labels_table = data_loader:load_batch(to_load)
+    images_table, labels_table, batch_keys = data_loader:load_batch(
+        to_load, true --[[return_keys]])
     data_loader:fetch_batch_async(to_load)
 
     local images = torch.Tensor(
@@ -85,6 +89,10 @@ while true do
     local predictions = model:forward(gpu_inputs):type(
         torch.getdefaulttensortype())
     labels = labels:type('torch.ByteTensor')
+    for i = 1, #images_table do
+        predictions_by_keys[batch_keys[i]] = predictions[i]
+    end
+
 
     if all_predictions == nil then
         all_predictions = predictions
@@ -122,5 +130,22 @@ end
 local map = evaluator.compute_mean_average_precision(
     all_predictions, all_labels)
 print('mAP: ', map)
-torch.save('evaluation.t7',
-           {predictions = all_predictions, labels = all_labels})
+
+-- Save predictions to HDF5.
+local output_file = hdf5.open(args.output_hdf5, 'w')
+-- Map filename to a table of predictions by frame number.
+local predictions_by_filename = {}
+for key, prediction in pairs(predictions_by_keys) do
+    -- Keys are of the form '<filename>-<frame_number>'.
+    -- Find the index of the '-'
+    local _, split_index = string.find(key, '.*-')
+    local filename = string.sub(key, 1, split_index - 1)
+    local frame_number = tonumber(string.sub(key, split_index + 1, -1))
+    if predictions_by_filename[filename] == nil then
+        predictions_by_filename[filename] = {}
+    end
+    predictions_by_filename[filename][frame_number] = prediction
+end
+for filename, predictions_table in pairs(predictions_by_filename) do
+    output_file:write(filename, torch.cat(predictions_table, 1))
+end
