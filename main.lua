@@ -31,7 +31,7 @@ if not paths.dirp(args.cache_base) and not paths.mkdir(args.cache_base) then
     print('Error creating cache base dir:', args.cache_base)
     os.exit()
 end
-local cache_dir = paths.concat(args.cache_base, os.time())
+local cache_dir = paths.concat(args.cache_base, os.date('%m-%d-%y-%H-%m-%S'))
 if not paths.mkdir(cache_dir) then
     print('Error making cache dir:', cache_dir)
     os.exit()
