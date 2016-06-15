@@ -49,18 +49,24 @@ function copy_file_naive(in_path, out_path)
 end
 copy_file_naive(args.config, paths.concat(cache_dir, 'config.yaml'))
 
-cutorch.setDevice(config.gpu or 1)
+cutorch.setDevice(config.gpus[1])
 torch.manualSeed(config.seed)
 cutorch.manualSeed(config.seed)
 torch.setdefaulttensortype('torch.FloatTensor')
 
 -- Load model
-local model
+local single_model
 if config.model_init ~= nil then
-    model = torch.load(config.model_init)
+    single_model = torch.load(config.model_init)
 else
-    model = require(config.model_layout)
+    single_model = require(config.model_layout)
 end
+local model = nn.DataParallelTable(1)
+for _, gpu in ipairs(config.gpus) do
+    cutorch.setDevice(gpu)
+    model:add(single_model:clone():cuda(), gpu)
+end
+cutorch.setDevice(config.gpus[1])
 -- https://groups.google.com/forum/#!topic/torch7/HiBymc9NfIY
 model = model:cuda()
 local criterion = nn.MultiLabelSoftMarginCriterion():cuda()
