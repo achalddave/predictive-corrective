@@ -13,6 +13,7 @@ local yaml = require 'yaml'
 local data_loader = require 'data_loader'
 local evaluator = require 'evaluator'
 local trainer = require 'trainer'
+local save_run_info = require 'save_run_info'
 
 local parser = argparse() {
     description = 'Fine tune ImageNet-pretrained VGG-16 network on MultiTHUMOS.'
@@ -35,6 +36,7 @@ if not paths.mkdir(cache_dir) then
     print('Error making cache dir:', cache_dir)
     os.exit()
 end
+save_run_info.save_git_info(cache_dir)
 print('Saving run information to', cache_dir)
 
 -- Save config to cache_dir
