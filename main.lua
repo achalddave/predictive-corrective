@@ -40,16 +40,8 @@ save_run_info.save_git_info(cache_dir)
 print('Saving run information to', cache_dir)
 
 -- Save config to cache_dir
-function copy_file_naive(in_path, out_path)
-    -- TODO(achald): Use a library function, if one exists.
-    local in_file = io.open(in_path, 'r')
-    local in_contents = in_file:read('*all')
-    in_file:close()
-    local out_file = io.open(out_path, 'w')
-    out_file:write(in_contents)
-    out_file:close()
-end
-copy_file_naive(args.config, paths.concat(cache_dir, 'config.yaml'))
+save_run_info.copy_file_naive(args.config,
+                              paths.concat(cache_dir, 'config.yaml'))
 
 cutorch.setDevice(config.gpus[1])
 torch.manualSeed(config.seed)
