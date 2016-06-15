@@ -33,12 +33,12 @@ pixel_mean: [96.8293, 103.073, 101.662]
 # Number of total epochs to run.
 num_epochs: 1000000
 # Number of batches in epoch.
-epoch_size: 500
+epoch_size: 250
 # Specify epoch to start at (e.g. if we are continuing to train a model from
 # earlier).
 init_epoch: 1
 # Number of examples in batch.
-batch_size: 64
+batch_size: 128
 # One of 'permuted', 'balanced' (case-insensitive)
 sampling_strategy: 'permuted'
 
