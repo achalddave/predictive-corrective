@@ -22,11 +22,17 @@ function Sampler.static.permute(list)
 end
 
 local PermutedSampler = classic.class('PermutedSampler', Sampler)
-function PermutedSampler:_init(lmdb_without_images_path, num_labels)
+function PermutedSampler:_init(lmdb_without_images_path, num_labels, _ --[[options]])
     --[[
     Returns consecutive batches from a permuted list of keys.
 
     Once the list has been exhausted, we generate a new permutation.
+
+    Args:
+        lmdb_without_images_path (str): Path to LMDB containing
+            LabeledVideoFrames as values, but without any raw image data. This
+            is easy to iterate over, and can be used to decide which images to
+            sample.
     ]]--
     self.imageless_path = lmdb_without_images_path
     self.keys = PermutedSampler.load_lmdb_keys(lmdb_without_images_path)
@@ -86,14 +92,26 @@ function PermutedSampler.static.load_lmdb_keys(lmdb_path)
 end
 
 local BalancedSampler = classic.class('BalancedSampler', Sampler)
-function BalancedSampler:_init(lmdb_without_images_path, num_labels)
+function BalancedSampler:_init(lmdb_without_images_path, num_labels, options)
     --[[
     Samples from each class a balanced number of times, so that the model should
     see approximately the same amount of data from each class.
+
+    Args:
+        lmdb_without_images_path (str): Path to LMDB containing
+            LabeledVideoFrames as values, but without any raw image data. This
+            is easy to iterate over, and can be used to decide which images to
+            sample.
+        num_labels (num)
+        options (table):
+            include_bg: Whether to output a balanced number of frames that
+                have none of the labels.
     ]]--
     self.imageless_path = lmdb_without_images_path
-    self.num_labels_without_background = num_labels
-    self.num_labels_with_background = num_labels + 1
+    options = options == nil and {} or options
+    self.include_bg = options.include_bg == nil and false or include_bg
+    self.num_labels = self.include_bg and num_labels + 1 or num_labels
+
     self.label_keys, self.num_keys = self:_load_label_key_mapping()
     -- For each label, maintain an index of the next data point to output.
     self.label_indices = {}
@@ -103,7 +121,7 @@ end
 function BalancedSampler:sample_keys(num_keys)
     local keys = {}
     for i = 1, num_keys do
-        local label = math.random(self.num_labels_with_background)
+        local label = math.random(self.num_labels)
         table.insert(keys, self.label_keys[label][self.label_indices[label]])
         self:_advance_label_index(label)
     end
@@ -123,7 +141,7 @@ function BalancedSampler:_advance_label_index(label)
 end
 
 function BalancedSampler:_permute_keys()
-    for i = 1, self.num_labels_with_background do
+    for i = 1, self.num_labels do
         self.label_keys[i] = Sampler.permute(self.label_keys[i])
         self.label_indices[i] = 1
     end
@@ -137,7 +155,7 @@ function BalancedSampler:_load_label_key_mapping()
     local cursor = transaction:cursor()
 
     local label_keys = {}
-    for i = 1, self.num_labels_with_background do
+    for i = 1, self.num_labels do
         label_keys[i] = {}
     end
 
@@ -147,7 +165,7 @@ function BalancedSampler:_load_label_key_mapping()
         local video_frame = video_frame_proto.LabeledVideoFrame()
         video_frame:ParseFromString(value:storage():string())
         local num_frame_labels = #video_frame.label
-        if num_frame_labels == 0 then
+        if num_frame_labels == 0 and self.include_bg then
             -- Add frame to list of background frames.
             table.insert(label_keys[#label_keys], key)
         else
@@ -169,20 +187,15 @@ end
 
 local DataLoader = classic.class('DataLoader')
 
-function DataLoader:_init(
-    lmdb_path, lmdb_without_images_path, sampler_class, num_labels)
+function DataLoader:_init(lmdb_path, sampler, num_labels)
     --[[
     Args:
         lmdb_path (str): Path to LMDB containing LabeledVideoFrames as values.
-        lmdb_without_images_path (str): Path to LMDB containing
-            LabeledVideoFrames as values, but without any raw image data. This
-            is easy to iterate over, and can be used to decide which images to
-            sample.
-        sampler_class (Sampler): Type of sampler used for batches.
+        sampler (Sampler): Sampler used for batches
         num_labels (num): Number of total labels.
     ]]--
     self.path = lmdb_path
-    self.sampler = sampler_class(lmdb_without_images_path, num_labels)
+    self.sampler = sampler
     self.num_labels = num_labels
     self._prefetched_data = {
         batch_images = nil,

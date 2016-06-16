@@ -70,12 +70,17 @@ local sampling_strategies = {
     permuted = data_loader.PermutedSampler,
     balanced = data_loader.BalancedSampler
 }
+local train_sampler = sampling_strategies[config.sampling_strategy:lower()](
+    config.train_lmdb_without_images,
+    config.num_labels,
+    config.sampling_strategy_options)
+local val_sampler = data_loader.PermutedSampler(
+    config.val_lmdb_without_images, config.num_labels)
+
 local train_loader = data_loader.DataLoader(
-    config.train_lmdb, config.train_lmdb_without_images,
-    sampling_strategies[config.sampling_strategy:lower()], config.num_labels)
+    config.train_lmdb, train_sampler, config.num_labels)
 local val_loader = data_loader.DataLoader(
-    config.val_lmdb, config.val_lmdb_without_images,
-    data_loader.PermutedSampler, config.num_labels)
+    config.val_lmdb, val_sampler, config.num_labels)
 
 local trainer = trainer.Trainer {
     model = model,
