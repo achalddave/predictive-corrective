@@ -266,8 +266,8 @@ function DataLoader.static._load_image_labels_from_proto(video_frame_proto)
     Loads an image tensor and labels for a given key.
 
     Returns:
-        img: (num_channels, height, width) tensor
-        labels: Table containing numeric id for each label.
+        img (ByteTensor): Image of size (num_channels, height, width).
+        labels (Table): Contains numeric id for each label.
     ]]
 
     local img = DataLoader._image_proto_to_tensor(video_frame_proto.frame.image)
@@ -296,6 +296,7 @@ function DataLoader.static._labels_to_tensor(labels, num_labels)
     end
     return labels_tensor
 end
+
 function DataLoader.static._image_proto_to_tensor(image_proto)
     local image_storage = torch.ByteStorage()
     image_storage:string(image_proto.data)
