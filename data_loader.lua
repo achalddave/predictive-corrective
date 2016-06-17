@@ -223,10 +223,10 @@ function DataLoader:load_batch(batch_size, return_keys)
         batch_keys (Array of strings): Only returned if return_keys is True.
     ]]--
     return_keys = return_keys == nil and false or return_keys
-    if self._prefetched_data.batch_images == nil then
-        -- Thread has not fetched data
+    if not self:_data_fetched() then
+        -- Wait for a possible existing thread that might be fetching data.
         self._prefetching_thread:synchronize()
-        if self._prefetched_data.batch_images == nil then
+        if not self:_data_fetched() then
             self:fetch_batch_async(batch_size)
             self._prefetching_thread:synchronize()
         end
@@ -247,8 +247,7 @@ end
 
 function DataLoader:fetch_batch_async(batch_size)
     --[[ Load a batch, store it for returning in next call to load_batch. ]]--
-    if self._prefetched_data.batch_images ~= nil then
-        -- We've already fetched this batch.
+    if self:_data_fetched() then
         return
     end
     local batch_keys = self.sampler:sample_keys(batch_size)
@@ -259,6 +258,10 @@ function DataLoader:fetch_batch_async(batch_size)
             self._prefetched_data = output
         end,
         self.path, batch_keys, self.num_labels)
+end
+
+function DataLoader:_data_fetched()
+    return self._prefetched_data.batch_images ~= nil
 end
 
 function DataLoader.static._load_image_labels_from_proto(video_frame_proto)
