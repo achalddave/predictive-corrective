@@ -67,7 +67,7 @@ function PermutedSampler.static.load_lmdb_keys(lmdb_path)
     Loads keys from LMDB, using the LMDB that doesn't contain images.
 
     Returns:
-        keys: List of keys.
+        keys: Array of keys.
     ]]--
 
     -- Get LMDB cursor.
@@ -218,9 +218,9 @@ function DataLoader:load_batch(batch_size, return_keys)
             Default false.
 
     Returns:
-        batch_images (Array of ByteTensors)
-        batch_labels (Array of arrays): Containing label ids.
-        batch_keys (Array of strings): Only returned if return_keys is True.
+        batch_images (array of ByteTensors)
+        batch_labels (array of arrays): Containing label ids.
+        batch_keys (array of strings): Only returned if return_keys is True.
     ]]--
     return_keys = return_keys == nil and false or return_keys
     if not self:_data_fetched() then
@@ -270,7 +270,7 @@ function DataLoader.static._load_image_labels_from_proto(video_frame_proto)
 
     Returns:
         img (ByteTensor): Image of size (num_channels, height, width).
-        labels (Table): Contains numeric id for each label.
+        labels (Array): Contains numeric id for each label.
     ]]
 
     local img = DataLoader._image_proto_to_tensor(video_frame_proto.frame.image)
@@ -314,7 +314,7 @@ function DataLoader.static._load_images_labels_for_keys(
 
     Args:
         lmdb_path (str): Path to an LMDB of LabeledVideoFrames
-        keys (list): List of string keys.
+        keys (array): Array of string keys.
         num_labels (num): Number of total labels.
 
     Returns:
