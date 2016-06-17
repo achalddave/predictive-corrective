@@ -254,7 +254,7 @@ function DataLoader:fetch_batch_async(batch_size)
     local batch_keys = self.sampler:sample_keys(batch_size)
 
     self._prefetching_thread:addjob(
-        DataLoader._load_image_labels_from_path,
+        DataLoader._load_images_labels_for_keys,
         function(output)
             self._prefetched_data = output
         end,
@@ -303,7 +303,7 @@ function DataLoader.static._image_proto_to_tensor(image_proto)
         image_proto.channels, image_proto.height, image_proto.width)
 end
 
-function DataLoader.static._load_image_labels_from_path(
+function DataLoader.static._load_images_labels_for_keys(
     lmdb_path, keys, num_labels)
     --[[
     Load images and labels for a set of keys from the LMDB.
