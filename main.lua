@@ -24,6 +24,16 @@ parser:argument('cache_base',
 
 local args = parser:parse()
 local config = yaml.loadpath(args.config)
+
+if config.data_paths_config ~= nil then
+    local data_paths = yaml.loadpath(config.data_paths_config)
+    local train_path = data_paths[config.train_split]
+    local val_path = data_paths[config.val_split]
+    config.train_lmdb = train_path.with_images
+    config.train_lmdb_without_images = train_path.without_images
+    config.val_lmdb = val_path.with_images
+    config.val_lmdb_without_images = val_path.without_images
+end
 -- TODO(achald): Validate config.
 
 -- Create cache_base

@@ -9,14 +9,11 @@ gpus: [1, 2, 3, 4]
 ###
 # Data options
 ###
-# LMDBs mapping keys to LabeledVideoFrames.
-train_lmdb: '/data/achald/MultiTHUMOS/frames@10fps/labeled_video_frames/all_train.lmdb'
-val_lmdb: '/data/achald/MultiTHUMOS/frames@10fps/labeled_video_frames/valval.lmdb'
+data_paths_config: 'data_paths.yaml'
 
-# LMDBs mapping keys to LabeledVideoFrames, without image bytes. These LMDBs
-# are quick to iterate over for sampling.
-train_lmdb_without_images: '/data/achald/MultiTHUMOS/frames@10fps/labeled_video_frames/all_train_without_images.lmdb'
-val_lmdb_without_images: '/data/achald/MultiTHUMOS/frames@10fps/labeled_video_frames/valval_without_images.lmdb'
+# Points to keys in data_paths_config
+train_lmdb: 'train_val_split'
+val_lmdb: 'test_split'
 
 # Number of labels
 num_labels: 65
