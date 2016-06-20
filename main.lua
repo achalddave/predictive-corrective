@@ -57,6 +57,11 @@ print('Saving run information to', cache_dir)
 -- Save config to cache_dir
 save_run_info.copy_file_naive(args.config,
                               paths.concat(cache_dir, 'config.yaml'))
+if config.data_paths_config ~= nil then
+    save_run_info.copy_file_naive(
+        config.data_paths_config,
+        paths.concat(cache_dir, paths.basename(config.data_paths_config)))
+end
 
 cutorch.setDevice(config.gpus[1])
 torch.manualSeed(config.seed)
