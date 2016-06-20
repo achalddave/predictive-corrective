@@ -12,6 +12,7 @@ local video_frame_proto = require 'video_util.video_frames_pb'
 local Sampler = classic.class('Sampler')
 Sampler:mustHave('sample_keys')
 Sampler:mustHave('num_samples')
+
 function Sampler.static.permute(list)
     local permuted_list = {}
     local permutation = torch.randperm(#list)
@@ -33,6 +34,7 @@ function PermutedSampler:_init(lmdb_without_images_path, num_labels, _ --[[optio
             LabeledVideoFrames as values, but without any raw image data. This
             is easy to iterate over, and can be used to decide which images to
             sample.
+        num_labels (num)
     ]]--
     self.imageless_path = lmdb_without_images_path
     self.keys = PermutedSampler.load_lmdb_keys(lmdb_without_images_path)
