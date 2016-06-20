@@ -9,6 +9,7 @@ local paths = require 'paths'
 local nn = require 'nn'
 local torch = require 'torch'
 local yaml = require 'yaml'
+require 'rnn'
 
 local data_loader = require 'data_loader'
 local evaluator = require 'evaluator'
@@ -34,6 +35,10 @@ if config.data_paths_config ~= nil then
     config.val_lmdb = val_path.with_images
     config.val_lmdb_without_images = val_path.without_images
 end
+
+config.sequence_length = config.sequence_length == nil
+                         and 1
+                         or config.sequence_length
 -- TODO(achald): Validate config.
 
 -- Create cache_base
@@ -65,7 +70,9 @@ if config.model_init ~= nil then
 else
     single_model = require(config.model_layout)
 end
-local model = nn.DataParallelTable(1)
+-- DataParallel across the 2nd dimension, which will be batch size. Our 1st
+-- dimension is a step in the sequence.
+local model = nn.DataParallelTable(2 --[[dimension]])
 for _, gpu in ipairs(config.gpus) do
     cutorch.setDevice(gpu)
     model:add(single_model:clone():cuda(), gpu)
@@ -73,19 +80,25 @@ end
 cutorch.setDevice(config.gpus[1])
 -- https://groups.google.com/forum/#!topic/torch7/HiBymc9NfIY
 model = model:cuda()
-local criterion = nn.MultiLabelSoftMarginCriterion():cuda()
+local criterion = nn.SequencerCriterion(
+    nn.MultiLabelSoftMarginCriterion():cuda())
 print 'Loaded model'
 
 local sampling_strategies = {
     permuted = data_loader.PermutedSampler,
     balanced = data_loader.BalancedSampler
 }
+
+-- Not supported with sequences yet.
+assert(config.sampling_strategy ~= 'balanced')
+
 local train_sampler = sampling_strategies[config.sampling_strategy:lower()](
     config.train_lmdb_without_images,
     config.num_labels,
+    config.sequence_length,
     config.sampling_strategy_options)
 local val_sampler = data_loader.PermutedSampler(
-    config.val_lmdb_without_images, config.num_labels)
+    config.val_lmdb_without_images, config.num_labels, config.sequence_length)
 
 local train_loader = data_loader.DataLoader(
     config.train_lmdb, train_sampler, config.num_labels)

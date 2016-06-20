@@ -22,8 +22,21 @@ function Sampler.static.permute(list)
     return permuted_list
 end
 
+function Sampler.static.next_frame_key(frame_key)
+    --[[ Return the key for the next frame. ]]--
+    -- Keys are of the form '<filename>-<frame_number>'.
+    -- Find the index of the '-'
+    local _, split_index = string.find(frame_key, '.*-')
+    local filename = string.sub(frame_key, 1, split_index - 1)
+    local frame_number = tonumber(string.sub(frame_key, split_index + 1, -1))
+    frame_number = frame_number + 1
+    return string.format('%s-%d', filename, frame_number)
+end
+
 local PermutedSampler = classic.class('PermutedSampler', Sampler)
-function PermutedSampler:_init(lmdb_without_images_path, num_labels, _ --[[options]])
+function PermutedSampler:_init(
+        lmdb_without_images_path, _ --[[num_labels]],
+        sequence_length, _ --[[options]])
     --[[
     Returns consecutive batches from a permuted list of keys.
 
@@ -35,29 +48,73 @@ function PermutedSampler:_init(lmdb_without_images_path, num_labels, _ --[[optio
             is easy to iterate over, and can be used to decide which images to
             sample.
         num_labels (num)
+        sequence_length (num): If provided, sample sequences of length
+            sequence_length for each training sample.
     ]]--
     self.imageless_path = lmdb_without_images_path
-    self.keys = PermutedSampler.load_lmdb_keys(lmdb_without_images_path)
+    self.sequence_length = sequence_length == nil and 1 or sequence_length
+    self.keys = self:filter_end_frames(
+        PermutedSampler.load_lmdb_keys(lmdb_without_images_path))
     self.permuted_keys = Sampler.permute(self.keys)
     self.key_index = 1
 end
 
-function PermutedSampler:sample_keys(num_keys)
+function PermutedSampler:sample_keys(num_sequences)
     --[[
     Sample the next set of keys.
+
+    Returns:
+        batch_keys (Array of array of strings): Each element contains
+            num_sequences arrays, each of which contains sequence_length keys.
     ]]--
     local batch_keys = {}
-    for _ = 1, num_keys do
+    for _ = 1, self.sequence_length do
+        table.insert(batch_keys, {})
+    end
+    for _ = 1, num_sequences do
         if self.key_index > #self.permuted_keys then
             print(string.format('%s: Finished pass through data, repermuting!',
                                 os.date('%X')))
             self.permuted_keys = Sampler.permute(self.keys)
             self.key_index = 1
         end
-        table.insert(batch_keys, self.permuted_keys[self.key_index])
+        local sampled_key = self.permuted_keys[self.key_index]
+        for step = 1, self.sequence_length do
+            table.insert(batch_keys[step], sampled_key)
+            sampled_key = Sampler.next_frame_key(sampled_key)
+        end
         self.key_index = self.key_index + 1
     end
     return batch_keys
+end
+
+function PermutedSampler:filter_end_frames(frame_keys)
+    --[[ Filter out the last sequence_length frames in the video.
+    --
+    -- Args:
+    --     frame_keys (array)
+    --]]
+    local frame_keys_set = {}
+    for _, key in ipairs(frame_keys) do
+        frame_keys_set[key] = true
+    end
+    local filtered_frame_keys = {}
+    for key, _ in pairs(frame_keys_set) do
+        local frame_to_check = key
+        local frame_valid = true
+        -- Check if next sequence_length frames exist.
+        for _ = 2, self.sequence_length do
+            frame_to_check = Sampler.next_frame_key(frame_to_check)
+            if frame_keys_set[frame_to_check] == nil then
+                frame_valid = false
+                break
+            end
+        end
+        if frame_valid then
+            table.insert(filtered_frame_keys, key)
+        end
+    end
+    return filtered_frame_keys
 end
 
 function PermutedSampler:num_samples()
@@ -94,7 +151,8 @@ function PermutedSampler.static.load_lmdb_keys(lmdb_path)
 end
 
 local BalancedSampler = classic.class('BalancedSampler', Sampler)
-function BalancedSampler:_init(lmdb_without_images_path, num_labels, options)
+function BalancedSampler:_init(
+        lmdb_without_images_path, num_labels, sequence_length, options)
     --[[
     Samples from each class a balanced number of times, so that the model should
     see approximately the same amount of data from each class.
@@ -105,10 +163,14 @@ function BalancedSampler:_init(lmdb_without_images_path, num_labels, options)
             is easy to iterate over, and can be used to decide which images to
             sample.
         num_labels (num)
+        sequence_length (num): If provided, sample sequences of length
+            sequence_length for each training sample.
         options (table):
             include_bg: Whether to output a balanced number of frames that
                 have none of the labels.
     ]]--
+    -- BalancedSampler is not yet implemented for sequences.
+    error("BalancedSampler is currently broken.")
     self.imageless_path = lmdb_without_images_path
     options = options == nil and {} or options
     self.include_bg = options.include_bg == nil and false or include_bg
@@ -220,9 +282,14 @@ function DataLoader:load_batch(batch_size, return_keys)
             Default false.
 
     Returns:
-        batch_images (array of ByteTensors)
-        batch_labels (array of arrays): Containing label ids.
-        batch_keys (array of strings): Only returned if return_keys is True.
+        images (Array of array of ByteTensors): Contains image sequences for
+            the batch. Each element is a step in the sequence, so that images is
+            an array of length sequence_length, whose elements are arrays of
+            length batch_size.
+        labels (ByteTensor): Contains label ids. Size is
+            (sequence_length, batch_size, num_labels)
+        keys (Array of array of strings): Only returned if return_keys is
+            True.
     ]]--
     return_keys = return_keys == nil and false or return_keys
     if not self:_data_fetched() then
@@ -318,14 +385,17 @@ function DataLoader.static._load_images_labels_for_keys(
 
     Args:
         lmdb_path (str): Path to an LMDB of LabeledVideoFrames
-        keys (array): Array of string keys.
+        keys (array): Array of array of string keys. Each element must be
+            an array of the same length as every element, and contains keys for
+            one step of the image sequence.
         num_labels (num): Number of total labels.
 
     Returns:
-        images_and_labels (table): Contains
-            batch_images: Array of ByteTensors
-            batch_labels: Array of ByteTensors
-            batch_keys: Same as keys argument.
+        images_and_labels (table): See load_batch for detailed information.
+            Contains
+            - batch_images: Array of array of ByteTensors
+            - batch_labels: ByteTensor
+            - batch_keys: Same as keys argument.
     ]]--
     -- Open database
     local torch = require 'torch'
@@ -337,21 +407,25 @@ function DataLoader.static._load_images_labels_for_keys(
     db:open()
     local transaction = db:txn(true --[[readonly]])
 
-    local batch_labels = {}
+    local num_steps = #keys
+    local batch_size = #keys[1]
+    local batch_labels = torch.ByteTensor(num_steps, batch_size, num_labels)
     local batch_images = {}
-    for i = 1, #keys do
-        -- Load LabeledVideoFrame.
-        local key = keys[i]
-        local video_frame = video_frame_proto.LabeledVideoFrame()
-        video_frame:ParseFromString(
-            transaction:get(key):storage():string())
+    for step = 1, num_steps do
+        batch_images[step] = {}
+        for i = 1, batch_size do
+            -- Load LabeledVideoFrame.
+            local video_frame = video_frame_proto.LabeledVideoFrame()
+            video_frame:ParseFromString(
+                transaction:get(keys[step][i]):storage():string())
 
-        -- Load image and labels.
-        local img, labels = DataLoader._load_image_labels_from_proto(
-            video_frame)
-        labels = DataLoader._labels_to_tensor(labels, num_labels)
-        table.insert(batch_images, img)
-        table.insert(batch_labels, labels)
+            -- Load image and labels.
+            local img, labels = DataLoader._load_image_labels_from_proto(
+                video_frame)
+            labels = DataLoader._labels_to_tensor(labels, num_labels)
+            table.insert(batch_images[step], img)
+            batch_labels[{step, i}] = labels
+        end
     end
 
     transaction:abort()
@@ -367,5 +441,6 @@ end
 return {
     DataLoader = DataLoader,
     PermutedSampler = PermutedSampler,
-    BalancedSampler = BalancedSampler
+    -- TODO(achald): Implement sequence sampling for BalancedSampler.
+    -- BalancedSampler = BalancedSampler
 }

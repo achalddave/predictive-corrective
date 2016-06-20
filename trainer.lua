@@ -68,22 +68,24 @@ function Trainer:train_batch()
 
     Returns:
         loss: Output of criterion:forward on this batch.
-        outputs: Output of model:forward on this batch.
-        labels: True labels.
+        outputs (Tensor): Output of model:forward on this batch. The tensor
+            size is (sequence_length, batch_size, num_labels)
+        labels (Tensor): True labels. Same size as the outputs.
     ]]--
-    local images_table, labels_table = self.data_loader:load_batch(
-        self.batch_size)
+    local images_table, labels = self.data_loader:load_batch(self.batch_size)
     -- Prefetch the next batch.
     self.data_loader:fetch_batch_async(self.batch_size)
-    local images = torch.Tensor(#images_table, images_table[1]:size(1),
+
+    local num_steps = #images_table
+    local num_channels = images_table[1][1]:size(1)
+    local images = torch.Tensor(num_steps, self.batch_size, num_channels,
                                 self.crop_size, self.crop_size)
-    local labels = torch.ByteTensor(#labels_table, self.num_labels)
-    for i, img in ipairs(images_table) do
-        -- Process image after converting to the default Tensor type.
-        -- (Originally, it is a ByteTensor).
-        images[i] = self:_process(img:typeAs(images))
-        -- TODO(achald): Convert table to tensor using torch.cat
-        labels[i] = labels_table[i]
+    for step, step_images in ipairs(images_table) do
+        for batch_index, img in ipairs(step_images) do
+            -- Process image after converting to the default Tensor type.
+            -- (Originally, it is a ByteTensor).
+            images[step][batch_index] = self:_process(img:typeAs(images))
+        end
     end
 
     self.gpu_inputs:resize(images:size()):copy(images)
@@ -126,6 +128,11 @@ function Trainer:train_epoch(epoch, num_batches)
         cutorch.synchronize()
         loss_epoch = loss_epoch + loss
 
+        -- We only care about the predictions and groundtruth in the last step
+        -- of the sequence.
+        local last_step = curr_predictions:size(1)
+        curr_predictions = curr_predictions[last_step]
+        curr_groundtruth = curr_groundtruth[last_step]
         -- Collect current predictions and groundtruth.
         local epoch_index_start = (batch_index - 1) * self.batch_size + 1
         predictions[{{epoch_index_start,
