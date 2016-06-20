@@ -249,9 +249,11 @@ end
 
 function DataLoader:fetch_batch_async(batch_size)
     --[[ Load a batch, store it for returning in next call to load_batch. ]]--
+    self._prefetching_thread:synchronize()
     if self:_data_fetched() then
         return
     end
+
     local batch_keys = self.sampler:sample_keys(batch_size)
 
     self._prefetching_thread:addjob(
