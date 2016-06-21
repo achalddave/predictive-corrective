@@ -14,8 +14,6 @@ data_paths_config: 'data_paths.yaml'
 # Points to keys in data_paths_config
 train_split: 'train_split'
 val_split: 'val_split'
-# train_lmdb: 'train_val_split'
-# val_lmdb: 'test_split'
 
 # Number of labels
 num_labels: 65
