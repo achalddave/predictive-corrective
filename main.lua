@@ -10,6 +10,7 @@ local nn = require 'nn'
 local torch = require 'torch'
 local yaml = require 'yaml'
 require 'rnn'
+require 'last_step_criterion'
 
 local data_loader = require 'data_loader'
 local evaluator = require 'evaluator'
@@ -88,7 +89,7 @@ end
 cutorch.setDevice(config.gpus[1])
 -- https://groups.google.com/forum/#!topic/torch7/HiBymc9NfIY
 model = model:cuda()
-local criterion = nn.SequencerCriterion(
+local criterion = nn.LastStepCriterion(
     nn.MultiLabelSoftMarginCriterion():cuda())
 print 'Loaded model'
 
