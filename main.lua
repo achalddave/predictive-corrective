@@ -75,6 +75,9 @@ if config.model_init ~= nil then
 else
     single_model = require(config.model_layout)
 end
+if not torch.isTypeOf(single_model, 'nn.Sequencer') then
+    single_model = nn.Sequencer(single_model)
+end
 -- DataParallel across the 2nd dimension, which will be batch size. Our 1st
 -- dimension is a step in the sequence.
 local model = nn.DataParallelTable(2 --[[dimension]])
