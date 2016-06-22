@@ -56,7 +56,7 @@ function Evaluator:evaluate_batch()
         for batch_index, img in ipairs(step_images) do
             -- Process image after converting to the default Tensor type.
             -- (Originally, it is a ByteTensor).
-            images[step][batch_index] = self:_process(img:typeAs(images))
+            images[{step, batch_index}] = self:_process(img:typeAs(images))
         end
     end
 
