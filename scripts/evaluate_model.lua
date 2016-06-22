@@ -37,14 +37,25 @@ local GPUS = {1, 2, 3, 4}
 local MEANS = {96.8293, 103.073, 101.662}
 local CROP_SIZE = 224
 local CROPS = {'c'}
+local SEQUENCE_LENGTH = 2
 local IMAGES_IN_BATCH = math.floor(NETWORK_BATCH_SIZE / #CROPS)
 
 cutorch.setDevice(GPUS[1])
 torch.setdefaulttensortype('torch.FloatTensor')
 
 -- Load model.
+nn.DataParallelTable.deserializeNGPUs = #GPUS
 local single_model = torch.load(args.model)
-local model = nn.DataParallelTable(1)
+if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
+    single_model = single_model:get(1)
+end
+if not torch.isTypeOf(single_model, 'nn.Sequencer') then
+    print('Creating sequencer')
+    single_model = nn.Sequencer(single_model)
+end
+-- DataParallel across the 2nd dimension, which will be batch size. Our 1st
+-- dimension is a step in the sequence.
+local model = nn.DataParallelTable(2 --[[dimension]])
 for _, gpu in ipairs(GPUS) do
     cutorch.setDevice(gpu)
     model:add(single_model:clone():cuda(), gpu)
@@ -53,11 +64,12 @@ cutorch.setDevice(GPUS[1])
 model:evaluate()
 
 -- Open database.
-local data_loader = data_loader.DataLoader(
-    args.labeled_video_frames_lmdb,
+local sampler = data_loader.PermutedSampler(
     args.labeled_video_frames_without_images_lmdb,
-    data_loader.PermutedSampler,
-    NUM_LABELS)
+    NUM_LABELS,
+    SEQUENCE_LENGTH)
+local data_loader = data_loader.DataLoader(
+    args.labeled_video_frames_lmdb, sampler, NUM_LABELS)
 
 -- Pass each image in the database through the model, collect predictions and
 -- groundtruth.
@@ -75,45 +87,50 @@ while true do
     if samples_complete + IMAGES_IN_BATCH > data_loader:num_samples() then
         to_load = data_loader:num_samples() - samples_complete
     end
-    images_table, labels_table, batch_keys = data_loader:load_batch(
+    local images_table, labels, batch_keys = data_loader:load_batch(
         to_load, true --[[return_keys]])
+    -- Prefetch the next batch.
     data_loader:fetch_batch_async(to_load)
 
-    local images = torch.Tensor(
-        #images_table * #CROPS, images_table[1]:size(1), CROP_SIZE, CROP_SIZE)
-    local labels = torch.ByteTensor(#images_table, NUM_LABELS)
-    local next_index = 1
-    for i, img in ipairs(images_table) do
-        -- Process image after converting to the default Tensor type.
-        -- (Originally, it is a ByteTensor).
-        img = img:typeAs(images)
-        for channel = 1, 3 do
-            img[{{channel}, {}, {}}]:add(-MEANS[channel])
+    local batch_size = #images_table[1]
+    local num_channels = images_table[1][1]:size(1)
+    local images = torch.Tensor(SEQUENCE_LENGTH, batch_size * #CROPS,
+                                num_channels, CROP_SIZE, CROP_SIZE)
+    for step, step_images in ipairs(images_table) do
+        for batch_index, img in ipairs(step_images) do
+            -- Process image after converting to the default Tensor type.
+            -- (Originally, it is a ByteTensor).
+            img = img:typeAs(images)
+            for channel = 1, 3 do
+                img[{{channel}, {}, {}}]:add(-MEANS[channel])
+            end
+            for i, crop in ipairs(CROPS) do
+                images[{step, batch_index + i - 1}] = image.crop(
+                    img, crop, CROP_SIZE, CROP_SIZE)
+            end
         end
-        for _, crop in ipairs(CROPS) do
-            images[next_index] = image.crop(img, crop, CROP_SIZE, CROP_SIZE)
-            next_index = next_index + 1
-        end
-        labels[i] = labels_table[i]
     end
-    labels = labels:type('torch.ByteTensor')
 
     gpu_inputs:resize(images:size()):copy(images)
 
-    -- (#images_table, num_labels) array
+    -- (SEQUENCE_LENGTH, #images_table, num_labels) array
     local crop_predictions = model:forward(gpu_inputs):type(
         torch.getdefaulttensortype())
-    local predictions = torch.Tensor(#images_table, NUM_LABELS)
-    for i = 1, #images_table do
+    -- We only care about the predictions for the last step of the sequence.
+    crop_predictions = crop_predictions[SEQUENCE_LENGTH]
+    labels = labels[SEQUENCE_LENGTH]
+    batch_keys = batch_keys[SEQUENCE_LENGTH]
+
+    local predictions = torch.Tensor(batch_size, NUM_LABELS)
+    for i = 1, batch_size do
         local start_crops = (i - 1) * #CROPS + 1
         local end_crops = i * #CROPS
         predictions[i] = torch.sum(
             crop_predictions[{{start_crops, end_crops}, {}}], 1) / #CROPS
     end
-    for i = 1, #images_table do
+    for i = 1, batch_size do
         predictions_by_keys[batch_keys[i]] = predictions[i]
     end
-
 
     if all_predictions == nil then
         all_predictions = predictions
@@ -130,6 +147,7 @@ while true do
         end
     end
 
+    samples_complete = samples_complete + to_load
     print('Number of labels with groundtruth:', num_labels_with_groundtruth)
     local map_so_far = evaluator.compute_mean_average_precision(
         all_predictions, all_labels)
@@ -140,7 +158,6 @@ while true do
         os.date('%X'), samples_complete, data_loader:num_samples(), map_so_far,
         batch_map))
     collectgarbage()
-    samples_complete = samples_complete + to_load
 end
 
 -- Compute AP for each class.
@@ -170,6 +187,10 @@ for key, prediction in pairs(predictions_by_keys) do
     end
     predictions_by_filename[filename][frame_number] = prediction
 end
+-- TODO(achald): This is currently broken when SEQUENCE_LENGTH > 1.
+-- The torch.cat call will fail because the first frame we have predictions for
+-- will be frame SEQUENCE_LENGTH, and so the predictions_table will not have a
+-- key for indices 1..SEQUENCE_LENGTH-1. Unclear how to fix...
 for filename, predictions_table in pairs(predictions_by_filename) do
     output_file:write(filename, torch.cat(predictions_table, 2):t())
 end
