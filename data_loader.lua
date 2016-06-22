@@ -293,12 +293,8 @@ function DataLoader:load_batch(batch_size, return_keys)
     ]]--
     return_keys = return_keys == nil and false or return_keys
     if not self:_data_fetched() then
-        -- Wait for a possible existing thread that might be fetching data.
+        self:fetch_batch_async(batch_size)
         self._prefetching_thread:synchronize()
-        if not self:_data_fetched() then
-            self:fetch_batch_async(batch_size)
-            self._prefetching_thread:synchronize()
-        end
     end
 
     local batch_images = self._prefetched_data.batch_images
@@ -316,7 +312,6 @@ end
 
 function DataLoader:fetch_batch_async(batch_size)
     --[[ Load a batch, store it for returning in next call to load_batch. ]]--
-    self._prefetching_thread:synchronize()
     if self:_data_fetched() then
         return
     end
@@ -332,6 +327,8 @@ function DataLoader:fetch_batch_async(batch_size)
 end
 
 function DataLoader:_data_fetched()
+    -- Wait for possible fetching thread to finish.
+    self._prefetching_thread:synchronize()
     return self._prefetched_data.batch_images ~= nil
 end
 
