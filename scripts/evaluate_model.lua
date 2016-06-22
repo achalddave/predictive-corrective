@@ -7,9 +7,12 @@
 package.path = package.path .. ";../?.lua"
 
 local argparse = require 'argparse'
+local cutorch = require 'cutorch'
 local hdf5 = require 'hdf5'
 local lmdb = require 'lmdb'
+local nn = require 'nn'
 local torch = require 'torch'
+require 'rnn'
 
 local data_loader = require 'data_loader'
 local evaluator = require 'evaluator'
