@@ -44,13 +44,13 @@ cutorch.setDevice(GPUS[1])
 torch.setdefaulttensortype('torch.FloatTensor')
 
 -- Load model.
+print('Loading model.')
 nn.DataParallelTable.deserializeNGPUs = #GPUS
 local single_model = torch.load(args.model)
 if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
     single_model = single_model:get(1)
 end
 if not torch.isTypeOf(single_model, 'nn.Sequencer') then
-    print('Creating sequencer')
     single_model = nn.Sequencer(single_model)
 end
 -- DataParallel across the 2nd dimension, which will be batch size. Our 1st
@@ -62,6 +62,7 @@ for _, gpu in ipairs(GPUS) do
 end
 cutorch.setDevice(GPUS[1])
 model:evaluate()
+print('Loaded model.')
 
 -- Open database.
 local sampler = data_loader.PermutedSampler(
@@ -70,6 +71,7 @@ local sampler = data_loader.PermutedSampler(
     SEQUENCE_LENGTH)
 local data_loader = data_loader.DataLoader(
     args.labeled_video_frames_lmdb, sampler, NUM_LABELS)
+print('Initialized sampler.')
 
 -- Pass each image in the database through the model, collect predictions and
 -- groundtruth.
