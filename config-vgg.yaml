@@ -12,8 +12,8 @@ gpus: [1, 2, 3, 4]
 data_paths_config: 'data_paths.yaml'
 
 # Points to keys in data_paths_config
-train_lmdb: 'train_val_split'
-val_lmdb: 'test_split'
+train_split: 'train_val_split'
+val_split: 'test_split'
 
 # Number of labels
 num_labels: 65
