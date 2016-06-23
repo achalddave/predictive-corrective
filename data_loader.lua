@@ -200,6 +200,7 @@ function BalancedSampler:_advance_label_index(label)
     if self.label_indices[label] + 1 <= #self.label_keys[label] then
         self.label_indices[label] = self.label_indices[label] + 1
     else
+        self.label_keys[i] = Sampler.permute(self.label_keys[i])
         self.label_indices[label] = 1
     end
 end
