@@ -52,6 +52,6 @@ weight_decay: 5.e-4
 # Model options
 ###
 # Lua model file.
-model_layout: ''
-# Torch model to start training with. If specified, model_layout can be omitted.
+# model_layout: './models/vgg_recurrent.lua'
+# Torch model to start training with. If specified, model_layout is ignored.
 model_init: '/data/achald/MultiTHUMOS/models/pretrained/vgg_pretrained_last_layer_updated/vgg16_ilsvrc_2014_pretrained_updated_for_multithumos.t7'
