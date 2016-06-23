@@ -26,7 +26,7 @@ local container = containers[#containers]
 for i = 1, #(container.modules) do
     if container.modules[i] == last_fc then
         container.modules[i] = nn.Recurrent(
-            output_size,
+            nn.Identity(),
             last_fc --[[input layer]],
             nn.Linear(output_size, output_size) --[[feedback]],
             nn.Identity() --[[transfer]])
