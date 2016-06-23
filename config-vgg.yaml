@@ -41,6 +41,7 @@ sampling_strategy: 'balanced'
 sampling_strategy_options: {
     include_bg: False
 }
+sequence_length: 1
 
 ###
 # Optimization options
