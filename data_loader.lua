@@ -218,6 +218,7 @@ function BalancedSampler:_load_label_key_mapping()
     local transaction = db:txn(true --[[readonly]])
     local cursor = transaction:cursor()
 
+    -- Create mapping from label index to keys.
     local label_keys = {}
     for i = 1, self.num_labels do
         label_keys[i] = {}
