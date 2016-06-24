@@ -65,8 +65,9 @@ if config.data_paths_config ~= nil then
 end
 
 cutorch.setDevice(config.gpus[1])
+math.randomseed(config.seed)
 torch.manualSeed(config.seed)
-cutorch.manualSeed(config.seed)
+cutorch.manualSeedAll(config.seed)
 torch.setdefaulttensortype('torch.FloatTensor')
 
 -- Load model
