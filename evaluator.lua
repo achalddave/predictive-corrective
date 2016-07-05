@@ -69,6 +69,7 @@ function Evaluator:evaluate_batch()
 end
 
 function Evaluator:evaluate_epoch(epoch, num_batches)
+    cutorch.synchronize()
     self.model:evaluate()
     local epoch_timer = torch.Timer()
     local batch_timer = torch.Timer()
