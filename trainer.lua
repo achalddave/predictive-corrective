@@ -109,6 +109,7 @@ function Trainer:train_batch()
 end
 
 function Trainer:train_epoch(epoch, num_batches)
+    self.model:clearState()
     self.model:training()
     self:update_regime(epoch)
     local epoch_timer = torch.Timer()
