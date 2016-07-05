@@ -77,6 +77,10 @@ if config.model_init ~= nil then
 else
     single_model = require(config.model_layout)
 end
+if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
+    print('Getting first of DataParallelTable.')
+    single_model = single_model:get(1)
+end
 if not torch.isTypeOf(single_model, 'nn.Sequencer') then
     single_model = nn.Sequencer(single_model)
 end
