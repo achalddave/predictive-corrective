@@ -82,9 +82,7 @@ function Evaluator:evaluate_epoch(epoch, num_batches)
     for batch_index = 1, num_batches do
         batch_timer: reset()
         collectgarbage()
-        cutorch.synchronize()
         local loss, curr_predictions, curr_groundtruth = self:evaluate_batch()
-        cutorch.synchronize()
 
         -- We only care about the predictions and groundtruth in the last step
         -- of the sequence.

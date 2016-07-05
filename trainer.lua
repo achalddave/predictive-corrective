@@ -124,9 +124,7 @@ function Trainer:train_epoch(epoch, num_batches)
     for batch_index = 1, num_batches do
         batch_timer:reset()
         collectgarbage()
-        cutorch.synchronize()
         local loss, curr_predictions, curr_groundtruth = self:train_batch()
-        cutorch.synchronize()
         loss_epoch = loss_epoch + loss
 
         -- We only care about the predictions and groundtruth in the last step
