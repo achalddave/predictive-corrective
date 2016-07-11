@@ -128,6 +128,7 @@ local trainer = trainer.Trainer {
     batch_size = config.batch_size,
     crop_size = config.crop_size,
     num_labels = config.num_labels,
+    learning_rates = config.learning_rates,
     momentum = config.momentum,
     weight_decay = config.weight_decay
 }

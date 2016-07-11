@@ -20,6 +20,12 @@ function Trainer:_init(args)
         pixel_mean
         batch_size
         crop_size
+        learning_rates: Array of tables containing keys 'start_epoch',
+            'learning_rate'. E.g.
+                [{start_epoch: 1, learning_rate: 1e-2},
+                 {start_epoch: 6, learning_rate: 1e-3}]
+            will use a learning rate of 1e-2 for the first 5 epochs, then switch
+            to a learning rate of 1e-3.
         num_labels
         momentum
         weight_decay
@@ -32,12 +38,13 @@ function Trainer:_init(args)
     self.crop_size = args.crop_size
     self.num_labels = args.num_labels
     self.optimization_config = {
-        learningRate = nil, -- set by _epoch_regime
+        learningRate = nil, -- set by update_learning_rate
         learningRateDecay = 0.0,
         momentum = args.momentum,
         dampening = 0.0,
         weightDecay = args.weight_decay
     }
+    self.learning_rates = args.learning_rates
 
     -- Preallocate GPU inputs.
     self.gpu_inputs = torch.CudaTensor()
@@ -53,8 +60,8 @@ function Trainer:_init(args)
     self.data_loader:fetch_batch_async(self.batch_size)
 end
 
-function Trainer:update_regime(epoch)
-    learning_rate, regime_was_updated = self:_epoch_regime(epoch)
+function Trainer:update_learning_rate(epoch)
+    learning_rate, regime_was_updated = self:_epoch_learning_rate(epoch)
     if regime_was_updated then
         self.optimization_config.learningRate = learning_rate
         self.optimization_state = {}
@@ -111,7 +118,7 @@ end
 function Trainer:train_epoch(epoch, num_batches)
     self.model:clearState()
     self.model:training()
-    self:update_regime(epoch)
+    self:update_learning_rate(epoch)
     local epoch_timer = torch.Timer()
     local batch_timer = torch.Timer()
 
@@ -201,7 +208,7 @@ function Trainer:_process(img)
     return img
 end
 
-function Trainer:_epoch_regime(epoch)
+function Trainer:_epoch_learning_rate(epoch)
     --[[
     Compute learning rate and weight decay regime for a given epoch.
 
@@ -216,28 +223,19 @@ function Trainer:_epoch_regime(epoch)
     Arbitrary learning rate policy modified from
     https://github.com/soumith/imagenet-multiGPU.torch
     except with learning rates divided by 10 because we're fine tuning.
-    TODO(achald): Is this ideal?
-    TODO(achald): Allow this to be configured from outside Trainer.
     --]]
-    local regimes = {
-        -- start,   LR
-        {  1,     1e-2 },
-        {  6,     1e-3 },
-        { 12,     1e-4 },
-        { 18,     1e-5 },
-        { 24,     1e-6 },
-    }
-
     local regime
-    for i = 1, #regimes do
-        if i == #regimes or
-                (epoch >= regimes[i][1] and epoch < regimes[i+1][1]) then
-            regime = regimes[i]
+    for i = 1, #self.learning_rates do
+        local start_epoch = self.learning_rates[i].start_epoch
+        local end_epoch = self.learning_rates[i+1].start_epoch
+        if i == #self.learning_rates or
+                (epoch >= start_epoch and epoch < end_epoch) then
+            regime = self.learning_rates[i]
             break
         end
     end
-    local is_new_regime = epoch == regime[1]
-    return regime[2], is_new_regime
+    local is_new_regime = epoch == regime.start_epoch
+    return regime.learning_rate, is_new_regime
 end
 
 return {Trainer = Trainer}
