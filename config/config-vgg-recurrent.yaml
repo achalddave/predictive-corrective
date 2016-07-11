@@ -9,7 +9,7 @@ gpus: [1, 2, 3, 4]
 ###
 # Data options
 ###
-data_paths_config: 'data_paths.yaml'
+data_paths_config: 'config/local_data_paths.yaml'
 
 # Points to keys in data_paths_config
 train_split: 'train_split'
