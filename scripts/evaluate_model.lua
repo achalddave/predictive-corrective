@@ -95,7 +95,9 @@ while true do
     local images_table, labels, batch_keys = data_loader:load_batch(
         to_load, true --[[return_keys]])
     -- Prefetch the next batch.
-    data_loader:fetch_batch_async(to_load)
+    if samples_complete + to_load < data_loader:num_samples() then
+        data_loader:fetch_batch_async(to_load)
+    end
 
     local batch_size = #images_table[1]
     local num_channels = images_table[1][1]:size(1)
