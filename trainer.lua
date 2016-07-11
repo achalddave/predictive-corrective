@@ -22,6 +22,7 @@ function Trainer:_init(args)
         crop_size
         num_labels
         momentum
+        weight_decay
     ]]--
     self.model = args.model
     self.criterion = args.criterion
@@ -35,7 +36,7 @@ function Trainer:_init(args)
         learningRateDecay = 0.0,
         momentum = args.momentum,
         dampening = 0.0,
-        weightDecay = nil -- set by _epoch_regime
+        weightDecay = args.weight_decay
     }
 
     -- Preallocate GPU inputs.
@@ -53,10 +54,9 @@ function Trainer:_init(args)
 end
 
 function Trainer:update_regime(epoch)
-    regime, regime_was_updated = self:_epoch_regime(epoch)
+    learning_rate, regime_was_updated = self:_epoch_regime(epoch)
     if regime_was_updated then
-        self.optimization_config.learningRate = regime.learning_rate
-        self.optimization_config.weightDecay = regime.weight_decay
+        self.optimization_config.learningRate = learning_rate
         self.optimization_state = {}
     end
     return regime_was_updated
@@ -220,12 +220,12 @@ function Trainer:_epoch_regime(epoch)
     TODO(achald): Allow this to be configured from outside Trainer.
     --]]
     local regimes = {
-        -- start,   LR,     WD
-        {  1,     1e-2,   5e-4 },
-        {  6,     1e-3,   5e-4 },
-        { 12,     1e-4,   5e-4 },
-        { 18,     1e-5,   5e-4 },
-        { 24,     1e-6,   5e-4 },
+        -- start,   LR
+        {  1,     1e-2 },
+        {  6,     1e-3 },
+        { 12,     1e-4 },
+        { 18,     1e-5 },
+        { 24,     1e-6 },
     }
 
     local regime
@@ -237,10 +237,7 @@ function Trainer:_epoch_regime(epoch)
         end
     end
     local is_new_regime = epoch == regime[1]
-    return {
-        learning_rate = regime[2],
-        weight_decay = regime[3]
-    }, is_new_regime
+    return regime[2], is_new_regime
 end
 
 return {Trainer = Trainer}
