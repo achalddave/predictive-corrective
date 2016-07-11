@@ -40,6 +40,9 @@ local CROPS = {'c'}
 local SEQUENCE_LENGTH = 2
 local IMAGES_IN_BATCH = math.floor(NETWORK_BATCH_SIZE / #CROPS)
 
+math.randomseed(0)
+torch.manualSeed(0)
+cutorch.manualSeedAll(0)
 cutorch.setDevice(GPUS[1])
 torch.setdefaulttensortype('torch.FloatTensor')
 
