@@ -17,11 +17,9 @@ cutorch.setDevice(1)
 
 local model = torch.load(args.model)
 print('Loaded model')
-local hidden_layer = model:findModules('nn.Recurrent')[1].feedbackModule
+print(model)
 print(model:findModules('nn.Recurrent'))
-print(model:findModules('nn.Recurrent')[1])
-print(hidden_layer)
-
+local hidden_layer = model:findModules('nn.Recurrent')[1].feedbackModule
 
 print('Saving matrix of size', hidden_layer.weight:size())
 torch.save(args.output_path, hidden_layer.weight)
