@@ -1,0 +1,17 @@
+# Paths for LMDBs mapping keys to LabeledVideoFrames.
+train_split:
+    with_images:    '/scratch/achald/all_train.lmdb'
+    without_images: '/data/achald/MultiTHUMOS/frames@10fps/labeled_video_frames/all_train_without_images.lmdb'
+
+val_split:
+    with_images:    '/scratch/achald/valval.lmdb'
+    without_images: '/data/achald/MultiTHUMOS/frames@10fps/labeled_video_frames/valval_without_images.lmdb'
+
+# train_split and val_split combined
+train_val_split:
+    with_images:    '/scratch/achald/all_train_and_val.lmdb'
+    without_images: '/data/achald/MultiTHUMOS/frames@10fps/labeled_video_frames/all_train_and_val_without_images.lmdb'
+
+test_split:
+    with_images:    '/scratch/achald/test.lmdb'
+    without_images: '/data/achald/MultiTHUMOS/frames@10fps/labeled_video_frames/test_without_images.lmdb'
