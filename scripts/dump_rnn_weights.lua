@@ -12,8 +12,8 @@ parser:argument('model', 'Model file')
 parser:argument('output_path', 'Output path')
 
 local args = parser:parse()
-
-nn.DataParallelTable.deserializeNGPUs = cutorch.getDeviceCount()
+nn.DataParallelTable.deserializeNGPUs = 1
+cutorch.setDevice(1)
 
 local model = torch.load(args.model)
 print('Loaded model')
