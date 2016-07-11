@@ -155,7 +155,6 @@ while true do
     end
 
     samples_complete = samples_complete + to_load
-    print('Number of labels with groundtruth:', num_labels_with_groundtruth)
     local map_so_far = evaluator.compute_mean_average_precision(
         all_predictions, all_labels)
     local batch_map = evaluator.compute_mean_average_precision(
