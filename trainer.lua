@@ -225,14 +225,16 @@ function Trainer:_epoch_learning_rate(epoch)
     except with learning rates divided by 10 because we're fine tuning.
     --]]
     local regime
-    for i = 1, #self.learning_rates do
+    for i = 1, #self.learning_rates - 1 do
         local start_epoch = self.learning_rates[i].start_epoch
         local end_epoch = self.learning_rates[i+1].start_epoch
-        if i == #self.learning_rates or
-                (epoch >= start_epoch and epoch < end_epoch) then
+        if epoch >= start_epoch and epoch < end_epoch then
             regime = self.learning_rates[i]
             break
         end
+    end
+    if regime == nil then 
+        regime = self.learning_rates[#self.learning_rates]
     end
     local is_new_regime = epoch == regime.start_epoch
     return regime.learning_rate, is_new_regime
