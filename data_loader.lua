@@ -53,8 +53,9 @@ function PermutedSampler:_init(
     ]]--
     self.imageless_path = lmdb_without_images_path
     self.sequence_length = sequence_length == nil and 1 or sequence_length
-    self.keys = self:filter_end_frames(
-        PermutedSampler.load_lmdb_keys(lmdb_without_images_path))
+    self.keys = PermutedSampler.filter_end_frames(
+        PermutedSampler.load_lmdb_keys(lmdb_without_images_path),
+        self.sequence_length)
     self.permuted_keys = Sampler.permute(self.keys)
     self.key_index = 1
 end
@@ -88,35 +89,6 @@ function PermutedSampler:sample_keys(num_sequences)
     return batch_keys
 end
 
-function PermutedSampler:filter_end_frames(frame_keys)
-    --[[ Filter out the last sequence_length frames in the video.
-    --
-    -- Args:
-    --     frame_keys (array)
-    --]]
-    local frame_keys_set = {}
-    for _, key in ipairs(frame_keys) do
-        frame_keys_set[key] = true
-    end
-    local filtered_frame_keys = {}
-    for key, _ in pairs(frame_keys_set) do
-        local frame_to_check = key
-        local frame_valid = true
-        -- Check if next sequence_length frames exist.
-        for _ = 2, self.sequence_length do
-            frame_to_check = Sampler.next_frame_key(frame_to_check)
-            if frame_keys_set[frame_to_check] == nil then
-                frame_valid = false
-                break
-            end
-        end
-        if frame_valid then
-            table.insert(filtered_frame_keys, key)
-        end
-    end
-    return filtered_frame_keys
-end
-
 function PermutedSampler:num_samples()
     return #self.keys
 end
@@ -148,6 +120,35 @@ function PermutedSampler.static.load_lmdb_keys(lmdb_path)
     db:close()
 
     return keys
+end
+
+function PermutedSampler.static.filter_end_frames(frame_keys, sequence_length)
+    --[[ Filter out the last sequence_length frames in the video.
+    --
+    -- Args:
+    --     frame_keys (array)
+    --]]
+    local frame_keys_set = {}
+    for _, key in ipairs(frame_keys) do
+        frame_keys_set[key] = true
+    end
+    local filtered_frame_keys = {}
+    for key, _ in pairs(frame_keys_set) do
+        local frame_to_check = key
+        local frame_valid = true
+        -- Check if next sequence_length frames exist.
+        for _ = 2, sequence_length do
+            frame_to_check = Sampler.next_frame_key(frame_to_check)
+            if frame_keys_set[frame_to_check] == nil then
+                frame_valid = false
+                break
+            end
+        end
+        if frame_valid then
+            table.insert(filtered_frame_keys, key)
+        end
+    end
+    return filtered_frame_keys
 end
 
 local BalancedSampler = classic.class('BalancedSampler', Sampler)
