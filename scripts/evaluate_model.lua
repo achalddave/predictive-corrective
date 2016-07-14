@@ -96,7 +96,14 @@ while true do
         to_load, true --[[return_keys]])
     -- Prefetch the next batch.
     if samples_complete + to_load < data_loader:num_samples() then
-        data_loader:fetch_batch_async(to_load)
+        -- Figure out how many images we will need in the next batch, and
+        -- prefetch them.
+        local next_samples_complete = samples_complete + to_load
+        local next_to_load = IMAGES_IN_BATCH
+        if next_samples_complete + next_to_load > data_loader:num_samples() then
+            next_to_load = data_loader:num_samples() - next_samples_complete
+        end
+        data_loader:fetch_batch_async(next_to_load)
     end
 
     local batch_size = #images_table[1]
