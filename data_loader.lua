@@ -73,7 +73,7 @@ function PermutedSampler:sample_keys(num_sequences)
         table.insert(batch_keys, {})
     end
     for _ = 1, num_sequences do
-        if self.key_index > #self.permuted_keys then
+        if self.key_index > self:num_samples() then
             print(string.format('%s: Finished pass through data, repermuting!',
                                 os.date('%X')))
             self.permuted_keys = Sampler.permute(self.keys)
