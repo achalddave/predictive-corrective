@@ -441,6 +441,7 @@ end
 return {
     DataLoader = DataLoader,
     PermutedSampler = PermutedSampler,
+    Sampler = Sampler,
     -- TODO(achald): Implement sequence sampling for BalancedSampler.
     -- BalancedSampler = BalancedSampler
 }
