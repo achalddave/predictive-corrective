@@ -128,7 +128,7 @@ print(#model:findModules(args.layer_type))
 -- Pass frames through model
 ---
 local sampler = VideoSampler(args.frames_lmdb, args.video_name, SEQUENCE_LENGTH)
-local data_loader = data_loader.DataLoader(
+local loader = data_loader.DataLoader(
     args.frames_lmdb, sampler, NUM_LABELS)
 
 local gpu_inputs = torch.CudaTensor()
@@ -141,7 +141,7 @@ while samples_complete ~= sampler:num_samples() do
     if samples_complete + IMAGES_IN_BATCH > sampler:num_samples() then
         to_load = sampler:num_samples() - samples_complete
     end
-    local images_table, _, batch_keys = data_loader:load_batch(
+    local images_table, _, batch_keys = loader:load_batch(
         to_load, true --[[return_keys]])
     local batch_keys = batch_keys[SEQUENCE_LENGTH]
 
