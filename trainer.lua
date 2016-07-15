@@ -61,7 +61,7 @@ function Trainer:_init(args)
 end
 
 function Trainer:update_learning_rate(epoch)
-    learning_rate, regime_was_updated = self:_epoch_learning_rate(epoch)
+    local learning_rate, regime_was_updated = self:_epoch_learning_rate(epoch)
     if regime_was_updated then
         self.optimization_config.learningRate = learning_rate
         self.optimization_state = {}
@@ -127,7 +127,7 @@ function Trainer:train_epoch(epoch, num_batches)
     local groundtruth = torch.ByteTensor(
         num_batches * self.batch_size, self.num_labels)
 
-    loss_epoch = 0
+    local loss_epoch = 0
     for batch_index = 1, num_batches do
         batch_timer:reset()
         collectgarbage()
@@ -165,7 +165,7 @@ function Trainer:train_epoch(epoch, num_batches)
     collectgarbage()
 end
 
-function Trainer:save(directory)
+function Trainer:save(directory, epoch)
     --[[
     Save model, optimization config, and optimization config to a directory.
     ]]--

@@ -148,6 +148,6 @@ for i = 1, config.num_epochs do
     print(('Training epoch %d'):format(i))
     epoch = config.init_epoch + i - 1
     trainer:train_epoch(epoch, config.epoch_size)
-    trainer:save(cache_dir)
+    trainer:save(cache_dir, epoch)
     evaluator:evaluate_epoch(epoch, config.epoch_size)
 end
