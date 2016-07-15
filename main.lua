@@ -143,6 +143,7 @@ local evaluator = evaluator.Evaluator {
 }
 
 print('Initialized trainer and evaluator.')
+local epoch
 for i = 1, config.num_epochs do
     print(('Training epoch %d'):format(i))
     epoch = config.init_epoch + i - 1
