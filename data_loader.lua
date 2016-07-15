@@ -154,7 +154,11 @@ end
 
 local BalancedSampler = classic.class('BalancedSampler', Sampler)
 function BalancedSampler:_init(
-        lmdb_without_images_path, num_labels, sequence_length, options)
+        lmdb_without_images_path,
+        num_labels,
+        _ --[[sequence_length]],
+        _ --[[step_size]],
+        options)
     --[[
     Samples from each class a balanced number of times, so that the model should
     see approximately the same amount of data from each class.
@@ -186,7 +190,7 @@ end
 
 function BalancedSampler:sample_keys(num_keys)
     local keys = {}
-    for i = 1, num_keys do
+    for _ = 1, num_keys do
         local label = math.random(self.num_labels)
         table.insert(keys, self.label_keys[label][self.label_indices[label]])
         self:_advance_label_index(label)
