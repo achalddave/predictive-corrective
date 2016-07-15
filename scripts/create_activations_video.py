@@ -1,10 +1,8 @@
 import argparse
 
 import torchfile
-import matplotlib;                                          matplotlib.use('Agg')
 import numpy as np
 
-from matplotlib import pyplot as plt
 from moviepy.editor import VideoClip, VideoFileClip, clips_array
 from moviepy.video.io.bindings import mplfig_to_npimage
 from PIL import Image
