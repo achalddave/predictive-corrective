@@ -12,27 +12,62 @@ require 'rnn'
 local parser = argparse() {
     description = 'Replace last fully connected layer with a recurrent layer.'
 }
-parser:argument('model', 'Torch model')
-parser:argument('output_model', 'Output rnn model')
+parser:option('--model', 'Torch model'):count(1)
+parser:option('--layer_type',
+                'Layer type to output activations from. ' ..
+                'E.g. cudnn.SpatialConvolution'):count(1)
+parser:option('--layer_type_index',
+                'Which of the layer types to extract.')
+      :convert(tonumber)
+      :count(1)
+parser:option('--hidden',
+    'Type of hidden connection. Options: \n' ..
+    'linear:  Fully connected layer between hidden weights. \n',
+    'avg: Average current activations with previous hidden activation.')
+    :default('linear')
+parser:option('--output', 'Output rnn model'):count(1)
 
 local args = parser:parse()
 
-model = torch.load(args.model)
+local model = torch.load(args.model)
 
-local fc_layers, containers = model:findModules('nn.Linear')
-local last_fc = fc_layers[#fc_layers]
-local output_size = last_fc.weight:size(1)
-local container = containers[#containers]
-for i = 1, #(container.modules) do
-    if container.modules[i] == last_fc then
-        container.modules[i] = nn.Recurrent(
-            nn.Identity(),
-            last_fc --[[input layer]],
-            nn.Linear(output_size, output_size) --[[feedback]],
-            nn.Identity() --[[transfer]])
+local layers, containers = model:findModules(args.layer_type)
+-- Use old_layer as input to a recurrent layer, then replace the old_layer in
+-- the model with the recurrent layer.
+local old_layer = layers[args.layer_type_index]
+local old_layer_container = containers[args.layer_type_index]
+
+for i = 1, #(old_layer_container.modules) do
+    if old_layer_container.modules[i] == old_layer then
+        local replacement_layer
+        if args.hidden == 'linear' then
+            local output_size = old_layer.weight:size(1)
+            replacement_layer = nn.Recurrent(
+                nn.Identity() --[[start]],
+                old_layer --[[input layer]],
+                nn.Linear(output_size, output_size) --[[feedback]],
+                nn.Identity() --[[transfer]],
+                nn.CAddTable() --[[merge]])
+        elseif args.hidden == 'avg' then
+            local averaging_layer = nn.Sequential()
+            averaging_layer:add(nn.CAddTable())
+            averaging_layer:add(nn.MulConstant(0.5))
+
+            replacement_layer = nn.Recurrent(
+                nn.Identity() --[[start]],
+                old_layer --[[input layer]],
+                nn.Identity() --[[feedback]],
+                nn.Identity() --[[transfer]],
+                1 --[[rho]],
+                averaging_layer --[[merge]])
+        else
+            error('Unknown --hidden option:' .. args.hidden .. '.' ..
+                  'See --help for valid options')
+        end
+        old_layer_container.modules[i] = replacement_layer
     end
 end
 model = nn.Sequencer(model)
 print(model)
 
-torch.save(args.output_model, model)
+torch.save(args.output, model)
