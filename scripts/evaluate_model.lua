@@ -71,7 +71,7 @@ local sampler = data_loader.PermutedSampler(
     args.labeled_video_frames_without_images_lmdb,
     NUM_LABELS,
     SEQUENCE_LENGTH)
-local data_loader = data_loader.DataLoader(
+local loader = data_loader.DataLoader(
     args.labeled_video_frames_lmdb, sampler, NUM_LABELS)
 print('Initialized sampler.')
 
@@ -84,25 +84,25 @@ local predictions_by_keys = {}
 local samples_complete = 0
 
 while true do
-    if samples_complete == data_loader:num_samples() then
+    if samples_complete == loader:num_samples() then
         break
     end
     local to_load = IMAGES_IN_BATCH
-    if samples_complete + IMAGES_IN_BATCH > data_loader:num_samples() then
-        to_load = data_loader:num_samples() - samples_complete
+    if samples_complete + IMAGES_IN_BATCH > loader:num_samples() then
+        to_load = loader:num_samples() - samples_complete
     end
-    local images_table, labels, batch_keys = data_loader:load_batch(
+    local images_table, labels, batch_keys = loader:load_batch(
         to_load, true --[[return_keys]])
     -- Prefetch the next batch.
-    if samples_complete + to_load < data_loader:num_samples() then
+    if samples_complete + to_load < loader:num_samples() then
         -- Figure out how many images we will need in the next batch, and
         -- prefetch them.
         local next_samples_complete = samples_complete + to_load
         local next_to_load = IMAGES_IN_BATCH
-        if next_samples_complete + next_to_load > data_loader:num_samples() then
-            next_to_load = data_loader:num_samples() - next_samples_complete
+        if next_samples_complete + next_to_load > loader:num_samples() then
+            next_to_load = loader:num_samples() - next_samples_complete
         end
-        data_loader:fetch_batch_async(next_to_load)
+        loader:fetch_batch_async(next_to_load)
     end
 
     local batch_size = #images_table[1]
@@ -167,7 +167,7 @@ while true do
         predictions, labels)
     print(string.format(
         '%s: Finished %d/%d. mAP so far: %.5f, batch mAP: %.5f',
-        os.date('%X'), samples_complete, data_loader:num_samples(), map_so_far,
+        os.date('%X'), samples_complete, loader:num_samples(), map_so_far,
         batch_map))
     collectgarbage()
 end
