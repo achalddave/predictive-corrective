@@ -7,6 +7,7 @@ from moviepy.editor import VideoClip, VideoFileClip, clips_array
 from moviepy.video.io.bindings import mplfig_to_npimage
 from PIL import Image
 
+
 def extract_max_var_filter(activations):
     max_var_filter = None
     max_var = -float('inf')
