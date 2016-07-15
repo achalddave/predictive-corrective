@@ -175,7 +175,7 @@ function BalancedSampler:_init(
     error("BalancedSampler is currently broken.")
     self.imageless_path = lmdb_without_images_path
     options = options == nil and {} or options
-    self.include_bg = options.include_bg == nil and false or include_bg
+    self.include_bg = options.include_bg == nil and false or options.include_bg
     self.num_labels = self.include_bg and num_labels + 1 or num_labels
 
     self.label_keys, self.num_keys = self:_load_label_key_mapping()
