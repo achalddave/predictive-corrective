@@ -3,6 +3,7 @@ local cudnn = require 'cudnn'
 local cunn = require 'cunn'
 local cutorch = require 'cutorch'
 local image = require 'image'
+local torch = require 'torch'
 
 local DataLoader = require('data_loader').DataLoader
 

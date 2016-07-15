@@ -6,6 +6,7 @@ as values.
 local classic = require 'classic'
 local lmdb = require 'lmdb'
 local threads = require 'threads'
+local torch = require 'torch'
 
 local video_frame_proto = require 'video_util.video_frames_pb'
 

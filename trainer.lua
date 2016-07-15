@@ -5,6 +5,7 @@ local cutorch = require 'cutorch'
 local image = require 'image'
 local optim = require 'optim'
 local paths = require 'paths'
+local torch = require 'torch'
 
 local evaluator = require 'evaluator'
 local DataLoader = require('data_loader').DataLoader
