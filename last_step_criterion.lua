@@ -45,6 +45,7 @@ end
 
 function LastStepCriterion:updateGradInput(input, target)
    self.gradInput = {}
+   local nStep
    if torch.isTensor(input) then
       assert(torch.isTensor(target),
              "Expecting target to be a Tensor since input is a Tensor.")
