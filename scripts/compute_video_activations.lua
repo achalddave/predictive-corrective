@@ -143,7 +143,7 @@ while samples_complete ~= sampler:num_samples() do
     end
     local images_table, _, batch_keys = loader:load_batch(
         to_load, true --[[return_keys]])
-    local batch_keys = batch_keys[SEQUENCE_LENGTH]
+    batch_keys = batch_keys[SEQUENCE_LENGTH]
 
     local batch_size = #images_table[1]
     local num_channels = images_table[1][1]:size(1)
