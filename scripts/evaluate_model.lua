@@ -9,14 +9,13 @@ package.path = package.path .. ";../?.lua"
 local argparse = require 'argparse'
 local cutorch = require 'cutorch'
 local hdf5 = require 'hdf5'
-local lmdb = require 'lmdb'
+local image = require 'image'
 local nn = require 'nn'
 local torch = require 'torch'
 require 'rnn'
 
 local data_loader = require 'data_loader'
 local evaluator = require 'evaluator'
-local video_frame_proto = require 'video_util.video_frames_pb'
 
 local parser = argparse() {
     description = 'Evaluate a Torch model on MultiTHUMOS.'
