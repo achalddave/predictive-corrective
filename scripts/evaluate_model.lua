@@ -184,25 +184,29 @@ end
 local map = torch.mean(aps[torch.ne(aps, -1)])
 print('mAP: ', map)
 
--- Save predictions to HDF5.
-local output_file = hdf5.open(args.output_hdf5, 'w')
--- Map filename to a table of predictions by frame number.
-local predictions_by_filename = {}
-for key, prediction in pairs(predictions_by_keys) do
-    -- Keys are of the form '<filename>-<frame_number>'.
-    -- Find the index of the '-'
-    local _, split_index = string.find(key, '.*-')
-    local filename = string.sub(key, 1, split_index - 1)
-    local frame_number = tonumber(string.sub(key, split_index + 1, -1))
-    if predictions_by_filename[filename] == nil then
-        predictions_by_filename[filename] = {}
+if SEQUENCE_LENGTH == 1 then
+    -- Save predictions to HDF5.
+    local output_file = hdf5.open(args.output_hdf5, 'w')
+    -- Map filename to a table of predictions by frame number.
+    local predictions_by_filename = {}
+    for key, prediction in pairs(predictions_by_keys) do
+        -- Keys are of the form '<filename>-<frame_number>'.
+        -- Find the index of the '-'
+        local _, split_index = string.find(key, '.*-')
+        local filename = string.sub(key, 1, split_index - 1)
+        local frame_number = tonumber(string.sub(key, split_index + 1, -1))
+        if predictions_by_filename[filename] == nil then
+            predictions_by_filename[filename] = {}
+        end
+        predictions_by_filename[filename][frame_number] = prediction
     end
-    predictions_by_filename[filename][frame_number] = prediction
-end
--- TODO(achald): This is currently broken when SEQUENCE_LENGTH > 1.
--- The torch.cat call will fail because the first frame we have predictions for
--- will be frame SEQUENCE_LENGTH, and so the predictions_table will not have a
--- key for indices 1..SEQUENCE_LENGTH-1. Unclear how to fix...
-for filename, predictions_table in pairs(predictions_by_filename) do
-    output_file:write(filename, torch.cat(predictions_table, 2):t())
+    -- TODO(achald): This is currently broken when SEQUENCE_LENGTH > 1.
+    -- The torch.cat call will fail because the first frame we have predictions for
+    -- will be frame SEQUENCE_LENGTH, and so the predictions_table will not have a
+    -- key for indices 1..SEQUENCE_LENGTH-1. Unclear how to fix...
+    for filename, predictions_table in pairs(predictions_by_filename) do
+        output_file:write(filename, torch.cat(predictions_table, 2):t())
+    end
+else
+    print('Cannot save predictions to HDF5 for SEQUENCE_LENGTH ~= 1')
 end
