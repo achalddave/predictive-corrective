@@ -133,7 +133,7 @@ local loader = data_loader.DataLoader(
 
 local gpu_inputs = torch.CudaTensor()
 local samples_complete = 0
-local layer_to_extract
+local layer_to_extract = model:findModules(args.layer_type)[args.layer_type_index]
 
 local frame_activations = {}
 while samples_complete ~= sampler:num_samples() do
@@ -162,7 +162,6 @@ while samples_complete ~= sampler:num_samples() do
         end
     end
 
-    layer_to_extract = model:findModules(args.layer_type)[args.layer_type_index]
     gpu_inputs:resize(images:size()):copy(images)
     model:forward(gpu_inputs)
     for i = 1, batch_size do
