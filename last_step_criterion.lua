@@ -7,6 +7,7 @@
 -- WARNING : assumes that the decorated criterion is stateless, i.e.
 -- the backward doesn't need to be preceded by a commensurate forward.
 ------------------------------------------------------------------------
+local torch = require 'torch'
 require 'nn'
 
 local LastStepCriterion, parent = torch.class('nn.LastStepCriterion', 'nn.Criterion')
