@@ -54,8 +54,8 @@ def main():
     max_value = activations.max()
     activations = (activations - min_value) / (max_value - min_value) * 255
 
-    old_height = activations[1].shape[0]
-    old_width = activations[1].shape[1]
+    old_height = activations.shape[1]
+    old_width = activations.shape[2]
     new_width, new_height = None, None
     if old_height > old_width:
         new_height = 500.
