@@ -52,7 +52,7 @@ def main():
         activations = activations[:, filter_index]
     min_value = activations.min()
     max_value = activations.max()
-    activations = (activations - min_value) / (max_value - min_value) * 256
+    activations = (activations - min_value) / (max_value - min_value) * 255
 
     old_height = activations[1].shape[0]
     old_width = activations[1].shape[1]
