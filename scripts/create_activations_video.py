@@ -92,6 +92,7 @@ def compute_offset_hdiffmap(activations, offset):
         activations.transpose((0, 2, 1)), offset)
     return activations.transpose((0, 2, 1))
 
+
 def compute_offset_vdiffmap(activations, offset):
     vdiffs = np.zeros((3, activations.shape[0], activations.shape[1],
                        activations.shape[2]))
