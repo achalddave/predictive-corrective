@@ -96,14 +96,14 @@ def compute_offset_hdiffmap(activations, offset):
 def compute_offset_vdiffmap(activations, offset):
     vdiffs = np.zeros((3, activations.shape[0], activations.shape[1],
                        activations.shape[2]))
-    current_frames = activations[offset:]
-    previous_frames = activations[:-offset]
+    right_frames = activations[offset:]
+    left_frames = activations[:-offset]
     # vdiffs[0, f, r] = activations[f, r] - activations[f - offset, r - 1]
-    vdiffs[0, offset:, 1:] = current_frames[:, 1:] - previous_frames[:, :-1]
+    vdiffs[0, offset:, 1:] = right_frames[:, 1:] - left_frames[:, :-1]
     # vdiffs[1, f, r] = activations[f, r] - activations[f - offset, r]
-    vdiffs[1, offset:] = current_frames - previous_frames
+    vdiffs[1, offset:] = right_frames - left_frames
     # vdiffs[2, f, r] = activations[f, r] - activations[f - offset, r + 1]
-    vdiffs[2, offset:, :-1] = current_frames[:, :-1] - previous_frames[:, 1:]
+    vdiffs[2, offset:, :-1] = right_frames[:, :-1] - left_frames[:, 1:]
     return abs(vdiffs).argmin(axis=0).astype(float)
 
 
