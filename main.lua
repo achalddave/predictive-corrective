@@ -40,6 +40,7 @@ end
 config.sequence_length = config.sequence_length == nil
                          and 1
                          or config.sequence_length
+config.step_size = config.step_size == nil and 1 or config.step_size
 -- TODO(achald): Validate config.
 
 -- Create cache_base
