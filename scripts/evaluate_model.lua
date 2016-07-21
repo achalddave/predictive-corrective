@@ -95,6 +95,11 @@ while true do
     end
     local images_table, labels, batch_keys = loader:load_batch(
         to_load, true --[[return_keys]])
+    if loader.sampler.key_index ~= samples_complete + to_load + 1 then
+        print('Data loader key index does not match samples_complete')
+        print(loader.sampler.key_index, samples_complete + to_load + 1)
+        os.exit(1)
+    end
     -- Prefetch the next batch.
     if samples_complete + to_load < loader:num_samples() then
         -- Figure out how many images we will need in the next batch, and
