@@ -5,8 +5,6 @@ local cutorch = require 'cutorch'
 local image = require 'image'
 local torch = require 'torch'
 
-local DataLoader = require('data_loader').DataLoader
-
 local Evaluator = classic.class('Evaluator')
 
 function Evaluator:_init(args)
