@@ -109,6 +109,7 @@ function Trainer:train_batch()
         self.model:backward(self.gpu_inputs, criterion_gradients)
         return loss, self.model_grad_parameters
     end
+
     -- Updates self.model_parameters (and, in turn, the parameters of
     -- self.model) in place.
     optim.sgd(model_forward_backward, self.model_parameters,
