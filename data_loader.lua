@@ -350,7 +350,7 @@ function DataLoader:_data_fetched()
     return self._prefetched_data.batch_images ~= nil
 end
 
-function DataLoader.static._load_image_labels_from_proto(video_frame_proto)
+function DataLoader.static._load_image_labels_from_proto(frame_proto)
     --[[
     Loads an image tensor and labels for a given key.
 
@@ -359,11 +359,11 @@ function DataLoader.static._load_image_labels_from_proto(video_frame_proto)
         labels (Array): Contains numeric id for each label.
     ]]
 
-    local img = DataLoader._image_proto_to_tensor(video_frame_proto.frame.image)
+    local img = DataLoader._image_proto_to_tensor(frame_proto.frame.image)
 
     -- Load labels in an array.
     local labels = {}
-    for _, label in ipairs(video_frame_proto.label) do
+    for _, label in ipairs(frame_proto.label) do
         table.insert(labels, label.id)
     end
 
