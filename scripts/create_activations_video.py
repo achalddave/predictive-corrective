@@ -189,7 +189,7 @@ def main():
     video_clip = video_clip.resize((new_height, new_width))
 
     final_clip = clips_array([[activations_clip, video_clip]])
-    final_clip.write_videofile(args.output)
+    final_clip.write_videofile(args.output, fps=args.frames_per_second)
 
 
 if __name__ == "__main__":
