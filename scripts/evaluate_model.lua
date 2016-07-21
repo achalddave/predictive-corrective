@@ -37,6 +37,7 @@ local MEANS = {96.8293, 103.073, 101.662}
 local CROP_SIZE = 224
 local CROPS = {'c'}
 local SEQUENCE_LENGTH = 2
+local STEP_SIZE = 1
 local IMAGES_IN_BATCH = math.floor(NETWORK_BATCH_SIZE / #CROPS)
 
 math.randomseed(0)
@@ -70,7 +71,8 @@ print('Loaded model.')
 local sampler = data_loader.PermutedSampler(
     args.labeled_video_frames_without_images_lmdb,
     NUM_LABELS,
-    SEQUENCE_LENGTH)
+    SEQUENCE_LENGTH,
+    STEP_SIZE)
 local loader = data_loader.DataLoader(
     args.labeled_video_frames_lmdb, sampler, NUM_LABELS)
 print('Initialized sampler.')
