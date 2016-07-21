@@ -24,20 +24,26 @@ function Sampler.static.permute(list)
 end
 
 function Sampler.static.next_frame_key(frame_key)
-    --[[ Return the key for the next frame. ]]--
+    --[[ Convenience method to get the key for the next frame. ]]--
+    return Sampler.frame_offset_key(frame_key, 1)
+end
+
+function Sampler.static.frame_offset_key(frame_key, offset)
+    --[[ Return the key for the frame at an offset from frame_key. ]]--
+
     -- Keys are of the form '<filename>-<frame_number>'.
     -- Find the index of the '-'
     local _, split_index = string.find(frame_key, '.*-')
     local filename = string.sub(frame_key, 1, split_index - 1)
     local frame_number = tonumber(string.sub(frame_key, split_index + 1, -1))
-    frame_number = frame_number + 1
+    frame_number = frame_number + offset
     return string.format('%s-%d', filename, frame_number)
 end
 
 local PermutedSampler = classic.class('PermutedSampler', Sampler)
 function PermutedSampler:_init(
         lmdb_without_images_path, _ --[[num_labels]],
-        sequence_length, _ --[[options]])
+        sequence_length, step_size, _ --[[options]])
     --[[
     Returns consecutive batches from a permuted list of keys.
 
@@ -54,9 +60,11 @@ function PermutedSampler:_init(
     ]]--
     self.imageless_path = lmdb_without_images_path
     self.sequence_length = sequence_length == nil and 1 or sequence_length
+    self.step_size = step_size == nil and 1 or step_size
     self.keys = PermutedSampler.filter_end_frames(
         PermutedSampler.load_lmdb_keys(lmdb_without_images_path),
-        self.sequence_length)
+        self.sequence_length,
+        self.step_size)
     self.permuted_keys = Sampler.permute(self.keys)
     self.key_index = 1
 end
@@ -83,7 +91,7 @@ function PermutedSampler:sample_keys(num_sequences)
         local sampled_key = self.permuted_keys[self.key_index]
         for step = 1, self.sequence_length do
             table.insert(batch_keys[step], sampled_key)
-            sampled_key = Sampler.next_frame_key(sampled_key)
+            sampled_key = Sampler.frame_offset_key(sampled_key, self.step_size)
         end
         self.key_index = self.key_index + 1
     end
@@ -123,7 +131,8 @@ function PermutedSampler.static.load_lmdb_keys(lmdb_path)
     return keys
 end
 
-function PermutedSampler.static.filter_end_frames(frame_keys, sequence_length)
+function PermutedSampler.static.filter_end_frames(
+        frame_keys, sequence_length, step_size)
     --[[ Filter out the last sequence_length frames in the video.
     --
     -- Args:
@@ -139,7 +148,8 @@ function PermutedSampler.static.filter_end_frames(frame_keys, sequence_length)
         local frame_valid = true
         -- Check if next sequence_length frames exist.
         for _ = 2, sequence_length do
-            frame_to_check = Sampler.next_frame_key(frame_to_check)
+            frame_to_check = Sampler.frame_offset_key(
+                frame_to_check, step_size)
             if frame_keys_set[frame_to_check] == nil then
                 frame_valid = false
                 break
