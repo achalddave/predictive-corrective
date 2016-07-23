@@ -1,5 +1,5 @@
 --[[
-Replace last fully connected layer with a recurrent layer.
+Turn a network into a recurrent network by connecting a layer over time.
 ]]--
 
 local argparse = require 'argparse'
