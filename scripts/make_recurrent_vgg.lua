@@ -17,7 +17,7 @@ parser:option('--layer_type',
                 'Layer type to output activations from. ' ..
                 'E.g. cudnn.SpatialConvolution'):count(1)
 parser:option('--layer_type_index',
-                'Which of the layer types to extract.')
+                'Which of the layer types to extract.'):count(1)
       :convert(tonumber)
       :count(1)
 parser:option('--hidden',
