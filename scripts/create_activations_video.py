@@ -220,6 +220,7 @@ def main():
 
     args = parser.parse_args()
 
+    # (num_frames, num_filters, height, width) array.
     all_activations = torchfile.load(args.activations_t7)
     if args.offset_action != 'align':
         if args.filter == 'max_var':
