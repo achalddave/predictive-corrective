@@ -26,6 +26,10 @@ parser:argument('labeled_video_frames_lmdb',
 parser:argument('labeled_video_frames_without_images_lmdb',
                 'LMDB containing LabeledVideoFrames without images.')
 parser:argument('output_hdf5', 'HDF5 to output predictions to')
+parser:flag('--decorate_sequencer',
+            'If specified, decorate model with nn.Sequencer.' ..
+            'This is necessary if the model does not expect a table as ' ..
+            'input.')
 
 local args = parser:parse()
 
@@ -53,7 +57,7 @@ local single_model = torch.load(args.model)
 if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
     single_model = single_model:get(1)
 end
-if not torch.isTypeOf(single_model, 'nn.Sequencer') then
+if args.decorate_sequencer then
     single_model = nn.Sequencer(single_model)
 end
 -- DataParallel across the 2nd dimension, which will be batch size. Our 1st
