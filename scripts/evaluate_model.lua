@@ -50,6 +50,12 @@ cutorch.manualSeedAll(0)
 cutorch.setDevice(GPUS[1])
 torch.setdefaulttensortype('torch.FloatTensor')
 
+print('Evaluating model. Args:')
+print(args)
+print('STEP_SIZE: ', STEP_SIZE)
+print('SEQUENCE_LENGTH: ', SEQUENCE_LENGTH)
+print('CROPS: ', CROPS)
+
 -- Load model.
 print('Loading model.')
 nn.DataParallelTable.deserializeNGPUs = #GPUS
