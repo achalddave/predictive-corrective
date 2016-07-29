@@ -26,8 +26,9 @@ parser:option('--layer_type_index',
       :count(1)
 parser:option('--hidden',
     'Type of hidden connection. Options: \n' ..
-    'linear:  Fully connected layer between hidden weights. \n',
-    'avg: Average current activations with previous hidden activation.')
+    'linear:  Fully connected layer between hidden weights. \n' ..
+    'avg: Average current activations with previous hidden activation. \n' ..
+    'poolavg: Average current activations with pooled previous activation. \n')
     :default('linear')
 parser:option('--output', 'Output rnn model'):count(1)
 
@@ -60,6 +61,25 @@ for i = 1, #(old_layer_container.modules) do
                 nn.Identity() --[[start]],
                 old_layer --[[input layer]],
                 nn.Identity() --[[feedback]],
+                nn.Identity() --[[transfer]],
+                1 --[[rho]],
+                averaging_layer --[[merge]])
+        elseif args.hidden == 'poolavg' then
+            local pool_layer = nn.SpatialMaxPooling(
+                3 --[[ kernel_width ]],
+                3 --[[ kernel_height ]],
+                1 --[[ stride_width ]],
+                1 --[[ stride_height ]],
+                1 --[[ pad_width ]],
+                1 --[[ pad_height ]]
+            )
+            local averaging_layer = nn.Sequential()
+            averaging_layer:add(nn.CAvgTable())
+
+            replacement_layer = nn.Recurrent(
+                nn.Identity() --[[start]],
+                old_layer --[[input layer]],
+                pool_layer --[[feedback]],
                 nn.Identity() --[[transfer]],
                 1 --[[rho]],
                 averaging_layer --[[merge]])
