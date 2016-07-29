@@ -5,6 +5,7 @@
 --]]
 
 package.path = package.path .. ";../?.lua"
+package.path = package.path .. ";layers/?.lua"
 
 local argparse = require 'argparse'
 local cutorch = require 'cutorch'
@@ -16,6 +17,7 @@ require 'rnn'
 
 local data_loader = require 'data_loader'
 local evaluator = require 'evaluator'
+require 'CAvgTable'
 
 local parser = argparse() {
     description = 'Evaluate a Torch model on MultiTHUMOS.'
