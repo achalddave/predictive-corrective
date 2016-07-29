@@ -2,12 +2,16 @@
 Turn a network into a recurrent network by connecting a layer over time.
 ]]--
 
+package.path = package.path .. ";layers/?.lua"
+
 local argparse = require 'argparse'
 local cudnn = require 'cudnn'
 local cutorch = require 'cutorch'
 local torch = require 'torch'
 local nn = require 'nn'
 require 'rnn'
+
+require 'CAvgTable'
 
 local parser = argparse() {
     description = 'Replace last fully connected layer with a recurrent layer.'
@@ -50,8 +54,7 @@ for i = 1, #(old_layer_container.modules) do
                 nn.CAddTable() --[[merge]])
         elseif args.hidden == 'avg' then
             local averaging_layer = nn.Sequential()
-            averaging_layer:add(nn.CAddTable())
-            averaging_layer:add(nn.MulConstant(0.5))
+            averaging_layer:add(nn.CAvgTable())
 
             replacement_layer = nn.Recurrent(
                 nn.Identity() --[[start]],
