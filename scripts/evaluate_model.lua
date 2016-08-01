@@ -149,7 +149,18 @@ while true do
     local crop_predictions = model:forward(gpu_inputs):type(
         torch.getdefaulttensortype())
     -- We only care about the predictions for the last step of the sequence.
-    crop_predictions = crop_predictions[SEQUENCE_LENGTH]
+    if torch.isTensor(crop_predictions) and
+        crop_predictions:size(1) == SEQUENCE_LENGTH then
+        -- If we are using nn.Sequencer
+        crop_predictions = crop_predictions[SEQUENCE_LENGTH]
+    elseif torch.isTensor(crop_predictions) and crop_predictions:size(1) == 1
+        then
+        -- If we are using, e.g. pyramid model.
+        crop_predictions = crop_predictions[1]
+    else
+        print(#crop_predictions)
+        error('Unknown output predictions shape.')
+    end
     labels = labels[SEQUENCE_LENGTH]
     batch_keys = batch_keys[SEQUENCE_LENGTH]
 
