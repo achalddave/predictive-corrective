@@ -62,6 +62,11 @@ function Evaluator:evaluate_batch()
     self.gpu_inputs:resize(images:size()):copy(images)
     self.gpu_labels:resize(labels:size()):copy(labels)
     local outputs = self.model:forward(self.gpu_inputs)
+    -- If the output of the network is a single prediction for the sequence,
+    -- compare it to the label of the last frame.
+    if outputs:size(1) == 1 and self.gpu_labels:size(1) ~= 1 then
+        self.gpu_labels = self.gpu_labels[self.gpu_labels:size(1)]
+    end
     local loss = self.criterion:forward(outputs, self.gpu_labels)
 
     return loss, outputs, labels

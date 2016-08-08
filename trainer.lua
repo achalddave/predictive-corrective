@@ -103,6 +103,11 @@ function Trainer:train_batch()
     local function model_forward_backward(_)
         self.model:zeroGradParameters()
         outputs = self.model:forward(self.gpu_inputs)
+        -- If the output of the network is a single prediction for the sequence,
+        -- compare it to the label of the last frame.
+        if outputs:size(1) == 1 and self.gpu_labels:size(1) ~= 1 then
+            self.gpu_labels = self.gpu_labels[self.gpu_labels:size(1)]
+        end
         loss = self.criterion:forward(outputs, self.gpu_labels)
         local criterion_gradients = self.criterion:backward(
             outputs, self.gpu_labels)
