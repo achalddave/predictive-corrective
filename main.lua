@@ -23,6 +23,10 @@ local parser = argparse() {
 parser:argument('config', 'Config file')
 parser:argument('cache_base',
                 'Directory to save model snapshots, logging, etc. to.')
+parser:flag('--decorate_sequencer',
+            'If specified, decorate model with nn.Sequencer.' ..
+            'This is necessary if the model does not expect a table as ' ..
+            'input.')
 
 local args = parser:parse()
 local config = yaml.loadpath(args.config)
@@ -82,7 +86,7 @@ if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
     print('Getting first of DataParallelTable.')
     single_model = single_model:get(1)
 end
-if not torch.isTypeOf(single_model, 'nn.Sequencer') then
+if args.decorate_sequencer then
     single_model = nn.Sequencer(single_model)
 end
 -- DataParallel across the 2nd dimension, which will be batch size. Our 1st
@@ -95,8 +99,10 @@ end
 cutorch.setDevice(config.gpus[1])
 -- https://groups.google.com/forum/#!topic/torch7/HiBymc9NfIY
 model = model:cuda()
-local criterion = nn.LastStepCriterion(
-    nn.MultiLabelSoftMarginCriterion():cuda())
+local criterion = nn.MultiLabelSoftMarginCriterion():cuda()
+if torch.isTypeOf(single_model, 'nn.Sequencer') then
+    criterion = nn.LastStepCriterion(criterion)
+end
 print 'Loaded model'
 
 local sampling_strategies = {
