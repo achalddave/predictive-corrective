@@ -43,6 +43,7 @@ local MEANS = {96.8293, 103.073, 101.662}
 local CROP_SIZE = 224
 local CROPS = {'c'}
 local SEQUENCE_LENGTH = 2
+local FRAME_TO_PREDICT = 1
 local STEP_SIZE = 1
 local IMAGES_IN_BATCH = math.floor(NETWORK_BATCH_SIZE / #CROPS)
 
@@ -56,6 +57,7 @@ print('Evaluating model. Args:')
 print(args)
 print('STEP_SIZE: ', STEP_SIZE)
 print('SEQUENCE_LENGTH: ', SEQUENCE_LENGTH)
+print('FRAME_TO_PREDICT: ', FRAME_TO_PREDICT)
 print('CROPS: ', CROPS)
 
 -- Load model.
@@ -161,7 +163,7 @@ while true do
         print(#crop_predictions)
         error('Unknown output predictions shape.')
     end
-    labels = labels[SEQUENCE_LENGTH]
+    labels = labels[FRAME_TO_PREDICT]
     batch_keys = batch_keys[SEQUENCE_LENGTH]
 
     local predictions = torch.Tensor(batch_size, NUM_LABELS)
