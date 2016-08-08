@@ -99,6 +99,9 @@ function Trainer:train_batch()
     self.gpu_inputs:resize(images:size()):copy(images)
     self.gpu_labels:resize(labels:size()):copy(labels)
 
+    -- TODO(achald): Allow smaller computational batch sizes while maintaining
+    -- optimization batch size (i.e. accumulate gradients across computational
+    -- batch sizes).
     local loss, outputs
     local function model_forward_backward(_)
         self.model:zeroGradParameters()
