@@ -48,11 +48,11 @@ sequence_length: 1
 momentum: 0.9
 weight_decay: 5.e-4
 learning_rates: [
-    { start_epoch:  1,5learning_rate: 5.e-2 },
-    { start_epoch:  6,5learning_rate: 5.e-3 },
-    { start_epoch: 12,5learning_rate: 5.e-4 },
-    { start_epoch: 18,5learning_rate: 5.e-5 },
-    { start_epoch: 24,5learning_rate: 5.e-6 }
+    { start_epoch:  1, learning_rate: 5.e-2 },
+    { start_epoch:  6, learning_rate: 5.e-3 },
+    { start_epoch: 12, learning_rate: 5.e-4 },
+    { start_epoch: 18, learning_rate: 5.e-5 },
+    { start_epoch: 24, learning_rate: 5.e-6 }
 ]
 
 ###
