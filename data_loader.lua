@@ -57,6 +57,9 @@ function PermutedSampler:_init(
         num_labels (num)
         sequence_length (num): If provided, sample sequences of length
             sequence_length for each training sample.
+        step_size (num): If provided, elements in the sequence should be
+            separated by this step_size. If step_size is 2, a sequence of length
+            5 starting at x_1 is {x_1, x_3, x_5, x_7, x_9}.
     ]]--
     self.imageless_path = lmdb_without_images_path
     self.sequence_length = sequence_length == nil and 1 or sequence_length
