@@ -104,9 +104,6 @@ local sampling_strategies = {
     balanced = data_loader.BalancedSampler
 }
 
--- Not supported with sequences yet.
-assert(config.sampling_strategy ~= 'balanced')
-
 local train_sampler = sampling_strategies[config.sampling_strategy:lower()](
     config.train_lmdb_without_images,
     config.num_labels,
