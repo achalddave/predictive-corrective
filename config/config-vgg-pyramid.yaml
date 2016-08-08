@@ -1,0 +1,64 @@
+# Example config for training model.
+
+###
+# General options
+###
+seed: 0
+gpus: [1, 2, 3]
+
+###
+# Data options
+###
+data_paths_config: 'config/local_data_paths.yaml'
+
+# Points to keys in data_paths_config
+train_split: 'train_split'
+val_split: 'val_split'
+
+# Number of labels
+num_labels: 65
+
+# Size to crop image to before passing to network.
+crop_size: 224
+
+# Mean pixel.
+pixel_mean: [96.8293, 103.073, 101.662]
+
+###
+# Training options
+###
+# Number of total epochs to run.
+num_epochs: 1000000
+# Number of batches in epoch.
+epoch_size: 800
+# Specify epoch to start at (e.g. if we are continuing to train a model from
+# earlier).
+init_epoch: 1
+# Number of examples in batch.
+batch_size: 40
+# One of 'permuted', 'balanced' (case-insensitive)
+sampling_strategy: 'permuted'
+sampling_strategy_options: {
+}
+sequence_length: 4
+
+###
+# Optimization options
+###
+momentum: 0.9
+weight_decay: 5.e-4
+learning_rates: [
+    { start_epoch:  1, learning_rate: 1.e-2 },
+    { start_epoch: 10, learning_rate: 1.e-3 },
+    { start_epoch: 20, learning_rate: 1.e-4 },
+    { start_epoch: 30, learning_rate: 1.e-5 },
+    { start_epoch: 40, learning_rate: 1.e-6 }
+]
+
+###
+# Model options
+###
+# Lua model file.
+# model_layout: './models/vgg_recurrent.lua'
+# Torch model to start training with. If specified, model_layout is ignored.
+model_init: '/data/achald/MultiTHUMOS/models/permuted_sampling_vgg/model_30_pyramid_seq4_start_avg_at_conv4_3_scalar_learned_weights.t7'
