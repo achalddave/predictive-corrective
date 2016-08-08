@@ -166,8 +166,8 @@ local BalancedSampler = classic.class('BalancedSampler', Sampler)
 function BalancedSampler:_init(
         lmdb_without_images_path,
         num_labels,
-        _ --[[sequence_length]],
-        _ --[[step_size]],
+        sequence_length,
+        step_size,
         options)
     --[[
     Samples from each class a balanced number of times, so that the model should
@@ -181,31 +181,49 @@ function BalancedSampler:_init(
         num_labels (num)
         sequence_length (num): If provided, sample sequences of length
             sequence_length for each training sample.
+        step_size (num): If provided, elements in the sequence should be
+            separated by this step_size. If step_size is 2, a sequence of length
+            5 starting at x_1 is {x_1, x_3, x_5, x_7, x_9}.
         options (table):
             include_bg: Whether to output a balanced number of frames that
                 have none of the labels.
     ]]--
-    -- BalancedSampler is not yet implemented for sequences.
-    error("BalancedSampler is currently broken.")
     self.imageless_path = lmdb_without_images_path
     options = options == nil and {} or options
     self.include_bg = options.include_bg == nil and false or options.include_bg
     self.num_labels = self.include_bg and num_labels + 1 or num_labels
+    self.sequence_length = sequence_length
+    self.step_size = step_size
 
-    self.label_keys, self.num_keys = self:_load_label_key_mapping()
+    self.label_keys = self:_load_label_key_mapping()
+    self.num_keys = 0
+    for label, keys in ipairs(self.label_keys) do
+        self.label_keys[label] = PermutedSampler.filter_end_frames(
+            keys, sequence_length, step_size)
+        self.num_keys = self.num_keys + #keys
+    end
+
     -- For each label, maintain an index of the next data point to output.
     self.label_indices = {}
     self:_permute_keys()
 end
 
-function BalancedSampler:sample_keys(num_keys)
-    local keys = {}
-    for _ = 1, num_keys do
+function BalancedSampler:sample_keys(num_sequences)
+    local batch_keys = {}
+    for _ = 1, self.sequence_length do
+        table.insert(batch_keys, {})
+    end
+    for _ = 1, num_sequences do
         local label = math.random(self.num_labels)
-        table.insert(keys, self.label_keys[label][self.label_indices[label]])
+        local label_key_index = self.label_indices[label]
+        local key = self.label_keys[label][label_key_index]
+        for step = 1, self.sequence_length do
+            table.insert(batch_keys[step], key)
+            key = Sampler.frame_offset_key(key, self.step_size)
+        end
         self:_advance_label_index(label)
     end
-    return keys
+    return batch_keys
 end
 
 function BalancedSampler:num_samples()
@@ -264,7 +282,7 @@ function BalancedSampler:_load_label_key_mapping()
     transaction:abort()
     db:close()
 
-    return label_keys, num_keys
+    return label_keys
 end
 
 local DataLoader = classic.class('DataLoader')
@@ -457,6 +475,5 @@ return {
     DataLoader = DataLoader,
     PermutedSampler = PermutedSampler,
     Sampler = Sampler,
-    -- TODO(achald): Implement sequence sampling for BalancedSampler.
-    -- BalancedSampler = BalancedSampler
+    BalancedSampler = BalancedSampler
 }
