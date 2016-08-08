@@ -16,6 +16,7 @@ local data_loader = require 'data_loader'
 local evaluator = require 'evaluator'
 local trainer = require 'trainer'
 local save_run_info = require 'save_run_info'
+require 'layers/CAvgTable'
 
 local parser = argparse() {
     description = 'Fine tune ImageNet-pretrained VGG-16 network on MultiTHUMOS.'
