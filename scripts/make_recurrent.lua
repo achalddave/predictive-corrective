@@ -90,7 +90,6 @@ for i = 1, #(old_layer_container.modules) do
         old_layer_container.modules[i] = replacement_layer
     end
 end
-model = nn.Sequencer(model)
 print(model)
 
 torch.save(args.output, model)
