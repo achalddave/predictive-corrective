@@ -104,7 +104,7 @@ local criterion = nn.MultiLabelSoftMarginCriterion():cuda()
 if torch.isTypeOf(single_model, 'nn.Sequencer') then
     criterion = nn.LastStepCriterion(criterion)
 end
-print 'Loaded model'
+print('Loaded model')
 
 local sampling_strategies = {
     permuted = data_loader.PermutedSampler,
