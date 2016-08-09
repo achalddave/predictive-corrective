@@ -36,6 +36,9 @@ parser:option('--output', 'Output rnn model'):count(1)
 local args = parser:parse()
 
 local model = torch.load(args.model)
+if torch.isTypeOf(model, 'nn.DataParallelTable') then
+    model = model:get(1)
+end
 
 local layers, containers = model:findModules(args.layer_type)
 -- Use old_layer as input to a recurrent layer, then replace the old_layer in
