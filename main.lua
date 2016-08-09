@@ -79,6 +79,7 @@ torch.setdefaulttensortype('torch.FloatTensor')
 -- Load model
 local single_model
 if config.model_init ~= nil then
+    print('Loading model from' .. config.model_init)
     single_model = torch.load(config.model_init)
 else
     single_model = require(config.model_layout)
