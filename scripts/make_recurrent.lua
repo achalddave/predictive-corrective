@@ -51,24 +51,34 @@ for i = 1, #(old_layer_container.modules) do
         local replacement_layer
         if args.hidden == 'linear' then
             local output_size = old_layer.weight:size(1)
-            replacement_layer = nn.Recurrent(
+            local recurrent_layer = nn.Recurrent(
                 nn.Identity() --[[start]],
-                old_layer --[[input layer]],
+                nn.Identity() --[[input layer]],
                 nn.Linear(output_size, output_size) --[[feedback]],
                 nn.Identity() --[[transfer]],
                 nn.CAddTable() --[[merge]])
+            old_layer_container:insert(recurrent_layer, i + 1)
         elseif args.hidden == 'avg' then
-            local averaging_layer = nn.Sequential()
-            averaging_layer:add(nn.CAvgTable())
+            -- Convert input tensor to singleton table.
+            local tensor_to_table = nn.ConcatTable()
+            tensor_to_table:add(nn.Identity())
 
-            replacement_layer = nn.Recurrent(
-                nn.Identity() --[[start]],
-                old_layer --[[input layer]],
+            local copy_layer = nn.Copy(nil, nil, true --[[forceCopy]])
+            local collect_recurrent_to_table = nn.Recurrent(
+                tensor_to_table, --[[start: Convert first output to table]]
+                copy_layer --[[input]],
                 nn.Identity() --[[feedback]],
-                nn.Identity() --[[transfer]],
-                1 --[[rho]],
-                averaging_layer --[[merge]])
+                nn.FlattenTable() --[[transfer]],
+                1 --[[rho; overridden by Sequencer]],
+                nn.Identity() --[[merge]])
+
+            old_layer_container:insert(collect_recurrent_to_table, i + 1)
+            old_layer_container:insert(nn.CAvgTable(), i + 2)
         elseif args.hidden == 'poolavg' then
+            -- Pooling layer averages after each new input; we would like to sum
+            -- after each new input, then divide by #inputs at the end. I don't
+            -- know how to easily do this.
+            error('Currently broken.')
             local pool_layer = nn.SpatialMaxPooling(
                 3 --[[ kernel_width ]],
                 3 --[[ kernel_height ]],
@@ -91,7 +101,6 @@ for i = 1, #(old_layer_container.modules) do
             error('Unknown --hidden option:' .. args.hidden .. '.' ..
                   'See --help for valid options')
         end
-        old_layer_container.modules[i] = replacement_layer
     end
 end
 print(model)
