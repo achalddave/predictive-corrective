@@ -220,6 +220,20 @@ end
 local map = torch.mean(aps[torch.ne(aps, -1)])
 print('mAP: ', map)
 
+local num_groups = 5
+local maps = torch.zeros(5)
+local group_size = math.floor(all_predictions:size(1) / num_groups)
+for i = 1, 5 do
+    local group_start = group_size * (i - 1) + 1
+    local group_end = group_size * i
+    if i == 5 then group_end = all_predictions:size(1) end
+    maps[i] = evaluator.compute_mean_average_precision(
+        all_predictions[{{group_start, group_end}, {}}],
+        all_labels[{{group_start, group_end}, {}}])
+end
+print('mAP for groups:', maps)
+print('mAP standard deviation: ', maps:std())
+
 if args.sequence_length == 1 then
     -- Save predictions to HDF5.
     local output_file = hdf5.open(args.output_hdf5, 'w')
