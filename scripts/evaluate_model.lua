@@ -99,8 +99,8 @@ print('Initialized sampler.')
 -- Pass each image in the database through the model, collect predictions and
 -- groundtruth.
 local gpu_inputs = torch.CudaTensor()
-local all_predictions
-local all_labels
+local all_predictions -- (num_samples, num_labels) tensor
+local all_labels -- (num_samples, num_labels) tensor
 local predictions_by_keys = {}
 local samples_complete = 0
 
