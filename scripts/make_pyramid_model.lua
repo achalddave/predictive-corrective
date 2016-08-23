@@ -30,7 +30,6 @@ parser:flag('--weighted_avg',
             'Initialized to 0.5.'):default(false)
 
 local args = parser:parse()
-print(args.weighted_avg)
 
 local SEQUENCE_LENGTH = 4
 
