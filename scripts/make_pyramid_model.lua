@@ -79,12 +79,10 @@ function create_averager(sequence_length, weighted)
     local pair_averagers = nn.ConcatTable()
     local num_pairs = sequence_length / 2
     for pair_index = 1, num_pairs do
-        local averager = nn.Sequential()
-        -- Select the current pair.
         local left_index = pair_index * 2 - 1 -- Index of 'left' frame in pair.
-        averager:add(nn.NarrowTable(left_index, 2))
-        -- Average the current pair.
-        averager:add(averaging_layer:clone())
+        local averager = nn.Sequential()
+        averager:add(nn.NarrowTable(left_index, 2)) -- Select the current pair.
+        averager:add(averaging_layer:clone()) -- Average the current pair.
         pair_averagers:add(averager)
     end
     local output_model = nn.Sequential()
