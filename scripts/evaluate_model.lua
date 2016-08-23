@@ -165,7 +165,6 @@ while true do
         -- If we are using, e.g. pyramid model.
         crop_predictions = crop_predictions[1]
     else
-        print(#crop_predictions)
         error('Unknown output predictions shape.')
     end
     labels = labels[FRAME_TO_PREDICT]
