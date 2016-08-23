@@ -27,7 +27,7 @@ parser:argument('labeled_video_frames_lmdb',
                 'LMDB containing LabeledVideoFrames to evaluate.')
 parser:argument('labeled_video_frames_without_images_lmdb',
                 'LMDB containing LabeledVideoFrames without images.')
-parser:argument('output_hdf5', 'HDF5 to output predictions to')
+parser:option('--output_hdf5', 'HDF5 to output predictions to'):count('?')
 parser:option('--sequence_length', 'Number of input frames.')
     :count('?'):default(2):convert(tonumber)
 parser:option('--step_size', 'Size of step between frames.')
@@ -234,7 +234,7 @@ end
 print('mAP for groups:', maps)
 print('mAP standard deviation: ', maps:std())
 
-if args.sequence_length == 1 then
+if args.output_hdf5 ~= nil then
     -- Save predictions to HDF5.
     local output_file = hdf5.open(args.output_hdf5, 'w')
     -- Map filename to a table of predictions by frame number.
