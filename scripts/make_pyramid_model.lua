@@ -34,6 +34,13 @@ local args = parser:parse()
 local SEQUENCE_LENGTH = 4
 
 local model = torch.load(args.model)
+if torch.isTypeOf(model, 'nn.DataParallelTable') then
+    model = model:get(1)
+end
+if torch.isTypeOf(model, 'nn.Sequencer') then
+    -- Remove Sequencer and Recursor decorators.
+    model = model:get(1):get(1)
+end
 
 local layers, containers = model:findModules('cudnn.SpatialConvolution')
 
