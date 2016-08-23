@@ -28,7 +28,7 @@ parser:option('--layer_type_index',
 parser:option('--hidden',
     'Type of hidden connection. Options: \n' ..
     'linear:  Fully connected layer between hidden weights. \n' ..
-    'avg: Average current activations with previous hidden activation. \n' ..
+    'avg: Average input activations. Output average at each time step. \n' ..
     'avg_ends: Average first and last time step activations. \n' ..
     'poolavg: Average current activations with pooled previous activation. \n')
     :default('linear')
