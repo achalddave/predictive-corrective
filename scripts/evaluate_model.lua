@@ -235,9 +235,6 @@ print('mAP for groups:', maps)
 print('mAP standard deviation: ', maps:std())
 
 if args.output_hdf5 ~= nil then
-    -- Save predictions to HDF5.
-    local output_file = hdf5.open(args.output_hdf5, 'w')
-    -- Map filename to a table of predictions by frame number.
     local predictions_by_filename = {}
     for key, prediction in pairs(predictions_by_keys) do
         -- Keys are of the form '<filename>-<frame_number>'.
@@ -250,13 +247,20 @@ if args.output_hdf5 ~= nil then
         end
         predictions_by_filename[filename][frame_number] = prediction
     end
-    -- TODO(achald): This is currently broken when sequence_length > 1.
-    -- The torch.cat call will fail because the first frame we have predictions for
-    -- will be frame sequence_length, and so the predictions_table will not have a
-    -- key for indices 1..sequence_length-1. Unclear how to fix...
     for filename, predictions_table in pairs(predictions_by_filename) do
-        output_file:write(filename, torch.cat(predictions_table, 2):t())
+        -- We don't have predictions for the first `sequence_length - 1` frames.
+        -- So, set them to be equal to the prediction for the `sequence_length`
+        -- frame.
+        for i = 1, args.sequence_length-1 do
+            predictions_by_filename[filename][i] =
+                predictions_by_filename[filename][args.sequence_length]
+        end
+        predictions_by_filename[filename] = torch.cat(predictions_table, 2):t()
     end
-else
-    print('Cannot save predictions to HDF5 for --sequence_length ~= 1')
+
+    -- Save predictions to HDF5.
+    local output_file = hdf5.open(args.output_hdf5, 'w')
+    for filename, file_predictions in pairs(predictions_by_filename) do
+        output_file:write(filename, file_predictions)
+    end
 end
