@@ -16,6 +16,7 @@ local cutorch = require 'cutorch'
 local torch = require 'torch'
 local nn = require 'nn'
 require 'rnn'
+require 'cunn'
 
 require 'CAvgTable'
 
