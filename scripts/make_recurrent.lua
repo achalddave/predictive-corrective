@@ -29,6 +29,7 @@ parser:option('--hidden',
     'Type of hidden connection. Options: \n' ..
     'linear:  Fully connected layer between hidden weights. \n' ..
     'avg: Average current activations with previous hidden activation. \n' ..
+    'avg_ends: Average first and last time step activations. \n' ..
     'poolavg: Average current activations with pooled previous activation. \n')
     :default('linear')
 parser:option('--output', 'Output rnn model'):count(1)
@@ -58,7 +59,7 @@ for i = 1, #(old_layer_container.modules) do
                 nn.Identity() --[[transfer]],
                 nn.CAddTable() --[[merge]])
             old_layer_container:insert(recurrent_layer, i + 1)
-        elseif args.hidden == 'avg' then
+        elseif args.hidden == 'avg' or args.hidden == 'avg_ends' then
             -- Convert input tensor to singleton table.
             local tensor_to_table = nn.ConcatTable()
             tensor_to_table:add(nn.Identity())
@@ -73,7 +74,15 @@ for i = 1, #(old_layer_container.modules) do
                 nn.Identity() --[[merge]])
 
             old_layer_container:insert(collect_recurrent_to_table, i + 1)
-            old_layer_container:insert(nn.CAvgTable(), i + 2)
+            if args.hidden == 'avg_ends' then
+                local first_last_selector = nn.ConcatTable()
+                first_last_selector:add(nn.SelectTable(1))
+                first_last_selector:add(nn.SelectTable(-1))
+                old_layer_container:insert(first_last_selector, i + 2)
+                old_layer_container:insert(nn.CAvgTable(), i + 3)
+            else
+                old_layer_container:insert(nn.CAvgTable(), i + 2)
+            end
         elseif args.hidden == 'poolavg' then
             -- Pooling layer averages after each new input; we would like to sum
             -- after each new input, then divide by #inputs at the end. I don't
