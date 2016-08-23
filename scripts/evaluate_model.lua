@@ -28,6 +28,10 @@ parser:argument('labeled_video_frames_lmdb',
 parser:argument('labeled_video_frames_without_images_lmdb',
                 'LMDB containing LabeledVideoFrames without images.')
 parser:argument('output_hdf5', 'HDF5 to output predictions to')
+parser:option('--sequence_length', 'Number of input frames.')
+    :count('?'):default(2):convert(tonumber)
+parser:option('--step_size', 'Size of step between frames.')
+    :count('?'):default(1):convert(tonumber)
 parser:flag('--decorate_sequencer',
             'If specified, decorate model with nn.Sequencer.' ..
             'This is necessary if the model does not expect a table as ' ..
@@ -42,9 +46,7 @@ local GPUS = {1, 2, 3, 4}
 local MEANS = {96.8293, 103.073, 101.662}
 local CROP_SIZE = 224
 local CROPS = {'c'}
-local SEQUENCE_LENGTH = 2
-local FRAME_TO_PREDICT = 1
-local STEP_SIZE = 1
+local FRAME_TO_PREDICT = args.sequence_length
 local IMAGES_IN_BATCH = math.floor(NETWORK_BATCH_SIZE / #CROPS)
 
 math.randomseed(0)
@@ -60,8 +62,6 @@ os.execute('git --no-pager rev-parse HEAD')
 print('===')
 print('Evaluating model. Args:')
 print(args)
-print('STEP_SIZE: ', STEP_SIZE)
-print('SEQUENCE_LENGTH: ', SEQUENCE_LENGTH)
 print('FRAME_TO_PREDICT: ', FRAME_TO_PREDICT)
 print('CROPS: ', CROPS)
 
@@ -90,8 +90,8 @@ print('Loaded model.')
 local sampler = data_loader.PermutedSampler(
     args.labeled_video_frames_without_images_lmdb,
     NUM_LABELS,
-    SEQUENCE_LENGTH,
-    STEP_SIZE)
+    args.sequence_length,
+    args.step_size)
 local loader = data_loader.DataLoader(
     args.labeled_video_frames_lmdb, sampler, NUM_LABELS)
 print('Initialized sampler.')
@@ -133,7 +133,7 @@ while true do
 
     local batch_size = #images_table[1]
     local num_channels = images_table[1][1]:size(1)
-    local images = torch.Tensor(SEQUENCE_LENGTH, batch_size * #CROPS,
+    local images = torch.Tensor(args.sequence_length, batch_size * #CROPS,
                                 num_channels, CROP_SIZE, CROP_SIZE)
     for step, step_images in ipairs(images_table) do
         for batch_index, img in ipairs(step_images) do
@@ -152,14 +152,14 @@ while true do
 
     gpu_inputs:resize(images:size()):copy(images)
 
-    -- (SEQUENCE_LENGTH, #images_table, num_labels) array
+    -- (sequence_length, #images_table, num_labels) array
     local crop_predictions = model:forward(gpu_inputs):type(
         torch.getdefaulttensortype())
     -- We only care about the predictions for the last step of the sequence.
     if torch.isTensor(crop_predictions) and
-        crop_predictions:size(1) == SEQUENCE_LENGTH then
+        crop_predictions:size(1) == args.sequence_length then
         -- If we are using nn.Sequencer
-        crop_predictions = crop_predictions[SEQUENCE_LENGTH]
+        crop_predictions = crop_predictions[args.sequence_length]
     elseif torch.isTensor(crop_predictions) and crop_predictions:size(1) == 1
         then
         -- If we are using, e.g. pyramid model.
@@ -168,7 +168,7 @@ while true do
         error('Unknown output predictions shape.')
     end
     labels = labels[FRAME_TO_PREDICT]
-    batch_keys = batch_keys[SEQUENCE_LENGTH]
+    batch_keys = batch_keys[args.sequence_length]
 
     local predictions = torch.Tensor(batch_size, NUM_LABELS)
     for i = 1, batch_size do
@@ -220,7 +220,7 @@ end
 local map = torch.mean(aps[torch.ne(aps, -1)])
 print('mAP: ', map)
 
-if SEQUENCE_LENGTH == 1 then
+if args.sequence_length == 1 then
     -- Save predictions to HDF5.
     local output_file = hdf5.open(args.output_hdf5, 'w')
     -- Map filename to a table of predictions by frame number.
@@ -236,13 +236,13 @@ if SEQUENCE_LENGTH == 1 then
         end
         predictions_by_filename[filename][frame_number] = prediction
     end
-    -- TODO(achald): This is currently broken when SEQUENCE_LENGTH > 1.
+    -- TODO(achald): This is currently broken when sequence_length > 1.
     -- The torch.cat call will fail because the first frame we have predictions for
-    -- will be frame SEQUENCE_LENGTH, and so the predictions_table will not have a
-    -- key for indices 1..SEQUENCE_LENGTH-1. Unclear how to fix...
+    -- will be frame sequence_length, and so the predictions_table will not have a
+    -- key for indices 1..sequence_length-1. Unclear how to fix...
     for filename, predictions_table in pairs(predictions_by_filename) do
         output_file:write(filename, torch.cat(predictions_table, 2):t())
     end
 else
-    print('Cannot save predictions to HDF5 for SEQUENCE_LENGTH ~= 1')
+    print('Cannot save predictions to HDF5 for --sequence_length ~= 1')
 end
