@@ -111,7 +111,7 @@ local parallel_stubs_conv4_3_to_conv5_3 = nn.ParallelTable()
 for _ = 1, (SEQUENCE_LENGTH/2) do
     parallel_stubs_conv4_3_to_conv5_3:add(stub_conv4_3_to_conv5_3:sharedClone())
 end
-local conv5_3_averager = create_averager(SEQUENCE_LENGTH / 2)
+local conv5_3_averager = create_averager(SEQUENCE_LENGTH / 2, args.weighted_avg)
 
 -- Conv5_3 -> Output
 local stub_conv5_3_to_output = extract_stub(
