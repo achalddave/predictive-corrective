@@ -9,12 +9,14 @@ local Evaluator = classic.class('Evaluator')
 
 function Evaluator:_init(args)
     --[[
-    Used to evaluate the model on validation data.
+    Used to evaluate the model on validation data. See trainer.lua for
+    documentation of arguments.
 
     Args:
         model
         criterion
         data_loader
+        input_dimension_permutation
         pixel_mean
         batch_size
         crop_size
@@ -23,6 +25,14 @@ function Evaluator:_init(args)
     self.model = args.model
     self.criterion = args.criterion
     self.data_loader = args.data_loader
+    -- Only use input permutation if it is not the identity.
+    self.input_dimension_permutation = nil
+    for i = 1, 5 do
+        if args.input_dimension_permutation[i] ~= i then
+            self.input_dimension_permutation = args.input_dimension_permutation
+            break
+        end
+    end
     self.pixel_mean = torch.Tensor(args.pixel_mean)
     self.batch_size = args.batch_size
     self.crop_size = args.crop_size
@@ -57,6 +67,9 @@ function Evaluator:evaluate_batch()
             -- (Originally, it is a ByteTensor).
             images[{step, batch_index}] = self:_process(img:typeAs(images))
         end
+    end
+    if self.input_dimension_permutation then
+        images = images:permute(unpack(self.input_dimension_permutation))
     end
 
     self.gpu_inputs:resize(images:size()):copy(images)
