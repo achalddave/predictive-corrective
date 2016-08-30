@@ -94,9 +94,15 @@ end
 if args.decorate_sequencer then
     single_model = nn.Sequencer(single_model)
 end
--- DataParallel across the 2nd dimension, which will be batch size. Our 1st
--- dimension is a step in the sequence.
-local model = nn.DataParallelTable(2 --[[dimension]])
+local batch_dimension = 2 -- by default
+for i = 1, 5 do
+    if config.input_dimension_permutation[i] == batch_dimension then
+        -- batch_dimension will be permuted to be i'th dimension
+        batch_dimension = i
+        break
+    end
+end
+local model = nn.DataParallelTable(batch_dimension)
 for _, gpu in ipairs(config.gpus) do
     cutorch.setDevice(gpu)
     model:add(single_model:clone():cuda(), gpu)
