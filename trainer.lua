@@ -179,10 +179,16 @@ function Trainer:train_epoch(epoch, num_batches)
                       epoch_index_start + self.batch_size - 1},
                       {}}] = curr_groundtruth
 
+        local current_mean_average_precision =
+            evaluator.compute_mean_average_precision(
+                predictions[{{1, epoch_index_start + self.batch_size - 1}}],
+                groundtruth[{{1, epoch_index_start + self.batch_size - 1}}])
         print(string.format(
-              '%s: Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f LR %.0e',
+              '%s: Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f ' ..
+              'epoch mAP %.4f LR %.0e',
               os.date('%X'), epoch, batch_index, num_batches,
               batch_timer:time().real, loss,
+              current_mean_average_precision,
               self.optimization_config.learningRate))
     end
 
