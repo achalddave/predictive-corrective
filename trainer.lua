@@ -125,7 +125,8 @@ function Trainer:train_batch()
         outputs = self.model:forward(self.gpu_inputs)
         -- If the output of the network is a single prediction for the sequence,
         -- compare it to the label of the last frame.
-        if outputs:size(1) == 1 and self.gpu_labels:size(1) ~= 1 then
+        if (outputs:size(1) == 1 or outputs:dim() == 2) and
+                self.gpu_labels:size(1) ~= 1 then
             self.gpu_labels = self.gpu_labels[self.gpu_labels:size(1)]
         end
         loss = self.criterion:forward(outputs, self.gpu_labels)
@@ -163,9 +164,12 @@ function Trainer:train_epoch(epoch, num_batches)
 
         -- We only care about the predictions and groundtruth in the last step
         -- of the sequence.
-        local last_step = curr_predictions:size(1)
-        curr_predictions = curr_predictions[last_step]
-        curr_groundtruth = curr_groundtruth[last_step]
+        if curr_predictions:dim() == 3 and curr_predictions:size(1) > 1 then
+            curr_predictions = curr_predictions[curr_predictions:size(1)]
+        end
+        if curr_groundtruth:dim() == 3 and curr_groundtruth:size(1) > 1 then
+            curr_groundtruth = curr_groundtruth[curr_groundtruth:size(1)]
+        end
         -- Collect current predictions and groundtruth.
         local epoch_index_start = (batch_index - 1) * self.batch_size + 1
         predictions[{{epoch_index_start,
