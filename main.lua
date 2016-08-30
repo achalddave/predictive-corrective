@@ -46,6 +46,9 @@ config.sequence_length = config.sequence_length == nil
                          and 1
                          or config.sequence_length
 config.step_size = config.step_size == nil and 1 or config.step_size
+if config.input_dimension_permutation == nil then
+    config.input_dimension_permutation = {1, 2, 3, 4, 5}
+end
 -- TODO(achald): Validate config.
 
 -- Create cache_base

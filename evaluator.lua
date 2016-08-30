@@ -28,7 +28,8 @@ function Evaluator:_init(args)
     -- Only use input permutation if it is not the identity.
     self.input_dimension_permutation = nil
     for i = 1, 5 do
-        if args.input_dimension_permutation[i] ~= i then
+        if args.input_dimension_permutation ~= nil
+                and args.input_dimension_permutation[i] ~= i then
             self.input_dimension_permutation = args.input_dimension_permutation
             break
         end
