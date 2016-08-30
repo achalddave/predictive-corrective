@@ -33,7 +33,7 @@ function Sampler.static.frame_offset_key(frame_key, offset)
 
     -- Keys are of the form '<filename>-<frame_number>'.
     -- Find the index of the '-'
-    local _, split_index = string.find(frame_key, '.*-')
+    local _, split_index = string.find(frame_key, '[^-]*-')
     local filename = string.sub(frame_key, 1, split_index - 1)
     local frame_number = tonumber(string.sub(frame_key, split_index + 1, -1))
     frame_number = frame_number + offset
