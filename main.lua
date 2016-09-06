@@ -181,10 +181,8 @@ local evaluator = evaluator.Evaluator {
 }
 
 print('Initialized trainer and evaluator.')
-local epoch
-for i = 1, config.num_epochs do
-    print(('Training epoch %d'):format(i))
-    epoch = config.init_epoch + i - 1
+for epoch = config.init_epoch, config.num_epochs do
+    print(('Training epoch %d'):format(epoch))
     trainer:train_epoch(epoch, config.epoch_size)
     trainer:save(cache_dir, epoch)
     evaluator:evaluate_epoch(epoch, config.epoch_size)
