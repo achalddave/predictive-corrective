@@ -196,6 +196,9 @@ function BalancedSampler:_init(
     Samples from each class a balanced number of times, so that the model should
     see approximately the same amount of data from each class.
 
+    If sequence_length is >1, then the label for the _last_ frame in the
+    sequence is used for balancing classes.
+
     Args:
         lmdb_without_images_path (str): Path to LMDB containing
             LabeledVideoFrames as values, but without any raw image data. This
