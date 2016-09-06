@@ -43,7 +43,7 @@ end
 local PermutedSampler = classic.class('PermutedSampler', Sampler)
 function PermutedSampler:_init(
         lmdb_without_images_path, _ --[[num_labels]],
-        sequence_length, step_size, _ --[[options]])
+        sequence_length, step_size, use_boundary_frames, _ --[[options]])
     --[[
     Returns consecutive batches from a permuted list of keys.
 
@@ -60,14 +60,24 @@ function PermutedSampler:_init(
         step_size (num): If provided, elements in the sequence should be
             separated by this step_size. If step_size is 2, a sequence of length
             5 starting at x_1 is {x_1, x_3, x_5, x_7, x_9}.
+        use_boundary_frames (bool): Default false. If false, avoid sequences
+            that go outside the video temporally. Otherwise, for sequences at
+            the boundary, we replicate the first or last frame of the video.
     ]]--
     self.imageless_path = lmdb_without_images_path
     self.sequence_length = sequence_length == nil and 1 or sequence_length
     self.step_size = step_size == nil and 1 or step_size
-    self.keys = PermutedSampler.filter_end_frames(
-        PermutedSampler.load_lmdb_keys(lmdb_without_images_path),
-        self.sequence_length,
-        self.step_size)
+    self.use_boundary_frames = use_boundary_frames == nil and
+                               false or use_boundary_frames
+    self.keys = PermutedSampler.load_lmdb_keys(lmdb_without_images_path)
+    -- List of all valid keys.
+    self.keys_set = {}
+    for _, key in ipairs(self.keys) do self.keys_set[key] = true end
+    if not self.use_boundary_frames then
+        self.keys = PermutedSampler.filter_boundary_frames(
+            self.keys, self.sequence_length, self.step_size)
+    end
+
     self.permuted_keys = Sampler.permute(self.keys)
     self.key_index = 1
 end
@@ -92,8 +102,17 @@ function PermutedSampler:sample_keys(num_sequences)
             self.key_index = 1
         end
         local sampled_key = self.permuted_keys[self.key_index]
+        local last_valid_key
         for step = 1, self.sequence_length do
-            table.insert(batch_keys[step], sampled_key)
+            -- If the key exists, use it. Otherwise, use the last frame we have.
+            if self.keys_set[sampled_key] then
+                last_valid_key = sampled_key
+            elseif not self.use_boundary_frames then
+                -- If we aren't using boundary frames, we shouldn't run into
+                -- missing keys!
+                print('Missing key:', sampled_key)
+            end
+            table.insert(batch_keys[step], last_valid_key)
             sampled_key = Sampler.frame_offset_key(sampled_key, self.step_size)
         end
         self.key_index = self.key_index + 1
@@ -134,7 +153,7 @@ function PermutedSampler.static.load_lmdb_keys(lmdb_path)
     return keys
 end
 
-function PermutedSampler.static.filter_end_frames(
+function PermutedSampler.static.filter_boundary_frames(
         frame_keys, sequence_length, step_size)
     --[[ Filter out the last sequence_length frames in the video.
     --
@@ -171,6 +190,7 @@ function BalancedSampler:_init(
         num_labels,
         sequence_length,
         step_size,
+        use_boundary_frames,
         options)
     --[[
     Samples from each class a balanced number of times, so that the model should
@@ -187,6 +207,9 @@ function BalancedSampler:_init(
         step_size (num): If provided, elements in the sequence should be
             separated by this step_size. If step_size is 2, a sequence of length
             5 starting at x_1 is {x_1, x_3, x_5, x_7, x_9}.
+        use_boundary_frames (bool): Default false. If false, avoid sequences
+            that go outside the video temporally. Otherwise, for sequences at
+            the boundary, we replicate the first or last frame of the video.
         options (table):
             include_bg: Whether to output a balanced number of frames that
                 have none of the labels.
@@ -197,12 +220,21 @@ function BalancedSampler:_init(
     self.num_labels = self.include_bg and num_labels + 1 or num_labels
     self.sequence_length = sequence_length
     self.step_size = step_size
+    self.use_boundary_frames = use_boundary_frames == nil and
+                               false or use_boundary_frames
 
     self.label_keys = self:_load_label_key_mapping()
+    -- List of all valid keys.
+    self.keys_set = {}
     self.num_keys = 0
     for label, keys in ipairs(self.label_keys) do
-        self.label_keys[label] = PermutedSampler.filter_end_frames(
-            keys, sequence_length, step_size)
+        for _, key in ipairs(self.label_keys[label]) do
+            self.keys_set[key] = true
+        end
+        if not self.use_boundary_frames then
+            self.label_keys[label] = PermutedSampler.filter_boundary_frames(
+                keys, sequence_length, -step_size)
+        end
         self.num_keys = self.num_keys + #keys
     end
 
@@ -219,10 +251,21 @@ function BalancedSampler:sample_keys(num_sequences)
     for _ = 1, num_sequences do
         local label = math.random(self.num_labels)
         local label_key_index = self.label_indices[label]
-        local key = self.label_keys[label][label_key_index]
-        for step = 1, self.sequence_length do
-            table.insert(batch_keys[step], key)
-            key = Sampler.frame_offset_key(key, self.step_size)
+        -- We sample the _end_ of the sequence based on the labels, and build
+        -- the sequence backwards.
+        local sampled_key = self.label_keys[label][label_key_index]
+        local last_valid_key
+        for step = self.sequence_length, 1, -1 do
+            -- If the key exists, use it. Otherwise, use the last frame we have.
+            if self.keys_set[sampled_key] then
+                last_valid_key = sampled_key
+            elseif not self.use_boundary_frames then
+                -- If we aren't using boundary frames, we shouldn't run into
+                -- missing keys!
+                print('Missing key:', sampled_key)
+            end
+            table.insert(batch_keys[step], last_valid_key)
+            sampled_key = Sampler.frame_offset_key(sampled_key, -self.step_size)
         end
         self:_advance_label_index(label)
     end

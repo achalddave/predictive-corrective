@@ -49,6 +49,9 @@ config.step_size = config.step_size == nil and 1 or config.step_size
 if config.input_dimension_permutation == nil then
     config.input_dimension_permutation = {1, 2, 3, 4, 5}
 end
+if config.use_boundary_frames == nil then
+    config.use_boundary_frames = false
+end
 -- TODO(achald): Validate config.
 
 -- Create cache_base
@@ -126,12 +129,14 @@ local train_sampler = sampling_strategies[config.sampling_strategy:lower()](
     config.num_labels,
     config.sequence_length,
     config.step_size,
+    config.use_boundary_frames,
     config.sampling_strategy_options)
 local val_sampler = data_loader.PermutedSampler(
     config.val_lmdb_without_images,
     config.num_labels,
     config.sequence_length,
-    config.step_size)
+    config.step_size,
+    config.use_boundary_frames)
 
 local train_loader = data_loader.DataLoader(
     config.train_lmdb, train_sampler, config.num_labels)
