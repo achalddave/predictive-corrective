@@ -9,6 +9,7 @@ local paths = require 'paths'
 local nn = require 'nn'
 local torch = require 'torch'
 local yaml = require 'yaml'
+require 'nnlr'
 require 'rnn'
 require 'last_step_criterion'
 

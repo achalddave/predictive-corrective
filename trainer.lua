@@ -6,6 +6,7 @@ local image = require 'image'
 local optim = require 'optim'
 local paths = require 'paths'
 local torch = require 'torch'
+require 'nnlr'
 
 local evaluator = require 'evaluator'
 local DataLoader = require('data_loader').DataLoader
@@ -53,12 +54,13 @@ function Trainer:_init(args)
     self.crop_size = args.crop_size
     self.num_labels = args.num_labels
     self.optimization_config = {
-        learningRate = nil, -- set by update_learning_rate
         learningRateDecay = 0.0,
         momentum = args.momentum,
         dampening = 0.0,
-        weightDecay = args.weight_decay
+        learningRate = nil, -- set by update_optim_config
+        weightDecay = nil -- set by update_optim_config
     }
+    self.weight_decay = args.weight_decay
     self.learning_rates = args.learning_rates
 
     -- Preallocate GPU inputs.
@@ -75,10 +77,14 @@ function Trainer:_init(args)
     self.data_loader:fetch_batch_async(self.batch_size)
 end
 
-function Trainer:update_learning_rate(epoch)
+function Trainer:update_optim_config(epoch)
     local learning_rate, regime_was_updated = self:_epoch_learning_rate(epoch)
+    self.epoch_base_learning_rate = learning_rate
+    local layer_learning_rates, layer_weight_decays = self.model:getOptimConfig(
+        learning_rate, self.weight_decay)
     if regime_was_updated then
-        self.optimization_config.learningRate = learning_rate
+        self.optimization_config.learningRates = learning_rates
+        self.optimization_config.weightDecays = weight_decays
         self.optimization_state = {}
     end
     return regime_was_updated
@@ -146,7 +152,7 @@ end
 function Trainer:train_epoch(epoch, num_batches)
     self.model:clearState()
     self.model:training()
-    self:update_learning_rate(epoch)
+    self:update_optim_config(epoch)
     local epoch_timer = torch.Timer()
     local batch_timer = torch.Timer()
 
@@ -189,7 +195,7 @@ function Trainer:train_epoch(epoch, num_batches)
               os.date('%X'), epoch, batch_index, num_batches,
               batch_timer:time().real, loss,
               current_mean_average_precision,
-              self.optimization_config.learningRate))
+              self.epoch_base_learning_rate))
     end
 
     local mean_average_precision = evaluator.compute_mean_average_precision(
