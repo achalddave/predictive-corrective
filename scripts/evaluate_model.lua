@@ -95,7 +95,8 @@ local sampler = data_loader.PermutedSampler(
     args.labeled_video_frames_without_images_lmdb,
     NUM_LABELS,
     args.sequence_length,
-    args.step_size)
+    args.step_size,
+    false --[[ use_boundary_frames ]])
 local loader = data_loader.DataLoader(
     args.labeled_video_frames_lmdb, sampler, NUM_LABELS)
 print('Initialized sampler.')
