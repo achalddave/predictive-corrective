@@ -248,7 +248,8 @@ for i = 1, 5 do
         all_predictions[{{group_start, group_end}, {}}],
         all_labels[{{group_start, group_end}, {}}])
 end
-print('mAP for groups:', maps)
+print('mAP for groups:')
+print(maps)
 print('mAP standard deviation: ', maps:std())
 
 if args.output_hdf5 ~= nil then
