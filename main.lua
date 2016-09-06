@@ -188,4 +188,6 @@ for i = 1, config.num_epochs do
     trainer:train_epoch(epoch, config.epoch_size)
     trainer:save(cache_dir, epoch)
     evaluator:evaluate_epoch(epoch, config.epoch_size)
+    collectgarbage()
+    collectgarbage()
 end
