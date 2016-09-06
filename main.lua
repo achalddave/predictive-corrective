@@ -144,6 +144,15 @@ local train_loader = data_loader.DataLoader(
 local val_loader = data_loader.DataLoader(
     config.val_lmdb, val_sampler, config.num_labels)
 
+local optim_config, optim_state
+if config.optim_config ~= nil and config.optim_state ~= nil then
+    optim_config = torch.load(config.optim_config)
+    optim_state = torch.load(config.optim_state)
+    print('Loading optim_config, optim_state from disk.')
+elseif not (config.optim_config == nil and config.optim_state == nil) then
+    error('optim_config and optim_state must either both be specified, ' ..
+          'or both left empty')
+end
 local trainer = trainer.Trainer {
     model = model,
     criterion = criterion,
@@ -156,7 +165,9 @@ local trainer = trainer.Trainer {
     num_labels = config.num_labels,
     learning_rates = config.learning_rates,
     momentum = config.momentum,
-    weight_decay = config.weight_decay
+    weight_decay = config.weight_decay,
+    optim_config = optim_config,
+    optim_state = optim_state
 }
 local evaluator = evaluator.Evaluator {
     model = model,

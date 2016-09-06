@@ -37,6 +37,8 @@ function Trainer:_init(args)
         num_labels
         momentum
         weight_decay
+        optim_config: Optional
+        optim_state: Optional
     ]]--
     self.model = args.model
     self.criterion = args.criterion
@@ -53,13 +55,6 @@ function Trainer:_init(args)
     self.batch_size = args.batch_size
     self.crop_size = args.crop_size
     self.num_labels = args.num_labels
-    self.optimization_config = {
-        learningRateDecay = 0.0,
-        momentum = args.momentum,
-        dampening = 0.0,
-        learningRate = nil, -- set by update_optim_config
-        weightDecay = nil -- set by update_optim_config
-    }
     self.weight_decay = args.weight_decay
     self.learning_rates = args.learning_rates
 
@@ -67,7 +62,22 @@ function Trainer:_init(args)
     self.gpu_inputs = torch.CudaTensor()
     self.gpu_labels = torch.CudaTensor()
 
-    self.optimization_state = {}
+    if args.optim_config then
+        self.optimization_config = optim_config
+    else
+        self.optimization_config = {
+            learningRateDecay = 0.0,
+            momentum = args.momentum,
+            dampening = 0.0,
+            learningRate = nil, -- set by update_optim_config
+            weightDecay = nil -- set by update_optim_config
+        }
+    end
+    if args.optim_state then
+        self.optimization_state = optim_state
+    else
+        self.optimization_state = {}
+    end
     -- These variables view into the model's parameters, so that changes to the
     -- model's parameters are automatically reflected in them, and vice versa.
     self.model_parameters, self.model_grad_parameters =
