@@ -36,6 +36,9 @@ parser:flag('--decorate_sequencer',
             'If specified, decorate model with nn.Sequencer.' ..
             'This is necessary if the model does not expect a table as ' ..
             'input.')
+parser:flag('--c3d_input',
+            'If specified, use C3D input format, which is of size ' ..
+            '(batch_size, num_channels, sequence_length, width, height)')
 
 local args = parser:parse()
 
@@ -77,7 +80,8 @@ if args.decorate_sequencer then
 end
 -- DataParallel across the 2nd dimension, which will be batch size. Our 1st
 -- dimension is a step in the sequence.
-local model = nn.DataParallelTable(2 --[[dimension]])
+local batch_dimension = args.c3d_input and 1 or 2
+local model = nn.DataParallelTable(batch_dimension --[[dimension]])
 for _, gpu in ipairs(GPUS) do
     cutorch.setDevice(gpu)
     model:add(single_model:clone():cuda(), gpu)
@@ -150,6 +154,13 @@ while true do
         end
     end
 
+    if args.c3d_input then
+        -- Permute
+        -- from (sequence_length,   batch_size,    num_channels, width, height)
+        -- to   (     batch_size, num_channels, sequence_length, width, height)
+        images = images:permute(2, 3, 1, 4, 5)
+    end
+
     gpu_inputs:resize(images:size()):copy(images)
 
     -- (sequence_length, #images_table, num_labels) array
@@ -157,6 +168,7 @@ while true do
         torch.getdefaulttensortype())
     -- We only care about the predictions for the last step of the sequence.
     if torch.isTensor(crop_predictions) and
+        crop_predictions:dim() == 3 and
         crop_predictions:size(1) == args.sequence_length then
         -- If we are using nn.Sequencer
         crop_predictions = crop_predictions[args.sequence_length]
@@ -164,7 +176,11 @@ while true do
         then
         -- If we are using, e.g. pyramid model.
         crop_predictions = crop_predictions[1]
-    else
+    end
+
+    if not (crop_predictions:dim() == 2
+            and crop_predictions:size(1) == batch_size
+            and crop_predictions:size(2) == NUM_LABELS) then
         error('Unknown output predictions shape.')
     end
     labels = labels[FRAME_TO_PREDICT]
