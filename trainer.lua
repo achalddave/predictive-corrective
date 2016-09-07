@@ -63,7 +63,7 @@ function Trainer:_init(args)
     self.gpu_labels = torch.CudaTensor()
 
     if args.optim_config then
-        self.optimization_config = optim_config
+        self.optimization_config = args.optim_config
     else
         self.optimization_config = {
             learningRateDecay = 0.0,
@@ -74,7 +74,7 @@ function Trainer:_init(args)
         }
     end
     if args.optim_state then
-        self.optimization_state = optim_state
+        self.optimization_state = args.optim_state
     else
         self.optimization_state = {}
     end
