@@ -93,8 +93,8 @@ function Trainer:update_optim_config(epoch)
     local layer_learning_rates, layer_weight_decays = self.model:getOptimConfig(
         learning_rate, self.weight_decay)
     if regime_was_updated then
-        self.optimization_config.learningRates = learning_rates
-        self.optimization_config.weightDecays = weight_decays
+        self.optimization_config.learningRates = layer_learning_rates
+        self.optimization_config.weightDecays = layer_weight_decays
         self.optimization_state = {}
     end
     return regime_was_updated
