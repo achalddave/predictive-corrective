@@ -42,8 +42,6 @@ if torch.isTypeOf(model, 'nn.Sequencer') then
     model = model:get(1):get(1)
 end
 
-local layers, containers = model:findModules('cudnn.SpatialConvolution')
-
 local CONV4_3_INDEX = 22
 local CONV5_3_INDEX = 29
 
