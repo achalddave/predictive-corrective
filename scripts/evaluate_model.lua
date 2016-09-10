@@ -195,8 +195,8 @@ while true do
     for i = 1, batch_size do
         local start_crops = (i - 1) * #CROPS + 1
         local end_crops = i * #CROPS
-        predictions[i] = torch.sum(
-            crop_predictions[{{start_crops, end_crops}, {}}], 1) / #CROPS
+        predictions[i] = crop_predictions[{{start_crops, end_crops},
+                                           {}}]:mean(1)
     end
     -- Concat batch_keys to all_keys.
     for i = 1, batch_size do table.insert(all_keys, batch_keys[i]) end
