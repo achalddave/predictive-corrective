@@ -32,6 +32,10 @@ parser:option('--sequence_length', 'Number of input frames.')
     :count('?'):default(2):convert(tonumber)
 parser:option('--step_size', 'Size of step between frames.')
     :count('?'):default(1):convert(tonumber)
+-- E.g. 'val1\nval2\n\nval3\n\nval4' denotes 3 groups.
+parser:option('--val_groups',
+              'Text file denoting groups of validation videos. ' ..
+              'Groups are delimited using a blank line.'):count('?')
 parser:flag('--decorate_sequencer',
             'If specified, decorate model with nn.Sequencer.' ..
             'This is necessary if the model does not expect a table as ' ..
@@ -240,20 +244,61 @@ end
 local map = torch.mean(aps[torch.ne(aps, -1)])
 print('mAP: ', map)
 
-local num_groups = 5
-local maps = torch.zeros(5)
-local group_size = math.floor(all_predictions:size(1) / num_groups)
-for i = 1, 5 do
-    local group_start = group_size * (i - 1) + 1
-    local group_end = group_size * i
-    if i == 5 then group_end = all_predictions:size(1) end
-    maps[i] = evaluator.compute_mean_average_precision(
-        all_predictions[{{group_start, group_end}, {}}],
-        all_labels[{{group_start, group_end}, {}}])
+if args.val_groups then
+    function trim(str)
+        return str:gsub("^%s*(.-)%s*$", "%1")
+    end
+    function string.starts(str, start_str)
+        return string.sub(str, 1, string.len(start_str)) == start_str
+    end
+
+    local groups_file = torch.DiskFile(args.val_groups, 'r'):quiet()
+    local file_groups = {{}}
+    while true do
+        local line = trim(groups_file:readString('*l'))
+        if groups_file:hasError() then break end
+        if line == '' then
+            table.insert(file_groups, {})
+        else
+            table.insert(file_groups[#file_groups], line)
+        end
+    end
+
+    local group_predictions = {}
+    local group_labels = {}
+    for key_index, key in ipairs(all_keys) do
+        local key_group = nil
+        for group, group_keys in ipairs(file_groups) do
+            for _, group_key in ipairs(group_keys) do
+                if string.starts(key, group_key) then
+                    key_group = group
+                    break
+                end
+            end
+            if key_group ~= nil then break end
+        end
+        if group_predictions[key_group] == nil then
+            group_predictions[key_group] = all_predictions[{{key_index}}]
+            group_labels[key_group] = all_labels[{{key_index}}]
+        else
+            group_predictions[key_group] = torch.cat(
+                group_predictions[key_group], all_predictions[{{key_index}}], 1)
+            group_labels[key_group] = torch.cat(
+                group_labels[key_group], all_labels[{{key_index}}], 1)
+        end
+    end
+
+    local mAPs = torch.zeros(#file_groups)
+    for group_index = 1, #file_groups do
+        if group_predictions[group_index] ~= nil then
+            mAPs[group_index] = evaluator.compute_mean_average_precision(
+                group_predictions[group_index],
+                group_labels[group_index])
+        end
+        print(string.format('Group %d mAP:', group_index), mAPs[group_index])
+    end
+    print('Group mAPs STD:', mAPs:std())
 end
-print('mAP for groups:')
-print(maps)
-print('mAP standard deviation: ', maps:std())
 
 if args.output_hdf5 ~= nil then
     local predictions_by_filename = {}
