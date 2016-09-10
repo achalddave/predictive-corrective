@@ -110,7 +110,7 @@ print('Initialized sampler.')
 local gpu_inputs = torch.CudaTensor()
 local all_predictions -- (num_samples, num_labels) tensor
 local all_labels -- (num_samples, num_labels) tensor
-local predictions_by_keys = {}
+local all_keys = {} -- (num_samples) length table
 local samples_complete = 0
 
 while true do
@@ -198,9 +198,8 @@ while true do
         predictions[i] = torch.sum(
             crop_predictions[{{start_crops, end_crops}, {}}], 1) / #CROPS
     end
-    for i = 1, batch_size do
-        predictions_by_keys[batch_keys[i]] = predictions[i]
-    end
+    -- Concat batch_keys to all_keys.
+    for i = 1, batch_size do table.insert(all_keys, batch_keys[i]) end
 
     if all_predictions == nil then
         all_predictions = predictions
@@ -258,7 +257,8 @@ print('mAP standard deviation: ', maps:std())
 
 if args.output_hdf5 ~= nil then
     local predictions_by_filename = {}
-    for key, prediction in pairs(predictions_by_keys) do
+    for i, key in pairs(all_keys) do
+        local prediction = all_predictions[i]
         -- Keys are of the form '<filename>-<frame_number>'.
         -- Find the index of the '-'
         local _, split_index = string.find(key, '.*-')
