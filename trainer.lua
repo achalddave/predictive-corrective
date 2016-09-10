@@ -215,7 +215,6 @@ function Trainer:train_epoch(epoch, num_batches)
         'average loss (per batch): %.5f \t mAP: %.5f',
         os.date('%X'), epoch, epoch_timer:time().real, loss_epoch / num_batches,
         mean_average_precision))
-    collectgarbage()
 end
 
 function Trainer:save(directory, epoch)
