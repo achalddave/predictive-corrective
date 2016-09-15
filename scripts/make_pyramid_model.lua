@@ -28,6 +28,8 @@ parser:option('--output', 'Output model'):count(1)
 parser:flag('--weighted_avg',
             'Whether to add learnable weights for averaging layers. ' ..
             'Initialized to 0.5.'):default(false)
+parser:flag('--untie_weights',
+            "If specified, don't tie weights of parallel stubs."):default(false)
 
 local args = parser:parse()
 
@@ -99,7 +101,11 @@ end
 local stub_to_conv4_3 = extract_stub(model, 1, CONV4_3_INDEX)
 local parallel_stubs_to_conv4_3 = nn.ParallelTable()
 for _ = 1, SEQUENCE_LENGTH do
-    parallel_stubs_to_conv4_3:add(stub_to_conv4_3:sharedClone())
+    if args.untie_weights then
+        parallel_stubs_to_conv4_3:add(stub_to_conv4_3:clone())
+    else
+        parallel_stubs_to_conv4_3:add(stub_to_conv4_3:sharedClone())
+    end
 end
 local conv4_3_averager = create_averager(SEQUENCE_LENGTH, args.weighted_avg)
 
@@ -108,7 +114,12 @@ local stub_conv4_3_to_conv5_3 = extract_stub(
     model, CONV4_3_INDEX + 1, CONV5_3_INDEX)
 local parallel_stubs_conv4_3_to_conv5_3 = nn.ParallelTable()
 for _ = 1, (SEQUENCE_LENGTH/2) do
-    parallel_stubs_conv4_3_to_conv5_3:add(stub_conv4_3_to_conv5_3:sharedClone())
+    if args.untie_weights then
+        parallel_stubs_conv4_3_to_conv5_3:add(stub_conv4_3_to_conv5_3:clone())
+    else
+        parallel_stubs_conv4_3_to_conv5_3:add(
+            stub_conv4_3_to_conv5_3:sharedClone())
+    end
 end
 local conv5_3_averager = create_averager(SEQUENCE_LENGTH / 2, args.weighted_avg)
 
