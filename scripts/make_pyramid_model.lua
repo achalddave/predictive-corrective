@@ -97,15 +97,19 @@ function create_averager(sequence_length, weighted)
 end
 
 local stub_to_conv4_3 = extract_stub(model, 1, CONV4_3_INDEX)
-local map_stubs_to_conv4_3 = nn.MapTable()
-map_stubs_to_conv4_3:add(stub_to_conv4_3)
+local parallel_stubs_to_conv4_3 = nn.ParallelTable()
+for _ = 1, SEQUENCE_LENGTH do
+    parallel_stubs_to_conv4_3:add(stub_to_conv4_3:sharedClone())
+end
 local conv4_3_averager = create_averager(SEQUENCE_LENGTH, args.weighted_avg)
 
 -- Conv4_3 -> Conv5_3
 local stub_conv4_3_to_conv5_3 = extract_stub(
     model, CONV4_3_INDEX + 1, CONV5_3_INDEX)
-local map_stubs_conv4_3_to_conv5_3 = nn.MapTable()
-map_stubs_conv4_3_to_conv5_3:add(stub_conv4_3_to_conv5_3)
+local parallel_stubs_conv4_3_to_conv5_3 = nn.ParallelTable()
+for _ = 1, (SEQUENCE_LENGTH/2) do
+    parallel_stubs_conv4_3_to_conv5_3:add(stub_conv4_3_to_conv5_3:sharedClone())
+end
 local conv5_3_averager = create_averager(SEQUENCE_LENGTH / 2, args.weighted_avg)
 
 -- Conv5_3 -> Output
@@ -114,9 +118,9 @@ local stub_conv5_3_to_output = extract_stub(
 
 local output_model = nn.Sequential()
 output_model:add(nn.SplitTable(1))
-output_model:add(map_stubs_to_conv4_3)
+output_model:add(parallel_stubs_to_conv4_3)
 output_model:add(conv4_3_averager)
-output_model:add(map_stubs_conv4_3_to_conv5_3)
+output_model:add(parallel_stubs_conv4_3_to_conv5_3)
 output_model:add(conv5_3_averager)
 -- At this point we should have a table with exactly one element, which is the
 -- tensor of averaged conv5 activations. Use JoinTable to convert it to a
