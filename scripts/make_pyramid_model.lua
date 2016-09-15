@@ -50,8 +50,7 @@ local CONV5_3_INDEX = 29
 function extract_stub(model, start_index, end_index)
     local output_model = nn.Sequential()
     for i = start_index, end_index do
-        output_model:add(model:get(i):clone(
-            'weight', 'bias', 'gradWeight', 'gradBias'))
+        output_model:add(model:get(i):sharedClone())
     end
     return output_model
 end
