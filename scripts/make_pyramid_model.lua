@@ -58,7 +58,7 @@ end
 local CONV4_3_INDEX = 22
 local CONV5_3_INDEX = 29
 
-function extract_stub(model, start_index, end_index)
+local function extract_stub(model, start_index, end_index)
     local output_model = nn.Sequential()
     for i = start_index, end_index do
         output_model:add(model:get(i):sharedClone())
@@ -66,7 +66,7 @@ function extract_stub(model, start_index, end_index)
     return output_model
 end
 
-function create_merger(sequence_length, merge_type, weighted)
+local function create_merger(sequence_length, merge_type, weighted)
     --[[
     -- Create a model that takes in a table of inputs and merge every
     -- consecutive pair output (without overlap).  The number of inputs to the
