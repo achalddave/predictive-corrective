@@ -55,8 +55,8 @@ if torch.isTypeOf(model, 'nn.Sequencer') then
     model = model:get(1):get(1)
 end
 
-local CONV4_3_INDEX = 22
-local CONV5_3_INDEX = 29
+local CONV4_3_INDEX = 22 -- HACK!
+local CONV5_3_INDEX = 29 -- HACK!
 
 local function extract_stub(model, start_index, end_index)
     local output_model = nn.Sequential()
