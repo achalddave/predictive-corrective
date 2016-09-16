@@ -38,8 +38,8 @@ parser:flag('--untie_weights',
 local args = parser:parse()
 
 local MERGE_OPTIONS = {
-    'sum': 1,
-    'avg': 2
+    sum = 1,
+    avg = 2
 }
 local merge_type = MERGE_OPTIONS[args.merge_type]
 assert(merge_type ~= nil, 'Invalid merge option.')
@@ -137,7 +137,7 @@ for _ = 1, (SEQUENCE_LENGTH/2) do
             stub_conv4_3_to_conv5_3:sharedClone())
     end
 end
-local conv5_3_merger = create_merger(SEQUENCE_LENGTH / 2, args.merge_type, args.weighted_avg)
+local conv5_3_merger = create_merger(SEQUENCE_LENGTH / 2, merge_type, args.weighted_avg)
 
 -- Conv5_3 -> Output
 local stub_conv5_3_to_output = extract_stub(
