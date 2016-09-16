@@ -25,13 +25,13 @@ local parser = argparse() {
 }
 parser:option('--model', 'Torch model'):count(1)
 parser:option('--output', 'Output model'):count(1)
+parser:option('--merge_type',
+              'Type of merging. Options: \n' ..
+              'sum: Sum the two inputs. \n' ..
+              'avg: Average the two inputs. \n'):count(1)
 parser:flag('--weighted',
             'Whether to add learnable weights before merging. ' ..
             'Initialized to 0.5.'):default(false)
-parser:flag('--merge_type',
-            'Type of merging. Options: \n' ..
-            'sum: Sum the two inputs. \n' ..
-            'avg: Average the two inputs. \n'):count(1)
 parser:flag('--untie_weights',
             "If specified, don't tie weights of parallel stubs."):default(false)
 
