@@ -1,5 +1,5 @@
 --[[
-Create a pyramid like network, where intermediate layers are averaged over time.
+Create a pyramid like network, where intermediate layers are merged over time.
 
 This network takes as input tensors of shape
 (sequence_length, batch_size, num_channels, height, width), and outputs
@@ -25,13 +25,24 @@ local parser = argparse() {
 }
 parser:option('--model', 'Torch model'):count(1)
 parser:option('--output', 'Output model'):count(1)
-parser:flag('--weighted_avg',
-            'Whether to add learnable weights for averaging layers. ' ..
+parser:flag('--weighted',
+            'Whether to add learnable weights before merging. ' ..
             'Initialized to 0.5.'):default(false)
+parser:flag('--merge_type',
+            'Type of merging. Options: \n' ..
+            'sum: Sum the two inputs. \n' ..
+            'avg: Average the two inputs. \n'):count(1)
 parser:flag('--untie_weights',
             "If specified, don't tie weights of parallel stubs."):default(false)
 
 local args = parser:parse()
+
+local MERGE_OPTIONS = {
+    'sum': 1,
+    'avg': 2
+}
+local merge_type = MERGE_OPTIONS[args.merge_type]
+assert(merge_type ~= nil, 'Invalid merge option.')
 
 local SEQUENCE_LENGTH = 4
 
@@ -55,9 +66,9 @@ function extract_stub(model, start_index, end_index)
     return output_model
 end
 
-function create_averager(sequence_length, weighted)
+function create_merger(sequence_length, merge_type, weighted)
     --[[
-    -- Create a model that takes in a table of inputs and averages every
+    -- Create a model that takes in a table of inputs and merge every
     -- consecutive pair output (without overlap).  The number of inputs to the
     -- model is `sequence_length` and the number of outputs from the model is
     -- `sequence_length / 2`.
@@ -65,35 +76,40 @@ function create_averager(sequence_length, weighted)
     assert(sequence_length % 2 == 0, 'Sequence length must be even.')
     weighted = weighted == nil and false or weighted
 
-    -- Takes average of table of inputs
-    local averaging_layer
+    -- Merge table of inputs
+    local merging_layer = nn.Sequential()
     do
-        if not weighted then
-            averaging_layer = nn.CAvgTable()
-        else
-            averaging_layer = nn.Sequential()
+        if weighted then
             local multiplications = nn.ParallelTable()
             local multiplier = nn.Mul()
-            multiplier.weight[1] = 0.5  -- Initialize to 0.5
+            multiplier.weight[1] = 1  -- Initialize to 1.
+            multiplications:add(multiplier)
             multiplications:add(multiplier:clone())
-            multiplications:add(multiplier:clone())
-            averaging_layer:add(multiplications)
-            averaging_layer:add(nn.CAddTable())
+            merging_layer:add(multiplications)
+            merging_layer:add(nn.CAddTable())
+        end
+
+        if merge_type == MERGE_OPTIONS['sum'] then
+            merging_layer = nn.CAddTable()
+        elseif merge_type == MERGE_OPTIONS['avg'] then
+            merging_layer = nn.CAvgTable()
+        else
+            error('Invalid merge type:', merge_type)
         end
     end
 
-    -- Average every 2 model_stub outputs.
-    local pair_averagers = nn.ConcatTable()
+    -- Merge every 2 model_stub outputs.
+    local pair_mergers = nn.ConcatTable()
     local num_pairs = sequence_length / 2
     for pair_index = 1, num_pairs do
         local left_index = pair_index * 2 - 1 -- Index of 'left' frame in pair.
-        local averager = nn.Sequential()
-        averager:add(nn.NarrowTable(left_index, 2)) -- Select the current pair.
-        averager:add(averaging_layer:clone()) -- Average the current pair.
-        pair_averagers:add(averager)
+        local merger = nn.Sequential()
+        merger:add(nn.NarrowTable(left_index, 2)) -- Select the current pair.
+        merger:add(merging_layer:clone()) -- Merge the current pair.
+        pair_mergers:add(merger)
     end
     local output_model = nn.Sequential()
-    output_model:add(pair_averagers)
+    output_model:add(pair_mergers)
     return output_model
 end
 
@@ -106,7 +122,8 @@ for _ = 1, SEQUENCE_LENGTH do
         parallel_stubs_to_conv4_3:add(stub_to_conv4_3:sharedClone())
     end
 end
-local conv4_3_averager = create_averager(SEQUENCE_LENGTH, args.weighted_avg)
+local conv4_3_merger = create_merger(
+    SEQUENCE_LENGTH, merge_type, args.weighted_avg)
 
 -- Conv4_3 -> Conv5_3
 local stub_conv4_3_to_conv5_3 = extract_stub(
@@ -120,7 +137,7 @@ for _ = 1, (SEQUENCE_LENGTH/2) do
             stub_conv4_3_to_conv5_3:sharedClone())
     end
 end
-local conv5_3_averager = create_averager(SEQUENCE_LENGTH / 2, args.weighted_avg)
+local conv5_3_merger = create_merger(SEQUENCE_LENGTH / 2, args.merge_type, args.weighted_avg)
 
 -- Conv5_3 -> Output
 local stub_conv5_3_to_output = extract_stub(
@@ -129,11 +146,11 @@ local stub_conv5_3_to_output = extract_stub(
 local output_model = nn.Sequential()
 output_model:add(nn.SplitTable(1))
 output_model:add(parallel_stubs_to_conv4_3)
-output_model:add(conv4_3_averager)
+output_model:add(conv4_3_merger)
 output_model:add(parallel_stubs_conv4_3_to_conv5_3)
-output_model:add(conv5_3_averager)
+output_model:add(conv5_3_merger)
 -- At this point we should have a table with exactly one element, which is the
--- tensor of averaged conv5 activations. Use JoinTable to convert it to a
+-- tensor of merged conv5 activations. Use JoinTable to convert it to a
 -- tensor. (We could also use SelectTable, but JoinTable will cause errors if
 -- the table somehow has more than one elements, which is nice.)
 output_model:add(nn.JoinTable(1))
