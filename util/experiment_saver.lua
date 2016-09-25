@@ -1,8 +1,8 @@
-function save_git_info(output_dir)
+local function save_git_info(output_dir)
     os.execute('./dump_git_info.sh ' .. output_dir)
 end
 
-function copy_file_naive(in_path, out_path)
+local function copy_file_naive(in_path, out_path)
     -- TODO(achald): Use a library function, if one exists.
     local in_file = io.open(in_path, 'r')
     local in_contents = in_file:read('*all')
