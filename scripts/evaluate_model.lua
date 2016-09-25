@@ -54,7 +54,8 @@ local MEANS = {96.8293, 103.073, 101.662}
 local CROP_SIZE = 224
 local CROPS = {'c'}
 local FRAME_TO_PREDICT = args.sequence_length
-local IMAGES_IN_BATCH = math.floor(args.batch_size / #CROPS)
+
+local num_images_in_batch = math.floor(args.batch_size / #CROPS)
 
 math.randomseed(0)
 torch.manualSeed(0)
@@ -121,8 +122,8 @@ while true do
     if samples_complete == loader:num_samples() then
         break
     end
-    local to_load = IMAGES_IN_BATCH
-    if samples_complete + IMAGES_IN_BATCH > loader:num_samples() then
+    local to_load = num_images_in_batch
+    if samples_complete + num_images_in_batch > loader:num_samples() then
         to_load = loader:num_samples() - samples_complete
     end
     local images_table, labels, batch_keys = loader:load_batch(
@@ -137,7 +138,7 @@ while true do
         -- Figure out how many images we will need in the next batch, and
         -- prefetch them.
         local next_samples_complete = samples_complete + to_load
-        local next_to_load = IMAGES_IN_BATCH
+        local next_to_load = num_images_in_batch
         if next_samples_complete + next_to_load > loader:num_samples() then
             next_to_load = loader:num_samples() - next_samples_complete
         end
