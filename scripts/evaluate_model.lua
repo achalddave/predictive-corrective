@@ -36,6 +36,7 @@ parser:option('--step_size', 'Size of step between frames.')
 parser:option('--val_groups',
               'Text file denoting groups of validation videos. ' ..
               'Groups are delimited using a blank line.'):count('?')
+parser:option('--batch_size', 'Batch size'):convert(tonumber):default(64)
 parser:flag('--decorate_sequencer',
             'If specified, decorate model with nn.Sequencer.' ..
             'This is necessary if the model does not expect a table as ' ..
@@ -48,13 +49,12 @@ local args = parser:parse()
 
 -- More config variables.
 local NUM_LABELS = 65
-local NETWORK_BATCH_SIZE = 384
 local GPUS = {1, 2, 3, 4}
 local MEANS = {96.8293, 103.073, 101.662}
 local CROP_SIZE = 224
 local CROPS = {'c'}
 local FRAME_TO_PREDICT = args.sequence_length
-local IMAGES_IN_BATCH = math.floor(NETWORK_BATCH_SIZE / #CROPS)
+local IMAGES_IN_BATCH = math.floor(args.batch_size / #CROPS)
 
 math.randomseed(0)
 torch.manualSeed(0)
