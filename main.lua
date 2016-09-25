@@ -16,7 +16,7 @@ require 'last_step_criterion'
 local data_loader = require 'data_loader'
 local evaluator = require 'evaluator'
 local trainer = require 'trainer'
-local save_run_info = require 'save_run_info'
+local experiment_saver = require 'util/experiment_saver'
 require 'layers/CAvgTable'
 
 local parser = argparse() {
@@ -65,14 +65,14 @@ if not paths.mkdir(cache_dir) then
     print('Error making cache dir:', cache_dir)
     os.exit()
 end
-save_run_info.save_git_info(cache_dir)
+experiment_saver.save_git_info(cache_dir)
 print('Saving run information to', cache_dir)
 
 -- Save config to cache_dir
-save_run_info.copy_file_naive(args.config,
+experiment_saver.copy_file_naive(args.config,
                               paths.concat(cache_dir, 'config.yaml'))
 if config.data_paths_config ~= nil then
-    save_run_info.copy_file_naive(
+    experiment_saver.copy_file_naive(
         config.data_paths_config,
         paths.concat(cache_dir, paths.basename(config.data_paths_config)))
 end
