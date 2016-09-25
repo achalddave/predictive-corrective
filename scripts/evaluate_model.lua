@@ -17,6 +17,7 @@ require 'rnn'
 
 local data_loader = require 'data_loader'
 local evaluator = require 'evaluator'
+local string_util = require 'util/strings'
 require 'CAvgTable'
 
 local parser = argparse() {
@@ -246,17 +247,10 @@ local map = torch.mean(aps[torch.ne(aps, -1)])
 print('mAP: ', map)
 
 if args.val_groups then
-    function trim(str)
-        return str:gsub("^%s*(.-)%s*$", "%1")
-    end
-    function string.starts(str, start_str)
-        return string.sub(str, 1, string.len(start_str)) == start_str
-    end
-
     local groups_file = torch.DiskFile(args.val_groups, 'r'):quiet()
     local file_groups = {{}}
     while true do
-        local line = trim(groups_file:readString('*l'))
+        local line = string_util.trim(groups_file:readString('*l'))
         if groups_file:hasError() then break end
         if line == '' then
             table.insert(file_groups, {})
@@ -271,7 +265,7 @@ if args.val_groups then
         local key_group = nil
         for group, group_keys in ipairs(file_groups) do
             for _, group_key in ipairs(group_keys) do
-                if string.starts(key, group_key) then
+                if string_util.starts(key, group_key) then
                     key_group = group
                     break
                 end
