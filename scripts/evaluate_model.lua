@@ -36,7 +36,9 @@ parser:option('--step_size', 'Size of step between frames.')
 -- E.g. 'val1\nval2\n\nval3\n\nval4' denotes 3 groups.
 parser:option('--val_groups',
               'Text file denoting groups of validation videos. ' ..
-              'Groups are delimited using a blank line.'):count('?')
+              'Groups are delimited using a blank line.')
+      :count(1)
+      :default('/data/achald/MultiTHUMOS/val_split/val_val_groups.txt')
 parser:option('--batch_size', 'Batch size'):convert(tonumber):default(64)
 parser:flag('--decorate_sequencer',
             'If specified, decorate model with nn.Sequencer.' ..
@@ -246,7 +248,7 @@ end
 local map = torch.mean(aps[torch.ne(aps, -1)])
 print('mAP: ', map)
 
-if args.val_groups then
+do -- Compute accuracy across validation groups.
     local groups_file = torch.DiskFile(args.val_groups, 'r'):quiet()
     local file_groups = {{}}
     while true do
