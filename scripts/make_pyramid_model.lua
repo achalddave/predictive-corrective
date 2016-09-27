@@ -18,6 +18,8 @@ local nn = require 'nn'
 require 'rnn'
 require 'cunn'
 
+local nninit = require 'nninit'
+
 require 'CAvgTable'
 
 local parser = argparse() {
@@ -29,6 +31,14 @@ parser:option('--merge_type',
               'Type of merging. Options: \n' ..
               'sum: Sum the two inputs. \n' ..
               'avg: Average the two inputs. \n'):count(1)
+parser:option('--weight_type',
+              'Specify relationship between and initialization of pyramid ' ..
+              'weights. Options: \n' ..
+              'tied: Tie weights between pyramid paths. \n' ..
+              'untied: Untie the weights between pyramid paths. \n' ..
+              'residual_tied: Initialize and tie weights on all but last ' ..
+                             'frame. \n')
+      :default('tied')
 parser:flag('--weighted_merge',
             'Whether to add learnable weights before merging. ' ..
             'Initialized to 0.5.'):default(false)
@@ -43,6 +53,10 @@ local MERGE_OPTIONS = {
 }
 local merge_type = MERGE_OPTIONS[args.merge_type]
 assert(merge_type ~= nil, 'Invalid merge option.')
+
+local WEIGHT_TYPE_OPTIONS = { tied = 1, untied = 2, residual_tied = 3 }
+local weight_type = WEIGHT_TYPE_OPTIONS[args.weight_type]
+assert(weight_type ~= nil, 'Invalid weight type.')
 
 local SEQUENCE_LENGTH = 4
 
@@ -113,14 +127,40 @@ local function create_merger(sequence_length, merge_type, weighted)
     return output_model
 end
 
+local function reset_weights(model)
+    local reset_conv_layers = model:findModules(
+        'cudnn.SpatialConvolution')
+    for _, layer in ipairs(reset_conv_layers) do
+        layer:init('weight', nninit.xavier)
+        layer:init('bias', nninit.constant, 0)
+    end
+    local reset_linear_layers = model:findModules('nn.Linear')
+    for _, layer in ipairs(reset_linear_layers) do
+        layer:init('weight', nninit.xavier)
+        layer:init('bias', nninit.constant, 0)
+    end
+end
+
 local stub_to_conv4_3 = extract_stub(model, 1, CONV4_3_INDEX)
 local parallel_stubs_to_conv4_3 = nn.ParallelTable()
-for _ = 1, SEQUENCE_LENGTH do
-    if args.untie_weights then
-        parallel_stubs_to_conv4_3:add(stub_to_conv4_3:clone())
-    else
-        parallel_stubs_to_conv4_3:add(stub_to_conv4_3:sharedClone())
+-- For residual weights.
+local reset_stub_to_conv4_3 = stub_to_conv4_3:clone()
+reset_weights(reset_stub_to_conv4_3)
+for i = 1, SEQUENCE_LENGTH do
+    local stub
+    if weight_type == WEIGHT_TYPE_OPTIONS.untied then
+        stub = stub_to_conv4_3:clone()
+    elseif weight_type == WEIGHT_TYPE_OPTIONS.tied then
+        stub = stub_to_conv4_3:sharedClone()
+    elseif weight_type == WEIGHT_TYPE_OPTIONS.residual_tied then
+        if i ~= SEQUENCE_LENGTH then
+            -- Share weights on all but the last frame.
+            stub = reset_stub_to_conv4_3:sharedClone()
+        else
+            stub = stub_to_conv4_3:clone()
+        end
     end
+    parallel_stubs_to_conv4_3:add(stub)
 end
 local conv4_3_merger = create_merger(
     SEQUENCE_LENGTH, merge_type, args.weighted_merge)
@@ -129,13 +169,24 @@ local conv4_3_merger = create_merger(
 local stub_conv4_3_to_conv5_3 = extract_stub(
     model, CONV4_3_INDEX + 1, CONV5_3_INDEX)
 local parallel_stubs_conv4_3_to_conv5_3 = nn.ParallelTable()
-for _ = 1, (SEQUENCE_LENGTH/2) do
-    if args.untie_weights then
-        parallel_stubs_conv4_3_to_conv5_3:add(stub_conv4_3_to_conv5_3:clone())
-    else
-        parallel_stubs_conv4_3_to_conv5_3:add(
-            stub_conv4_3_to_conv5_3:sharedClone())
+-- For residual weights.
+local reset_stub_conv4_3_to_conv5_3 = stub_conv4_3_to_conv5_3:clone()
+reset_weights(reset_stub_conv4_3_to_conv5_3)
+for i = 1, (SEQUENCE_LENGTH/2) do
+    local stub
+    if weight_type == WEIGHT_TYPE_OPTIONS.untied then
+        stub = stub_conv4_3_to_conv5_3:clone()
+    elseif weight_type == WEIGHT_TYPE_OPTIONS.tied then
+        stub = stub_conv4_3_to_conv5_3:sharedClone()
+    elseif weight_type == WEIGHT_TYPE_OPTIONS.residual_tied then
+        if i ~= (SEQUENCE_LENGTH / 2) then
+            -- Share weights on all but the last frame.
+            stub = reset_stub_conv4_3_to_conv5_3:sharedClone()
+        else
+            stub = stub_conv4_3_to_conv5_3:clone()
+        end
     end
+    parallel_stubs_conv4_3_to_conv5_3:add(stub)
 end
 local conv5_3_merger = create_merger(SEQUENCE_LENGTH / 2, merge_type, args.weighted_merge)
 
