@@ -42,8 +42,6 @@ parser:option('--weight_type',
 parser:flag('--weighted_merge',
             'Whether to add learnable weights before merging. ' ..
             'Initialized to 0.5.'):default(false)
-parser:flag('--untie_weights',
-            "If specified, don't tie weights of parallel stubs."):default(false)
 
 local args = parser:parse()
 
