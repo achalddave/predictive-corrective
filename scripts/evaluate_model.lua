@@ -17,6 +17,7 @@ require 'rnn'
 
 local data_loader = require 'data_loader'
 local evaluator = require 'evaluator'
+local experiment_saver = require 'util/experiment_saver'
 local string_util = require 'util/strings'
 require 'CAvgTable'
 
@@ -33,6 +34,11 @@ parser:option('--sequence_length', 'Number of input frames.')
     :count('?'):default(2):convert(tonumber)
 parser:option('--step_size', 'Size of step between frames.')
     :count('?'):default(1):convert(tonumber)
+parser:option('--experiment_id_file',
+              'Path to text file containing the experiment id for this run.' ..
+              'The id in this file will be incremented by this program.')
+              :count(1)
+              :default('/data/achald/MultiTHUMOS/models/next_experiment_id.txt')
 -- E.g. 'val1\nval2\n\nval3\n\nval4' denotes 3 groups.
 parser:option('--val_groups',
               'Text file denoting groups of validation videos. ' ..
@@ -75,6 +81,12 @@ print('Evaluating model. Args:')
 print(args)
 print('FRAME_TO_PREDICT: ', FRAME_TO_PREDICT)
 print('CROPS: ', CROPS)
+
+local experiment_id = experiment_saver.read_and_increment_experiment_id(
+    args.experiment_id_file)
+print('===')
+print('Experiment id:', experiment_id)
+print('===')
 
 -- Load model.
 print('Loading model.')

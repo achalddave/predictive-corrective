@@ -25,6 +25,11 @@ local parser = argparse() {
 parser:argument('config', 'Config file')
 parser:argument('cache_base',
                 'Directory to save model snapshots, logging, etc. to.')
+parser:option('--experiment_id_file',
+              'Path to text file containing the experiment id for this run.' ..
+              'The id in this file will be incremented by this program.')
+              :count(1)
+              :default('/data/achald/MultiTHUMOS/models/next_experiment_id.txt')
 parser:flag('--decorate_sequencer',
             'If specified, decorate model with nn.Sequencer.' ..
             'This is necessary if the model does not expect a table as ' ..
@@ -76,6 +81,14 @@ if config.data_paths_config ~= nil then
         config.data_paths_config,
         paths.concat(cache_dir, paths.basename(config.data_paths_config)))
 end
+
+local experiment_id = experiment_saver.read_and_increment_experiment_id(
+    args.experiment_id_file)
+experiment_saver.copy_file_naive(
+    args.experiment_id_file, paths.concat(cache_dir, 'experiments-id.txt'))
+print('===')
+print('Experiment id:', experiment_id)
+print('===')
 
 cutorch.setDevice(config.gpus[1])
 math.randomseed(config.seed)
