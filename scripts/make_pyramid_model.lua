@@ -123,7 +123,7 @@ for _ = 1, SEQUENCE_LENGTH do
     end
 end
 local conv4_3_merger = create_merger(
-    SEQUENCE_LENGTH, merge_type, args.weighted_avg)
+    SEQUENCE_LENGTH, merge_type, args.weighted)
 
 -- Conv4_3 -> Conv5_3
 local stub_conv4_3_to_conv5_3 = extract_stub(
@@ -137,7 +137,7 @@ for _ = 1, (SEQUENCE_LENGTH/2) do
             stub_conv4_3_to_conv5_3:sharedClone())
     end
 end
-local conv5_3_merger = create_merger(SEQUENCE_LENGTH / 2, merge_type, args.weighted_avg)
+local conv5_3_merger = create_merger(SEQUENCE_LENGTH / 2, merge_type, args.weighted)
 
 -- Conv5_3 -> Output
 local stub_conv5_3_to_output = extract_stub(
