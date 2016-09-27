@@ -47,14 +47,12 @@ parser:flag('--untie_weights',
 
 local args = parser:parse()
 
-local MERGE_OPTIONS = {
-    sum = 1,
-    avg = 2
-}
+local MERGE_OPTIONS = { sum = 1, avg = 2 }
+local WEIGHT_TYPE_OPTIONS = { tied = 1, untied = 2, residual_tied = 3 }
+
 local merge_type = MERGE_OPTIONS[args.merge_type]
 assert(merge_type ~= nil, 'Invalid merge option.')
 
-local WEIGHT_TYPE_OPTIONS = { tied = 1, untied = 2, residual_tied = 3 }
 local weight_type = WEIGHT_TYPE_OPTIONS[args.weight_type]
 assert(weight_type ~= nil, 'Invalid weight type.')
 
