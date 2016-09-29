@@ -39,6 +39,7 @@ local NETWORK_BATCH_SIZE = 64
 -- Only supports one GPU. I can't figure out how to get activations from an
 -- arbitrary layer on multiple GPUs easily.
 local GPU = 1
+nn.DataParallelTable.deserializeNGPUs = 1
 local MEANS = {96.8293, 103.073, 101.662}
 local CROP_SIZE = 224
 local IMAGES_IN_BATCH = math.floor(NETWORK_BATCH_SIZE)
@@ -110,7 +111,6 @@ end
 -- Load model.
 ---
 print('Loading model.')
-nn.DataParallelTable.deserializeNGPUs = 1
 local model = torch.load(args.model)
 if torch.isTypeOf(model, 'nn.DataParallelTable') then
     model = model:get(1)
