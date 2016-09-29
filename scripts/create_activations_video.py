@@ -224,11 +224,11 @@ def main():
     all_activations = torchfile.load(args.activations_t7)
     if args.offset_action != 'align':
         if args.filter == 'max_var':
-            activations = extract_max_var_filter(activations)
+            activations = extract_max_var_filter(all_activations)
         elif args.filter == 'max':
-            activations = activations.max(axis=1)
+            activations = all_activations.max(axis=1)
         elif args.filter == 'avg':
-            activations = activations.mean(axis=1)
+            activations = all_activations.mean(axis=1)
         else:
             filter_index = None
             try:
@@ -236,7 +236,7 @@ def main():
             except ValueError:
                 print('Invalid --filter option, see --help.')
                 raise
-            activations = activations[:, filter_index]
+            activations = all_activations[:, filter_index]
 
     if args.offset_action == 'diff':
         activations = compute_offset_diff(activations, args.offset)
