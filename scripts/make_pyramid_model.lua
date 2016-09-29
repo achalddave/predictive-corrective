@@ -23,7 +23,7 @@ local nninit = require 'nninit'
 require 'CAvgTable'
 
 local parser = argparse() {
-    description = 'Replace last fully connected layer with a recurrent layer.'
+    description = 'Create a pyramid shaped network.'
 }
 parser:option('--model', 'Torch model'):count(1)
 parser:option('--output', 'Output model'):count(1)
