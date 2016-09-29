@@ -29,6 +29,7 @@ parser:option('--layer_type_index',
 parser:option('--frames_lmdb')
 parser:option('--video_name')
 parser:option('--output_activations')
+parser:flag('--decorate_sequencer')
 
 local args = parser:parse()
 
@@ -115,7 +116,11 @@ local model = torch.load(args.model)
 if torch.isTypeOf(model, 'nn.DataParallelTable') then
     model = model:get(1)
 end
-if not torch.isTypeOf(model, 'nn.Sequencer') then
+if args.decorate_sequencer then
+    if torch.isTypeOf(model, 'nn.Sequencer') then
+        print('WARNING: --decorate_sequencer on model that is already ' ..
+              'nn.Sequencer!')
+    end
     model = nn.Sequencer(model)
 end
 
