@@ -58,7 +58,7 @@ torch.setdefaulttensortype('torch.FloatTensor')
 ---
 local VideoSampler = classic.class('VideoSampler', data_loader.Sampler)
 function VideoSampler:_init(frames_lmdb, video_name, sequence_length)
-    self.video_keys = data_loader.PermutedSampler.filter_end_frames(
+    self.video_keys = data_loader.PermutedSampler.filter_boundary_frames(
         VideoSampler.get_video_keys(frames_lmdb, video_name),
         sequence_length, 1 --[[step size]])
     self.sequence_length = sequence_length
