@@ -21,11 +21,13 @@ local parser = argparse() {
     description = 'Computes activations for a given video for a VGG network.'
 }
 parser:option('--model', 'Torch model')
-parser:option('--layer_type',
-                'Layer type to output activations from. ' ..
-                'E.g. cudnn.SpatialConvolution')
-parser:option('--layer_type_index',
-                'Which of the layer types to extract.'):convert(tonumber)
+parser:option('--layer_spec',
+              'Layer specification. This is a ">" separated list of '  ..
+              'specifications of the form "layer_type:index". ' ..
+              'For example, ' ..
+              '"nn.ParallelTable:2>cudnn.SpatialConvolution:13"' ..
+              'will select the 13th SpatialConvolution layer in the 2nd ' ..
+              'ParallelTable module.')
 parser:option('--frames_lmdb')
 parser:option('--video_name')
 parser:option('--output_activations')
@@ -130,9 +132,19 @@ print('Loaded model.')
 ---
 -- Get requested layer.
 ---
-print(args.layer_type)
-print(args.layer_type_index)
-print(#model:findModules(args.layer_type))
+print('Layer specification:', args.layer_spec)
+-- Find specifications between ">" characters.
+local search_module = model
+for specification in string.gmatch(args.layer_spec, "[^>]+") do
+    -- Split on "," character, returns an iterator.
+    local spec_parser = string.gmatch(specification, "[^,]+")
+    local layer_type = spec_parser()
+    local layer_index = tonumber(spec_parser())
+    print(layer_type, layer_index)
+    search_module = search_module:findModules(layer_type)[layer_index]
+end
+local layer_to_extract = search_module
+print('Extracting from layer:', layer_to_extract)
 
 ---
 -- Pass frames through model
@@ -144,7 +156,6 @@ local loader = data_loader.DataLoader(
 
 local gpu_inputs = torch.CudaTensor()
 local samples_complete = 0
-local layer_to_extract = model:findModules(args.layer_type)[args.layer_type_index]
 local relus = model:findModules('cudnn.ReLU')
 for _, relu in ipairs(relus) do
     relu.inplace = false
