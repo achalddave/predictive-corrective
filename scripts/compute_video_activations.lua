@@ -140,6 +140,12 @@ local loader = data_loader.DataLoader(
 local gpu_inputs = torch.CudaTensor()
 local samples_complete = 0
 local layer_to_extract = model:findModules(args.layer_type)[args.layer_type_index]
+local relus = model:findModules('cudnn.ReLU')
+for _, relu in ipairs(relus) do
+    relu.inplace = false
+    print('Disabling')
+end
+print('Disabled in place relus')
 
 local frame_activations = {}
 while samples_complete ~= sampler:num_samples() do
