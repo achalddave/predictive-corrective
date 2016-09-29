@@ -244,11 +244,6 @@ function Trainer:_epoch_learning_rate(epoch)
         is_new_regime: True if this marks the beginning of new parameters.
     --]]
 
-    --[[
-    Arbitrary learning rate policy modified from
-    https://github.com/soumith/imagenet-multiGPU.torch
-    except with learning rates divided by 10 because we're fine tuning.
-    --]]
     local regime
     for i = 1, #self.learning_rates - 1 do
         local start_epoch = self.learning_rates[i].start_epoch
