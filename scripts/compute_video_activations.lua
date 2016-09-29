@@ -31,6 +31,7 @@ parser:option('--layer_spec',
 parser:option('--frames_lmdb')
 parser:option('--video_name')
 parser:option('--output_activations')
+parser:option('--batch_size'):convert(tonumber):default(64)
 parser:flag('--decorate_sequencer')
 
 local args = parser:parse()
@@ -38,14 +39,12 @@ local args = parser:parse()
 ---
 -- Configuration
 ---
-local NETWORK_BATCH_SIZE = 64
 -- Only supports one GPU. I can't figure out how to get activations from an
 -- arbitrary layer on multiple GPUs easily.
 local GPU = 1
 nn.DataParallelTable.deserializeNGPUs = 1
 local MEANS = {96.8293, 103.073, 101.662}
 local CROP_SIZE = 224
-local IMAGES_IN_BATCH = math.floor(NETWORK_BATCH_SIZE)
 -- Unfortunately, this is necessary due to the way DataLoader is implemented.
 local NUM_LABELS = 65
 -- If this is a Sequencer, only the activations for the last step will be
@@ -165,8 +164,8 @@ print('Disabled in place relus')
 
 local frame_activations = {}
 while samples_complete ~= sampler:num_samples() do
-    local to_load = IMAGES_IN_BATCH
-    if samples_complete + IMAGES_IN_BATCH > sampler:num_samples() then
+    local to_load = args.batch_size
+    if samples_complete + args.batch_size > sampler:num_samples() then
         to_load = sampler:num_samples() - samples_complete
     end
     local images_table, _, batch_keys = loader:load_batch(
