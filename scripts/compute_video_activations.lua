@@ -44,8 +44,11 @@ local CROP_SIZE = 224
 local IMAGES_IN_BATCH = math.floor(NETWORK_BATCH_SIZE)
 -- Unfortunately, this is necessary due to the way DataLoader is implemented.
 local NUM_LABELS = 65
-local SEQUENCE_LENGTH = 1
-assert(SEQUENCE_LENGTH == 1) -- Only sequence length of 1 is supported.
+-- If this is a Sequencer, only the activations for the last step will be
+-- provided.
+local SEQUENCE_LENGTH = 4
+-- assert(SEQUENCE_LENGTH == 1) -- Only sequence length of 1 is supported.
+local STEP_SIZE = 1
 
 math.randomseed(0)
 torch.manualSeed(0)
@@ -57,11 +60,12 @@ torch.setdefaulttensortype('torch.FloatTensor')
 -- Load list of frame keys for video.
 ---
 local VideoSampler = classic.class('VideoSampler', data_loader.Sampler)
-function VideoSampler:_init(frames_lmdb, video_name, sequence_length)
+function VideoSampler:_init(frames_lmdb, video_name, sequence_length, step_size)
     self.video_keys = data_loader.PermutedSampler.filter_boundary_frames(
         VideoSampler.get_video_keys(frames_lmdb, video_name),
         sequence_length, 1 --[[step size]])
     self.sequence_length = sequence_length
+    self.step_size = step_size
     self.key_index = 1
 end
 
@@ -81,7 +85,8 @@ function VideoSampler:sample_keys(num_sequences)
         local sampled_key = self.video_keys[self.key_index]
         for step = 1, self.sequence_length do
             table.insert(batch_keys[step], sampled_key)
-            sampled_key = self.video_keys[self.key_index + step]
+            sampled_key = data_loader.Sampler.frame_offset_key(
+                sampled_key, self.step_size)
         end
         self.key_index = self.key_index + 1
     end
@@ -127,7 +132,8 @@ print(#model:findModules(args.layer_type))
 ---
 -- Pass frames through model
 ---
-local sampler = VideoSampler(args.frames_lmdb, args.video_name, SEQUENCE_LENGTH)
+local sampler = VideoSampler(
+    args.frames_lmdb, args.video_name, SEQUENCE_LENGTH, STEP_SIZE)
 local loader = data_loader.DataLoader(
     args.frames_lmdb, sampler, NUM_LABELS)
 
@@ -177,8 +183,8 @@ print('Finished computing activations.')
 -- Create activations tensor.
 ---
 local activation_map_size = torch.totable(layer_to_extract.output[1]:size())
-local activations_tensor = torch.zeros(sampler:num_samples(),
-                                       unpack(activation_map_size))
+local activations_tensor = torch.zeros(
+    sampler:num_samples() + SEQUENCE_LENGTH - 1, unpack(activation_map_size))
 for key, activation in pairs(frame_activations) do
     -- Keys are of the form '<filename>-<frame_number>'.
     -- Find the index of the '-'
