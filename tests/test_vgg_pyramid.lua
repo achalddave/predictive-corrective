@@ -13,9 +13,14 @@ require 'layers/CAvgTable'
 local parser = argparse()
 parser:option('--single_model', 'Single frame model'):count(1)
 parser:option('--pyramid_model', 'Pyramid model'):count(1)
+parser:flag('--decorate_single_sequencer',
+            'Whether to add nn.Sequencer to single frame model'):default(false)
 local args = parser:parse()
 
 local single_model = torch.load(args.single_model):cuda()
+if args.decorate_single_sequencer then
+    single_model = nn.Sequencer(single_model)
+end
 local pyramid_model = torch.load(args.pyramid_model):cuda()
 single_model:evaluate()
 pyramid_model:evaluate()
