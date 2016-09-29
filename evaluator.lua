@@ -66,7 +66,8 @@ function Evaluator:evaluate_batch()
         for batch_index, img in ipairs(step_images) do
             -- Process image after converting to the default Tensor type.
             -- (Originally, it is a ByteTensor).
-            images[{step, batch_index}] = self:_process(img:typeAs(images))
+            images[{step, batch_index}] = image_util.augment_image_eval(
+                img, self.crop_size, self.crop_size, self.pixel_mean)
         end
     end
     if self.input_dimension_permutation then
@@ -131,27 +132,6 @@ function Evaluator:evaluate_epoch(epoch, num_batches)
         os.date('%X'), epoch, epoch_timer:time().real, loss_epoch / num_batches,
         mean_average_precision))
     collectgarbage()
-end
-
-function Evaluator:_process(img)
-    -- Avoid wrap around for ByteTensors, which are unsigned.
-    assert(img:type() ~= torch.ByteTensor():type())
-
-    -- Take center crop.
-    img = image.crop(img, "c" --[[center crop]], self.crop_size, self.crop_size)
-    assert(img:size(3) == self.crop_size)
-    assert(img:size(2) == self.crop_size)
-
-    for channel = 1, 3 do
-        -- Subtract mean
-        if self.pixel_mean then
-            img[{{channel}, {}, {}}]:add(-self.pixel_mean[channel])
-        end
-        -- Divide by std.
-        -- TODO(achald): Figure out if this is necessary; if so, implement it.
-    end
-
-    return img
 end
 
 -- TODO(achald): Move this to a separate util file.

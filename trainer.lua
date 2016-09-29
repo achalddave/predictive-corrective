@@ -122,7 +122,9 @@ function Trainer:train_batch()
         for batch_index, img in ipairs(step_images) do
             -- Process image after converting to the default Tensor type.
             -- (Originally, it is a ByteTensor).
-            images[{step, batch_index}] = self:_process(img:typeAs(images))
+            images[{step, batch_index}] = image_util:augment_image_train(
+                img:typeAs(images),self.crop_size, self.crop_size,
+                self.pixel_mean)
         end
     end
     if self.input_dimension_permutation then
@@ -229,35 +231,6 @@ function Trainer:save(directory, epoch)
                self.optimization_config)
     torch.save(paths.concat(directory, 'optim_state_' .. epoch .. '.t7'),
                self.optimization_state)
-end
-
-function Trainer:_process(img)
-    -- Avoid wrap around for ByteTensors, which are unsigned.
-    assert(img:type() ~= torch.ByteTensor():type())
-
-    -- Randomly crop.
-    local width = img:size(3)
-    local height = img:size(2)
-    local x_origin = math.random(width - self.crop_size)
-    local y_origin = math.random(height - self.crop_size)
-    img = image.crop(img, x_origin, y_origin,
-                     x_origin + self.crop_size, y_origin + self.crop_size)
-
-    -- Mirror horizontally with probability 0.5.
-    if torch.uniform() > 0.5 then
-        img = image.hflip(img)
-    end
-
-    for channel = 1, 3 do
-        -- Subtract mean
-        if self.pixel_mean then
-            img[{{channel}, {}, {}}]:add(-self.pixel_mean[channel])
-        end
-        -- Divide by std.
-        -- TODO(achald): Figure out if this is necessary; if so, implement it.
-    end
-
-    return img
 end
 
 function Trainer:_epoch_learning_rate(epoch)
