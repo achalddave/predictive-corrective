@@ -203,6 +203,7 @@ print('Finished computing activations.')
 ---
 -- Create activations tensor.
 ---
+print('Creating activations tensor.')
 local activation_map_size = torch.totable(layer_to_extract.output[1]:size())
 local activations_tensor = torch.zeros(
     sampler:num_samples() + SEQUENCE_LENGTH - 1, unpack(activation_map_size))
