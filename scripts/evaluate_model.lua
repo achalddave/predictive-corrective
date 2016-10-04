@@ -2,6 +2,18 @@
 --
 -- Note that this should be run from the root directory, not from within
 -- scripts/.
+--
+-- Example usage:
+--  th scripts/evaluate_model.lua \
+--      /data/achald/MultiTHUMOS/models/balanced_without_bg_sampling_vgg_new/from_scratch/model_30.t7 \
+--      /data/achald/MultiTHUMOS/frames@10fps/labeled_video_frames/valval.lmdb/ \
+--      /data/achald/MultiTHUMOS/frames@10fps/labeled_video_frames/valval_without_images.lmdb \
+--      --sequence_length 1 \
+--      --step_size 1 \
+--      --batch_size 128 \
+--      --val_groups /data/achald/MultiTHUMOS/val_split/val_val_groups.txt \
+--      --output_hdf5 /data/achald/MultiTHUMOS/models/balanced_without_bg_sampling_vgg_new/from_scratch/model_30_valval_predictions.h5 \
+--      | tee /data/achald/MultiTHUMOS/models/balanced_without_bg_sampling_vgg_new/from_scratch/model_30_valval_evaluation.log
 --]]
 
 package.path = package.path .. ";../?.lua"

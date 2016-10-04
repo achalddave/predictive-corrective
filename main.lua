@@ -1,5 +1,11 @@
 --[[
 -- Fine-tunes an ImageNet-pretrained VGG-16 network on MultiTHUMOS data.
+--
+-- Example usage:
+--    th main.lua \
+--      config/config-vgg.yaml \
+--      model_output_dir/ \
+--      | tee model_output_dir/training.log
 --]]
 
 local argparse = require 'argparse'
