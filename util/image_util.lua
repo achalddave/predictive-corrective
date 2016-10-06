@@ -1,5 +1,7 @@
 local image = require 'image'
 local torch = require 'torch'
+require 'cudnn'
+require 'cutorch'
 
 local AUGMENT_MODE = { TRAIN = 1, EVAL = 2 }
 
