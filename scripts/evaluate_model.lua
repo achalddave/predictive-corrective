@@ -224,7 +224,8 @@ while true do
     if not (crop_predictions:dim() == 2
             and crop_predictions:size(1) == batch_size_crops
             and crop_predictions:size(2) == NUM_LABELS) then
-        error('Unknown output predictions shape.')
+        error(string.format('Unknown output predictions shape: %s',
+                            crop_predictions:size()))
     end
     labels = labels[FRAME_TO_PREDICT]
     batch_keys = batch_keys[args.sequence_length]
