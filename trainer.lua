@@ -2,14 +2,12 @@ local classic = require 'classic'
 local cudnn = require 'cudnn'
 local cunn = require 'cunn'
 local cutorch = require 'cutorch'
-local image = require 'image'
 local optim = require 'optim'
 local paths = require 'paths'
 local torch = require 'torch'
 require 'nnlr'
 
 local evaluator = require 'evaluator'
-local DataLoader = require('data_loader').DataLoader
 local image_util = require 'util/image_util'
 
 local Trainer = classic.class('Trainer')
