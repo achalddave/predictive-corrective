@@ -28,16 +28,19 @@ function Sampler.static.next_frame_key(frame_key)
     return Sampler.frame_offset_key(frame_key, 1)
 end
 
-function Sampler.static.frame_offset_key(frame_key, offset)
-    --[[ Return the key for the frame at an offset from frame_key. ]]--
-
+function Sampler.static.parse_frame_key(frame_key)
     -- Keys are of the form '<filename>-<frame_number>'.
     -- Find the index of the '-'
     local _, split_index = string.find(frame_key, '[^-]*-')
     local filename = string.sub(frame_key, 1, split_index - 1)
     local frame_number = tonumber(string.sub(frame_key, split_index + 1, -1))
-    frame_number = frame_number + offset
-    return string.format('%s-%d', filename, frame_number)
+    return filename, frame_number
+end
+
+function Sampler.static.frame_offset_key(frame_key, offset)
+    --[[ Return the key for the frame at an offset from frame_key. ]]--
+    local filename, frame_number = Sampler.parse_frame_key(frame_key)
+    return string.format('%s-%d', filename, frame_number + offset)
 end
 
 local PermutedSampler = classic.class('PermutedSampler', Sampler)
