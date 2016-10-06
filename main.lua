@@ -204,6 +204,7 @@ local evaluator = evaluator.Evaluator {
 }
 
 print('Initialized trainer and evaluator.')
+trainer:save(cache_dir, 0)
 for epoch = config.init_epoch, config.num_epochs do
     print(('Training epoch %d'):format(epoch))
     trainer:train_epoch(epoch, config.epoch_size)
