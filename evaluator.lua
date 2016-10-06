@@ -5,6 +5,8 @@ local cutorch = require 'cutorch'
 local image = require 'image'
 local torch = require 'torch'
 
+local image_util = require 'util/image_util'
+
 local Evaluator = classic.class('Evaluator')
 
 function Evaluator:_init(args)

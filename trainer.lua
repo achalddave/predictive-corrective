@@ -10,6 +10,7 @@ require 'nnlr'
 
 local evaluator = require 'evaluator'
 local DataLoader = require('data_loader').DataLoader
+local image_util = require 'util/image_util'
 
 local Trainer = classic.class('Trainer')
 
