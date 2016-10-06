@@ -525,7 +525,7 @@ end
 
 return {
     DataLoader = DataLoader,
-    PermutedSampler = PermutedSampler,
     Sampler = Sampler,
-    BalancedSampler = BalancedSampler
+    BalancedSampler = BalancedSampler,
+    PermutedSampler = PermutedSampler
 }
