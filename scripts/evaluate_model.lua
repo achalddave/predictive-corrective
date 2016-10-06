@@ -76,7 +76,8 @@ local CROP_SIZE = 224
 local CROPS = {'c'}
 local FRAME_TO_PREDICT = args.sequence_length
 
-local num_images_in_batch = math.floor(args.batch_size / #CROPS)
+local max_batch_size_images = math.floor(args.batch_size / #CROPS)
+local max_batch_size_crops = max_batch_size_images * #CROPS
 
 math.randomseed(0)
 torch.manualSeed(0)
@@ -149,8 +150,8 @@ while true do
     if samples_complete == loader:num_samples() then
         break
     end
-    local to_load = num_images_in_batch
-    if samples_complete + num_images_in_batch > loader:num_samples() then
+    local to_load = max_batch_size_images
+    if samples_complete + max_batch_size_images > loader:num_samples() then
         to_load = loader:num_samples() - samples_complete
     end
     local images_table, labels, batch_keys = loader:load_batch(
@@ -165,16 +166,20 @@ while true do
         -- Figure out how many images we will need in the next batch, and
         -- prefetch them.
         local next_samples_complete = samples_complete + to_load
-        local next_to_load = num_images_in_batch
+        local next_to_load = max_batch_size_images
         if next_samples_complete + next_to_load > loader:num_samples() then
             next_to_load = loader:num_samples() - next_samples_complete
         end
         loader:fetch_batch_async(next_to_load)
     end
 
-    local batch_size = #images_table[1]
+    -- This may not be equal to max_batch_size_images and max_batch_size_crops
+    -- in the last batch!
+    local batch_size_images = to_load
+    local batch_size_crops = #CROPS * batch_size_images
+
     local num_channels = images_table[1][1]:size(1)
-    local images = torch.Tensor(args.sequence_length, batch_size * #CROPS,
+    local images = torch.Tensor(args.sequence_length, batch_size_crops,
                                 num_channels, CROP_SIZE, CROP_SIZE)
     for step, step_images in ipairs(images_table) do
         for batch_index, img in ipairs(step_images) do
@@ -185,7 +190,8 @@ while true do
                 img[{{channel}, {}, {}}]:add(-MEANS[channel])
             end
             for i, crop in ipairs(CROPS) do
-                images[{step, batch_index + i - 1}] = image.crop(
+                local crop_index = ((batch_index - 1) * #CROPS) + i
+                images[{step, crop_index}] = image.crop(
                     img, crop, CROP_SIZE, CROP_SIZE)
             end
         end
@@ -193,8 +199,8 @@ while true do
 
     if args.c3d_input then
         -- Permute
-        -- from (sequence_length,   batch_size,    num_channels, width, height)
-        -- to   (     batch_size, num_channels, sequence_length, width, height)
+        -- from (sequence_length, batch_size_crops, num_channels, width, height)
+        -- to   (batch_size_crops, num_channels, sequence_length, width, height)
         images = images:permute(2, 3, 1, 4, 5)
     end
 
@@ -216,22 +222,22 @@ while true do
     end
 
     if not (crop_predictions:dim() == 2
-            and crop_predictions:size(1) == batch_size
+            and crop_predictions:size(1) == batch_size_crops
             and crop_predictions:size(2) == NUM_LABELS) then
         error('Unknown output predictions shape.')
     end
     labels = labels[FRAME_TO_PREDICT]
     batch_keys = batch_keys[args.sequence_length]
 
-    local predictions = torch.Tensor(batch_size, NUM_LABELS)
-    for i = 1, batch_size do
+    local predictions = torch.Tensor(batch_size_images, NUM_LABELS)
+    for i = 1, batch_size_images do
         local start_crops = (i - 1) * #CROPS + 1
         local end_crops = i * #CROPS
         predictions[i] = crop_predictions[{{start_crops, end_crops},
                                            {}}]:mean(1)
     end
     -- Concat batch_keys to all_keys.
-    for i = 1, batch_size do table.insert(all_keys, batch_keys[i]) end
+    for i = 1, batch_size_images do table.insert(all_keys, batch_keys[i]) end
 
     if all_predictions == nil then
         all_predictions = predictions
