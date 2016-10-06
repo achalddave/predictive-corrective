@@ -106,7 +106,8 @@ function Trainer:train_batch()
     Returns:
         loss: Output of criterion:forward on this batch.
         outputs (Tensor): Output of model:forward on this batch. The tensor
-            size is (sequence_length, batch_size, num_labels)
+            size should be either (sequence_length, batch_size, num_labels) or
+            (batch_size, num_labels), depending on the model.
         labels (Tensor): True labels. Same size as the outputs.
     ]]--
     local images_table, labels = self.data_loader:load_batch(self.batch_size)
@@ -122,10 +123,11 @@ function Trainer:train_batch()
             -- Process image after converting to the default Tensor type.
             -- (Originally, it is a ByteTensor).
             images[{step, batch_index}] = image_util:augment_image_train(
-                img:typeAs(images),self.crop_size, self.crop_size,
+                img:typeAs(images), self.crop_size, self.crop_size,
                 self.pixel_mean)
         end
     end
+
     if self.input_dimension_permutation then
         images = images:permute(unpack(self.input_dimension_permutation))
     end
@@ -187,6 +189,7 @@ function Trainer:train_epoch(epoch, num_batches)
         if curr_groundtruth:dim() == 3 and curr_groundtruth:size(1) > 1 then
             curr_groundtruth = curr_groundtruth[curr_groundtruth:size(1)]
         end
+
         -- Collect current predictions and groundtruth.
         local epoch_index_start = (batch_index - 1) * self.batch_size + 1
         predictions[{{epoch_index_start,
@@ -200,6 +203,7 @@ function Trainer:train_epoch(epoch, num_batches)
             evaluator.compute_mean_average_precision(
                 predictions[{{1, epoch_index_start + self.batch_size - 1}}],
                 groundtruth[{{1, epoch_index_start + self.batch_size - 1}}])
+
         print(string.format(
               '%s: Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f ' ..
               'epoch mAP %.4f LR %.0e',
@@ -211,6 +215,7 @@ function Trainer:train_epoch(epoch, num_batches)
 
     local mean_average_precision = evaluator.compute_mean_average_precision(
         predictions, groundtruth)
+
     print(string.format(
         '%s: Epoch: [%d][TRAINING SUMMARY] Total Time(s): %.2f\t' ..
         'average loss (per batch): %.5f \t mAP: %.5f',
@@ -252,7 +257,7 @@ function Trainer:_epoch_learning_rate(epoch)
             break
         end
     end
-    if regime == nil then 
+    if regime == nil then
         regime = self.learning_rates[#self.learning_rates]
     end
     local is_new_regime = epoch == regime.start_epoch

@@ -105,6 +105,7 @@ function Evaluator:evaluate_epoch(epoch, num_batches)
         batch_timer: reset()
         collectgarbage()
         local loss, curr_predictions, curr_groundtruth = self:evaluate_batch()
+        loss_epoch = loss_epoch + loss
 
         -- We only care about the predictions and groundtruth in the last step
         -- of the sequence.
@@ -114,6 +115,7 @@ function Evaluator:evaluate_epoch(epoch, num_batches)
         if curr_groundtruth:dim() == 3 and curr_groundtruth:size(1) > 1 then
             curr_groundtruth = curr_groundtruth[curr_groundtruth:size(1)]
         end
+
         -- Collect current predictions and groundtruth.
         local epoch_index_start = (batch_index - 1) * self.batch_size + 1
         predictions[{{epoch_index_start,
@@ -122,9 +124,8 @@ function Evaluator:evaluate_epoch(epoch, num_batches)
         groundtruth[{{epoch_index_start,
                       epoch_index_start + self.batch_size - 1},
                       {}}] = curr_groundtruth
-
-        loss_epoch = loss_epoch + loss
     end
+
     local mean_average_precision = compute_mean_average_precision(
         predictions, groundtruth)
     print(string.format(
