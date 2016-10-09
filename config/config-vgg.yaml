@@ -39,7 +39,7 @@ batch_size: 64
 # One of 'permuted', 'balanced' (case-insensitive)
 sampling_strategy: 'balanced'
 sampling_strategy_options: {
-    include_bg: False
+    include_bg: True
 }
 sequence_length: 1
 
