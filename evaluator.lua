@@ -190,7 +190,131 @@ function compute_mean_average_precision(predictions, groundtruth)
     return torch.mean(average_precisions)
 end
 
+local SequentialEvaluator, SequentialEvaluatorSuper = classic.class(
+    'SequentialEvaluator', Evaluator)
+function SequentialEvaluator:_init(args)
+    if args.input_dimension_permutation ~= nil then
+        for i = 1, #args do
+            if args.input_dimension_permutation[i] ~= i then
+                error('SequentialEvaluator does not support ' ..
+                      'input_dimension_permutation')
+            end
+        end
+    end
+    SequentialEvaluatorSuper._init(self, args)
+    assert(self.model:findModules('nn.Sequencer') ~= nil,
+           'SequentialEvaluator requires that the input model be decorated ' ..
+           'with nn.Sequencer.')
+    assert(torch.isTypeOf(self.criterion, 'nn.SequencerCriterion'),
+           'SequentialEvaluator expects SequencerCriterion.')
+    self.max_backprop_steps = args.max_backprop_steps
+end
+
+function SequentialEvaluator:evaluate_batch()
+    --[[
+    Train on a batch of data
+
+    Returns:
+        loss: Output of criterion:forward on this batch.
+        outputs (Tensor): Output of model:forward on this batch. The tensor
+            size should be either (sequence_length, batch_size, num_labels) or
+            (batch_size, num_labels), depending on the model.
+        labels (Tensor): True labels. Same size as the outputs.
+    ]]--
+    local images_table, labels = self.data_loader:load_batch(self.batch_size)
+    -- Prefetch the next batch.
+    self.data_loader:fetch_batch_async(self.batch_size)
+
+    local num_steps = #images_table
+    local num_channels = images_table[1][1]:size(1)
+    local images = torch.Tensor(num_steps, self.batch_size, num_channels,
+                                self.crop_size, self.crop_size)
+
+    -- valid_step[step_i][sequence_j] = 0 indicates that this is an invalid
+    -- step, that is, if sequence_j has no frame for step_i because the sequence
+    -- has ended.
+    local valid_step = torch.ones(
+        num_steps, self.batch_size --[[num_sequences]])
+    for step, step_images in ipairs(images_table) do
+        for sequence, img in ipairs(step_images) do
+            if img == nil then
+                valid_step[{step, sequence}] = 0
+            else
+                -- Process image after converting to the default Tensor type.
+                -- (Originally, it is a ByteTensor).
+                images[{step, sequence}] = image_util.augment_image_eval(
+                    img:typeAs(images), self.crop_size, self.crop_size,
+                    self.pixel_mean)
+            end
+        end
+    end
+
+    self.gpu_inputs:resize(images:size()):copy(images)
+    self.gpu_labels:resize(labels:size()):copy(labels)
+
+
+    -- Should be of shape (sequence_length, batch_size, num_classes)
+    local outputs = self.model:forward(self.gpu_inputs)
+    local valid_outputs
+    local valid_labels
+    if torch.all(valid_step) then
+        valid_outputs = outputs
+        valid_labels = self.gpu_labels
+    else
+        -- If there's an invalid step for at least one sequence, we'll
+        -- collect the valid sequences for each step in a table and ignore
+        -- the invalid frames.
+        valid_outputs = {}
+        valid_labels = {}
+        for step = 1, outputs:size(1) do
+            valid_outputs[step] = outputs[valid_step[step]]
+            valid_labels[step] = self.gpu_labels[valid_step[step]]
+        end
+    end
+    local loss = self.criterion:forward(valid_outputs, valid_labels)
+
+    return loss, valid_outputs, valid_labels
+end
+
+function SequentialEvaluator:evaluate_epoch(epoch, num_batches)
+    self.model:evaluate()
+    local epoch_timer = torch.Timer()
+    local batch_timer = torch.Timer()
+
+    local predictions = {}
+    local groundtruth = {}
+
+    local loss_epoch = 0
+    for _ = 1, num_batches do
+        batch_timer:reset()
+        collectgarbage()
+        local loss, batch_predictions, batch_groundtruth = self:evaluate_batch()
+        loss_epoch = loss_epoch + loss
+
+        local num_steps = torch.isTensor(batch_predictions) and
+            batch_predictions:size(1) or #batch_predictions
+        for step = 1, num_steps do
+            local step_predictions = batch_predictions[step]
+            local step_groundtruth = batch_groundtruth[step]
+            for sequence = 1, #step_predictions do
+                table.insert(predictions, step_predictions[sequence])
+                table.insert(groundtruth, step_groundtruth[sequence])
+            end
+        end
+    end
+
+    local mean_average_precision = compute_mean_average_precision(predictions,
+                                                                  groundtruth)
+    print(string.format(
+        '%s: Epoch: [%d]VALIDATION SUMMARY] Total Time(s): %.2f\t' ..
+        'average loss (per batch): %.5f \t mAP: %.5f',
+        os.date('%X'), epoch, epoch_timer:time().real, loss_epoch / num_batches,
+        mean_average_precision))
+end
+
+
 return {
     Evaluator = Evaluator,
+    SequentialEvaluator = SequentialEvaluator,
     compute_mean_average_precision = compute_mean_average_precision
 }

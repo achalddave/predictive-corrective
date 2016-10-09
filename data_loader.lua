@@ -337,6 +337,136 @@ function BalancedSampler:_load_label_key_mapping()
     return label_keys
 end
 
+-- TODO(achald): Implement sequential sampler. This will choose
+-- `batch_size` videos, and then emit consecutive sequences from these videos.
+-- So each batch will contain sequence_length frames from batch_size videos.
+-- If a video has less than batch_size frames left, the batch will be padded
+-- with 'nil' keys.
+local SequentialSampler = classic.class('SequentialSampler', Sampler)
+function SequentialSampler:_init(
+        lmdb_without_images_path, _ --[[num_labels]],
+        sequence_length, step_size, _ --[[use_boundary_frames]], options)
+    --[[
+    Returns consecutives sequences of frames from videos.
+
+    Args:
+        lmdb_without_images_path (str): Path to LMDB containing
+            LabeledVideoFrames as values, but without any raw image data. This
+            is easy to iterate over, and can be used to decide which images to
+            sample.
+        num_labels (num)
+        sequence_length (num): If provided, sample sequences of length
+            sequence_length for each training sample.
+        step_size (num): If provided, elements in the sequence should be
+            separated by this step_size. If step_size is 2, a sequence of length
+            5 starting at x_1 is {x_1, x_3, x_5, x_7, x_9}.
+        use_boundary_frames (bool): Ignored for SequentialSampler.
+        options:
+            batch_size (int): Must be specified a-priori and cannot be changed.
+            sample_once (bool): Default false. If true, sample from each video
+                only once, and output nil keys once all videos are exhausted.
+    ]]--
+    self.imageless_path = lmdb_without_images_path
+    self.sequence_length = sequence_length == nil and 1 or sequence_length
+    self.step_size = step_size == nil and 1 or step_size
+    assert(options.batch_size ~= nil)
+    self.sample_once = options.sample_once == nil and false
+                                                  or options.sample_once
+    self.batch_size = options.batch_size
+    self.keys = PermutedSampler.load_lmdb_keys(lmdb_without_images_path)
+
+    -- List of all valid keys.
+    self.keys_set = {}
+    for _, key in ipairs(self.keys) do self.keys_set[key] = true end
+    if not self.use_boundary_frames then
+        self.keys = PermutedSampler.filter_boundary_frames(
+            self.keys, self.sequence_length, self.step_size)
+    end
+
+    -- TODO(achald): Should we sort these by length of videos?
+    self.video_start_keys = Sampler.permute(
+        SequentialSampler.get_start_frames(self.keys))
+    self.video_index = 1
+    self.next_frames = {}
+    for i = 1, self.batch_size do
+        self.next_frames[i] = self.video_start_keys[i]
+    end
+    self.video_index = self.video_index + self.batch_size
+end
+
+function SequentialSampler:sample_keys(num_sequences)
+    --[[
+    Sample the next set of keys.
+
+    Returns:
+        batch_keys (Array of array of strings): Each element contains
+            num_sequences arrays, each of which contains sequence_length keys.
+    ]]--
+    local batch_keys = {}
+    for _ = 1, self.sequence_length do
+        table.insert(batch_keys, {})
+    end
+    assert(num_sequences == self.batch_size,
+           string.format('Expected batch size %s, received %s',
+                         self.batch_size, num_sequences))
+    for sequence = 1, num_sequences do
+        if self.video_index > #self.video_start_keys and not self.sample_once
+            then
+            print(string.format(
+                '%s: Finished pass through videos, repermuting!',
+                os.date('%X')))
+            self.video_start_keys = Sampler.permute(self.video_start_keys)
+            self.video_index = 1
+        end
+
+        local sampled_key = self.next_frames[sequence]
+        local sequence_valid = true
+        for step = 1, self.sequence_length do
+            sequence_valid = sequence_valid and self.keys_set[sampled_key]
+            if not sequence_valid then
+                table.insert(batch_keys[step], nil)
+            else
+                table.insert(batch_keys[step], sampled_key)
+            end
+            sampled_key = Sampler.frame_offset_key(sampled_key, self.step_size)
+        end
+        if self.keys_set[sampled_key] then
+            -- The frame at `sampled_key` exists; continue with this video.
+            self.next_frames[sequence] = sampled_key
+        else
+            -- The video is over; start a new video.
+            if self.video_index > #self.video_start_keys then
+                assert(self.sample_once,
+                       'video_index > #videos, but sample_once is false!')
+                -- We've exhausted all the videos and don't want to cycle.
+                self.next_frames[sequence] = nil
+            else
+                self.next_frames[sequence] =
+                    self.video_start_keys[self.video_index]
+                -- No need to mod by #videos; this will be done in the next
+                -- loop iteration.
+                self.video_index = self.video_index + 1
+            end
+        end
+    end
+    return batch_keys
+end
+
+function SequentialSampler:num_samples()
+    return #self.keys
+end
+
+function SequentialSampler.static.get_start_frames(keys)
+    local start_frame_keys = {}
+    for _, key in ipairs(keys) do
+        local _, frame_number = Sampler.parse_frame_key(key)
+        if frame_number == 1 then
+            table.insert(start_frame_keys, key)
+        end
+    end
+    return start_frame_keys
+end
+
 local DataLoader = classic.class('DataLoader')
 
 function DataLoader:_init(lmdb_path, sampler, num_labels)
@@ -499,17 +629,22 @@ function DataLoader.static._load_images_labels_for_keys(
     for step = 1, num_steps do
         batch_images[step] = {}
         for i = 1, batch_size do
-            -- Load LabeledVideoFrame.
-            local video_frame = video_frame_proto.LabeledVideoFrame()
-            video_frame:ParseFromString(
-                transaction:get(keys[step][i]):storage():string())
+            if keys[step][i] == nil then
+                table.insert(batch_images[step], nil)
+                batch_labels[{step, i}]:zero()
+            else
+                -- Load LabeledVideoFrame.
+                local video_frame = video_frame_proto.LabeledVideoFrame()
+                video_frame:ParseFromString(
+                    transaction:get(keys[step][i]):storage():string())
 
-            -- Load image and labels.
-            local img, labels = DataLoader._load_image_labels_from_proto(
-                video_frame)
-            labels = DataLoader._labels_to_tensor(labels, num_labels)
-            table.insert(batch_images[step], img)
-            batch_labels[{step, i}] = labels
+                -- Load image and labels.
+                local img, labels = DataLoader._load_image_labels_from_proto(
+                    video_frame)
+                labels = DataLoader._labels_to_tensor(labels, num_labels)
+                table.insert(batch_images[step], img)
+                batch_labels[{step, i}] = labels
+            end
         end
     end
 
@@ -527,5 +662,6 @@ return {
     DataLoader = DataLoader,
     Sampler = Sampler,
     BalancedSampler = BalancedSampler,
-    PermutedSampler = PermutedSampler
+    PermutedSampler = PermutedSampler,
+    SequentialSampler = SequentialSampler
 }

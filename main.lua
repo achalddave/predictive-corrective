@@ -159,8 +159,17 @@ print('Loaded model')
 
 local sampling_strategies = {
     permuted = data_loader.PermutedSampler,
-    balanced = data_loader.BalancedSampler
+    balanced = data_loader.BalancedSampler,
+    sequential = data_loader.SequentialSampler
 }
+
+config.sampling_strategy_options = config.sampling_strategy_options == nil and
+    {} or config.sampling_strategy_options
+
+if sampling_strategies[config.sampling_strategy:lower()] ==
+        sampling_strategies.sequential then
+    config.sampling_strategy_options.batch_size = config.batch_size
+end
 
 local train_sampler = sampling_strategies[config.sampling_strategy:lower()](
     config.train_lmdb_without_images,
@@ -190,7 +199,18 @@ elseif not (config.optim_config == nil and config.optim_state == nil) then
     error('optim_config and optim_state must either both be specified, ' ..
           'or both left empty')
 end
-local trainer = trainer.Trainer {
+
+local trainer_class, evaluator_class
+if sampling_strategies[config.sampling_strategy:lower()] ==
+        sampling_strategies.sequential then
+    trainer_class = trainer.SequentialTrainer
+    evaluator_class = evaluator.SequentialEvaluator
+else
+    trainer_class = trainer.Trainer
+    evaluator_class = evaluator.Evaluator
+end
+
+local trainer = trainer_class {
     model = model,
     criterion = criterion,
     data_loader = train_loader,
@@ -206,7 +226,7 @@ local trainer = trainer.Trainer {
     optim_config = optim_config,
     optim_state = optim_state
 }
-local evaluator = evaluator.Evaluator {
+local evaluator = evaluator_class {
     model = model,
     criterion = criterion,
     data_loader = val_loader,
