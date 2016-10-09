@@ -140,8 +140,20 @@ cutorch.setDevice(config.gpus[1])
 -- https://groups.google.com/forum/#!topic/torch7/HiBymc9NfIY
 model = model:cuda()
 local criterion = nn.MultiLabelSoftMarginCriterion():cuda()
-if torch.isTypeOf(single_model, 'nn.Sequencer') then
+if config.criterion_wrapper == nil then
+    if torch.isTypeOf(single_model, 'nn.Sequencer') then
+        print('nn.Sequencer models are wrapped by LastStepCriterion if ' ..
+            'config.criterion_wrapper is not set.')
+        config.criterion_wrapper = 'last_step_criterion'
+    else
+        config.criterion_wrapper = false
+    end
+end
+
+if config.criterion_wrapper:lower() == 'last_step_criterion' then
     criterion = nn.LastStepCriterion(criterion)
+elseif config.criterion_wrapper:lower() == 'sequencer_criterion' then
+    criterion = nn.SequencerCriterion(criterion)
 end
 print('Loaded model')
 
