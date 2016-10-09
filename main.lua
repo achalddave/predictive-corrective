@@ -14,7 +14,7 @@ local cutorch = require 'cutorch'
 local paths = require 'paths'
 local nn = require 'nn'
 local torch = require 'torch'
-local yaml = require 'yaml'
+local lyaml = require 'lyaml'
 require 'nnlr'
 require 'rnn'
 require 'last_step_criterion'
@@ -42,10 +42,12 @@ parser:flag('--decorate_sequencer',
             'input.')
 
 local args = parser:parse()
-local config = yaml.loadpath(args.config)
+print(type(io.open(args.config, 'r'):read('*a')))
+local config = lyaml.load(io.open(args.config, 'r'):read('*a'))
 
 if config.data_paths_config ~= nil then
-    local data_paths = yaml.loadpath(config.data_paths_config)
+    local data_paths = lyaml.load(
+        io.open(config.data_paths_config, 'r'):read('*a'))
     local train_path = data_paths[config.train_split]
     local val_path = data_paths[config.val_split]
     config.train_lmdb = train_path.with_images
