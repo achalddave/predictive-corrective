@@ -29,23 +29,12 @@ for i, v in ipairs(modes) do
   levels[v.name] = i
 end
 
-
-local round = function(x, increment)
-  increment = increment or 1
-  x = x / increment
-  return (x > 0 and math.floor(x + .5) or math.ceil(x - .5)) * increment
-end
-
-
 local _tostring = tostring
 
 local tostring = function(...)
   local t = {}
   for i = 1, select('#', ...) do
     local x = select(i, ...)
-    if type(x) == "number" then
-      x = round(x, .01)
-    end
     t[#t + 1] = _tostring(x)
   end
   return table.concat(t, " ")
