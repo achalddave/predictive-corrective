@@ -11,18 +11,18 @@
 local argparse = require 'argparse'
 local cudnn = require 'cudnn'
 local cutorch = require 'cutorch'
-local paths = require 'paths'
-local nn = require 'nn'
-local torch = require 'torch'
 local lyaml = require 'lyaml'
+local nn = require 'nn'
+local paths = require 'paths'
+local torch = require 'torch'
 require 'nnlr'
 require 'rnn'
 require 'last_step_criterion'
 
 local data_loader = require 'data_loader'
 local evaluator = require 'evaluator'
-local trainer = require 'trainer'
 local experiment_saver = require 'util/experiment_saver'
+local trainer = require 'trainer'
 require 'layers/CAvgTable'
 
 local parser = argparse() {
