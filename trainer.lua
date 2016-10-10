@@ -122,7 +122,7 @@ function Trainer:train_batch()
         for sequence, img in ipairs(step_images) do
             -- Process image after converting to the default Tensor type.
             -- (Originally, it is a ByteTensor).
-            images[{step, sequence}] = image_util:augment_image_train(
+            images[{step, sequence}] = image_util.augment_image_train(
                 img:typeAs(images), self.crop_size, self.crop_size,
                 self.pixel_mean)
         end
