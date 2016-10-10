@@ -42,7 +42,6 @@ parser:flag('--decorate_sequencer',
             'input.')
 
 local args = parser:parse()
-print(type(io.open(args.config, 'r'):read('*a')))
 local config = lyaml.load(io.open(args.config, 'r'):read('*a'))
 
 if config.data_paths_config ~= nil then
