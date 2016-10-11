@@ -145,7 +145,7 @@ if config.criterion_wrapper == nil then
             'config.criterion_wrapper is not set.')
         config.criterion_wrapper = 'last_step_criterion'
     else
-        config.criterion_wrapper = false
+        config.criterion_wrapper = ''
     end
 end
 
