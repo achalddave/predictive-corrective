@@ -46,9 +46,11 @@ parser:flag('--weighted_merge',
 
 local args = parser:parse()
 
-local MERGE_LAYER_INDICES = {29 --[[conv53]]} -- {22 --[[conv43]], 29 --[[conv53]]}
+local MERGE_LAYER_INDICES = {22 --[[conv43]], 29 --[[conv53]]}
+-- Number of input frames.
 local SEQUENCE_LENGTH = 4
-local MERGE_INPUT_LENGTH = 4
+-- How many consecutive inputs to merge at each merging step.
+local MERGE_INPUT_LENGTH = 2
 
 local MERGE_OPTIONS = { sum = 1, avg = 2 }
 local WEIGHT_TYPE_OPTIONS = {
