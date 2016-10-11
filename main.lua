@@ -15,7 +15,6 @@ local lyaml = require 'lyaml'
 local nn = require 'nn'
 local paths = require 'paths'
 local torch = require 'torch'
-require 'nnlr'
 require 'rnn'
 require 'last_step_criterion'
 

@@ -5,7 +5,6 @@ local cutorch = require 'cutorch'
 local optim = require 'optim'
 local paths = require 'paths'
 local torch = require 'torch'
-require 'nnlr'
 
 local evaluator = require 'evaluator'
 local image_util = require 'util/image_util'
@@ -89,11 +88,9 @@ end
 function Trainer:update_optim_config(epoch)
     local learning_rate, regime_was_updated = self:_epoch_learning_rate(epoch)
     self.epoch_base_learning_rate = learning_rate
-    local layer_learning_rates, layer_weight_decays = self.model:getOptimConfig(
-        learning_rate, self.weight_decay)
     if regime_was_updated then
-        self.optimization_config.learningRates = layer_learning_rates
-        self.optimization_config.weightDecays = layer_weight_decays
+        self.optimization_config.learningRate = learning_rate
+        self.optimization_config.weightDecay = self.weightDecay
         self.optimization_state = {}
     end
     return regime_was_updated
