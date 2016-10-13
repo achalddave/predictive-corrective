@@ -217,19 +217,29 @@ function BalancedSampler:_init(
             that go outside the video temporally. Otherwise, for sequences at
             the boundary, we replicate the first or last frame of the video.
         options (table):
-            include_bg: Whether to output a balanced number of frames that
-                have none of the labels.
+            background_weight (int): Indicates weight for sampling background frames.
+                If this is 1, for example, , we sample background frames as
+                often as frames from any particular label
+                (i.e. with probability 1/(num_labels + 1)).
+            DEPRECATED include_bg (bool): If true, background_weight is set to
+                1; if false, background_weight is set to 0.
     ]]--
     self.imageless_path = lmdb_without_images_path
     options = options == nil and {} or options
-    self.include_bg = options.include_bg == nil and false or options.include_bg
-    self.num_labels = self.include_bg and num_labels + 1 or num_labels
+    self.num_labels = num_labels
     self.sequence_length = sequence_length
     self.step_size = step_size
     self.use_boundary_frames = use_boundary_frames == nil and
                                false or use_boundary_frames
 
+    assert(options.include_bg == nil,
+           'include_bg is deprecated; use background_weight instead.')
     self.label_keys = self:_load_label_key_mapping()
+    self.label_weights = torch.ones(self.num_labels + 1)
+    self.label_weights[self.num_labels + 1] =
+        options.background_weight == nil and 0 or options.background_weight
+    print('Background weight', self.label_weights[self.num_labels + 1])
+
     -- List of all valid keys.
     self.keys_set = {}
     self.num_keys = 0
@@ -254,8 +264,9 @@ function BalancedSampler:sample_keys(num_sequences)
     for _ = 1, self.sequence_length do
         table.insert(batch_keys, {})
     end
-    for _ = 1, num_sequences do
-        local label = math.random(self.num_labels)
+    local sampled_labels = torch.multinomial(self.label_weights, num_sequences)
+    for sequence = 1, num_sequences do
+        local label = sampled_labels[sequence]
         local label_key_index = self.label_indices[label]
         -- We sample the _end_ of the sequence based on the labels, and build
         -- the sequence backwards.
@@ -292,7 +303,7 @@ function BalancedSampler:_advance_label_index(label)
 end
 
 function BalancedSampler:_permute_keys()
-    for i = 1, self.num_labels do
+    for i = 1, self.num_labels + 1 do
         self.label_keys[i] = Sampler.permute(self.label_keys[i])
         self.label_indices[i] = 1
     end
@@ -307,7 +318,7 @@ function BalancedSampler:_load_label_key_mapping()
 
     -- Create mapping from label index to keys.
     local label_keys = {}
-    for i = 1, self.num_labels do
+    for i = 1, self.num_labels + 1 do
         label_keys[i] = {}
     end
 
@@ -317,9 +328,9 @@ function BalancedSampler:_load_label_key_mapping()
         local video_frame = video_frame_proto.LabeledVideoFrame()
         video_frame:ParseFromString(value:storage():string())
         local num_frame_labels = #video_frame.label
-        if num_frame_labels == 0 and self.include_bg then
+        if num_frame_labels == 0 then
             -- Add frame to list of background frames.
-            table.insert(label_keys[#label_keys], key)
+            table.insert(label_keys[self.num_labels + 1], key)
         else
             for _, label in ipairs(video_frame.label) do
                 -- Label ids start at 0.
