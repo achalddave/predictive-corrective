@@ -248,13 +248,6 @@ while true do
         all_labels = torch.cat(all_labels, labels, 1)
     end
 
-    local num_labels_with_groundtruth = 0
-    for i = 1, NUM_LABELS do
-        if torch.any(all_labels[{{}, {i}}]) then
-            num_labels_with_groundtruth = num_labels_with_groundtruth + 1
-        end
-    end
-
     samples_complete = samples_complete + to_load
     local map_so_far = evaluator.compute_mean_average_precision(
         all_predictions, all_labels)
