@@ -433,8 +433,13 @@ function SequentialSampler:sample_keys(num_sequences)
             end
             sampled_key = Sampler.frame_offset_key(sampled_key, self.step_size)
         end
-        if self.keys_set[sampled_key] then
-            -- The frame at `sampled_key` exists; continue with this video.
+        local last_key = batch_keys[step][#batch_keys[step]]
+        if self.keys_set[last_key] then
+            -- The last key we sampled was valid, so we want to output
+            -- sampled_key at the next sample.
+            -- Note that sampled_key may be nil if the video has ended, in which
+            -- case we will use the next batch to report the end of the
+            -- sequence.
             self.next_frames[sequence] = sampled_key
         elseif self.video_index == #self.video_start_keys and self.sample_once
                 then
