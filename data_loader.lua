@@ -422,15 +422,6 @@ function SequentialSampler:sample_keys(num_sequences)
            string.format('Expected batch size %s, received %s',
                          self.batch_size, num_sequences))
     for sequence = 1, num_sequences do
-        if self.video_index > #self.video_start_keys and not self.sample_once
-            then
-            print(string.format(
-                '%s: Finished pass through videos, repermuting!',
-                os.date('%X')))
-            self.video_start_keys = Sampler.permute(self.video_start_keys)
-            self.video_index = 1
-        end
-
         local sampled_key = self.next_frames[sequence]
         local sequence_valid = true
         for step = 1, self.sequence_length do
@@ -445,20 +436,23 @@ function SequentialSampler:sample_keys(num_sequences)
         if self.keys_set[sampled_key] then
             -- The frame at `sampled_key` exists; continue with this video.
             self.next_frames[sequence] = sampled_key
+        elseif self.video_index == #self.video_start_keys and self.sample_once
+                then
+            -- We've exhausted all the videos and don't want to cycle.
+            -- TODO(achald): I think there needs to be more handling to support
+            -- sample_once.
+            self.next_frames[sequence] = nil
         else
-            -- The video is over; start a new video.
+            -- Move to the next video.
+            self.video_index = self.video_index + 1
             if self.video_index > #self.video_start_keys then
-                assert(self.sample_once,
-                       'video_index > #videos, but sample_once is false!')
-                -- We've exhausted all the videos and don't want to cycle.
-                self.next_frames[sequence] = nil
-            else
-                self.next_frames[sequence] =
-                    self.video_start_keys[self.video_index]
-                -- No need to mod by #videos; this will be done in the next
-                -- loop iteration.
-                self.video_index = self.video_index + 1
+                print(string.format(
+                    '%s: Finished pass through videos, repermuting!',
+                    os.date('%X')))
+                self.video_start_keys = Sampler.permute(self.video_start_keys)
+                self.video_index = 1
             end
+            self.next_frames[sequence] = self.video_start_keys[self.video_index]
         end
     end
     return batch_keys
