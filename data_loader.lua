@@ -264,7 +264,8 @@ function BalancedSampler:sample_keys(num_sequences)
     for _ = 1, self.sequence_length do
         table.insert(batch_keys, {})
     end
-    local sampled_labels = torch.multinomial(self.label_weights, num_sequences)
+    local sampled_labels = torch.multinomial(
+        self.label_weights, num_sequences, true --[[replace]])
     for sequence = 1, num_sequences do
         local label = sampled_labels[sequence]
         local label_key_index = self.label_indices[label]
