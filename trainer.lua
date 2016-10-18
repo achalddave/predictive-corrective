@@ -273,11 +273,16 @@ function SequentialTrainer:_init(args)
         end
     end
     SequentialTrainerSuper._init(self, args)
-    assert(self.model:findModules('nn.Sequencer') ~= nil,
+    assert(self.batch_size == 1,
+          'Currently, SequentialTrainer only supports batch size = 1. ' ..
+          'See the "recurrent_batched_training" branch for some WIP on ' ..
+          'allowing the batch size to be greater than 1.')
+    assert(torch.isTypeOf(self.model, 'nn.Sequencer'),
            'SequentialTrainer requires that the input model be decorated ' ..
            'with nn.Sequencer.')
     assert(torch.isTypeOf(self.criterion, 'nn.SequencerCriterion'),
            'SequentialTrainer expects SequencerCriterion.')
+    self.model:remember('both')
     self.max_backprop_steps = args.max_backprop_steps
 end
 
@@ -288,80 +293,57 @@ function SequentialTrainer:train_batch()
     Returns:
         loss: Output of criterion:forward on this batch.
         outputs (Tensor): Output of model:forward on this batch. The tensor
-            size should be either (sequence_length, batch_size, num_labels) or
-            (batch_size, num_labels), depending on the model.
+            size should be either (sequence_length, 1, num_labels). The
+            sequence_length may be shorter at the end of the sequence (if the
+            sequence ends before we get enough frames).
         labels (Tensor): True labels. Same size as the outputs.
     ]]--
-    local images_table, labels = self.data_loader:load_batch(self.batch_size)
+    local images_table, labels = self.data_loader:load_batch(1 --[[batch size]])
+    if images_table[1][1] == nil then
+        -- The sequence ended at the end of the last batch; reset the model and
+        -- start loading the next sequence in the next batch.
+        self.model:forget()
+        local images_table, labels = self.data_loader:load_batch(1 --[[batch size]])
+    end
     -- Prefetch the next batch.
-    self.data_loader:fetch_batch_async(self.batch_size)
+    self.data_loader:fetch_batch_async(1 --[[batch size]])
 
     local num_steps = #images_table
     local num_channels = images_table[1][1]:size(1)
-    local images = torch.Tensor(num_steps, self.batch_size, num_channels,
+    local images = torch.Tensor(num_steps, 1 --[[batch size]], num_channels,
                                 self.crop_size, self.crop_size)
 
-    -- valid_step[step_i][sequence_j] = 0 indicates that this is an invalid
-    -- step, that is, if sequence_j has no frame for step_i because the sequence
-    -- has ended.
-    local valid_step = torch.ones(
-        num_steps, self.batch_size --[[num_sequences]]):byte()
+    local num_valid_steps = num_steps
     for step, step_images in ipairs(images_table) do
-        for sequence, img in ipairs(step_images) do
-            if img == nil then
-                valid_step[{step, sequence}] = 0
-            else
-                -- Process image after converting to the default Tensor type.
-                -- (Originally, it is a ByteTensor).
-                images[{step, sequence}] = image_util.augment_image_train(
-                    img:typeAs(images), self.crop_size, self.crop_size,
-                    self.pixel_mean)
-            end
+        local img = step_images[1]
+        if img == nil then
+            -- We're out of frames for this sequence.
+            num_valid_steps = step - 1
+            break
+        else
+            -- Process image after converting to the default Tensor type.
+            -- (Originally, it is a ByteTensor).
+            images[step] = image_util.augment_image_train(
+                img:typeAs(images), self.crop_size, self.crop_size,
+                self.pixel_mean)
         end
+    end
+    if num_valid_steps ~= num_steps then
+        labels = labels[{1, num_valid_steps}]
+        images = images[{1, num_valid_steps}]
     end
 
     self.gpu_inputs:resize(images:size()):copy(images)
     self.gpu_labels:resize(labels:size()):copy(labels)
 
-    -- TODO(achald): This is currently broken! When a sequence ends, we reduce
-    -- the batch size to remove that sequence, but the ordering of the batches
-    -- is important because that is what keeps track of the hidden state!
-    --
-    -- We need to pass empty images for sequences that have ended to ensure
-    -- that the hidden states are consistent. This is easy enough to do; the
-    -- hard part is _forgetting_ the hidden state for sequences that end. One
-    -- way to do this is using the nn.MaskZero decorator; however, this doesn't
-    -- necessarily work in general. For example, it doesn't work for
-    -- nn.Recurrent! What we really need is a way to explicitly zero out the
-    -- hidden state for a given batch index, but I don't know if this is
-    -- possible within the element-rnn framework.
-    assert(false, 'SequentialTrainer is not implemented correctly yet. ' ..
-                  'See comment above this line.')
-
-    local loss
-    local valid_outputs
-    local valid_labels
+    local loss, outputs
     local function model_forward_backward(_)
         self.model:zeroGradParameters()
         -- Should be of shape (sequence_length, batch_size, num_classes)
-        local outputs = self.model:forward(self.gpu_inputs)
-        if torch.all(valid_step) then
-            valid_outputs = outputs
-            valid_labels = self.gpu_labels
-        else
-            -- If there's an invalid step for at least one sequence, we'll
-            -- collect the valid sequences for each step in a table and ignore
-            -- the invalid frames.
-            valid_outputs = {}
-            valid_labels = {}
-            for step = 1, outputs:size(1) do
-                valid_outputs[step] = outputs[valid_step[step]]
-                valid_labels[step] = self.gpu_labels[valid_step[step]]
-            end
-        end
-        loss = self.criterion:forward(valid_outputs, valid_labels)
+        outputs = self.model:forward(self.gpu_inputs)
+        loss = self.criterion:forward(outputs, labels)
         local criterion_gradients = self.criterion:backward(
-            valid_outputs, valid_labels)
+            outputs, loss)
         self.model:backward(self.gpu_inputs, criterion_gradients)
         return loss, self.model_grad_parameters
     end
@@ -370,7 +352,10 @@ function SequentialTrainer:train_batch()
     -- self.model) in place.
     optim.sgd(model_forward_backward, self.model_parameters,
               self.optimization_config, self.optimization_state)
-    return loss, valid_outputs, valid_labels
+    if num_valid_steps ~= num_steps then
+        self.model:forget()
+    end
+    return loss, outputs, labels
 end
 
 function SequentialTrainer:train_epoch(epoch, num_batches)
@@ -393,12 +378,10 @@ function SequentialTrainer:train_epoch(epoch, num_batches)
         local num_steps = torch.isTensor(batch_predictions) and
             batch_predictions:size(1) or #batch_predictions
         for step = 1, num_steps do
-            local step_predictions = batch_predictions[step]
-            local step_groundtruth = batch_groundtruth[step]
-            for sequence = 1, step_predictions:size(1) do
-                table.insert(predictions, step_predictions[sequence])
-                table.insert(groundtruth, step_groundtruth[sequence])
-            end
+            table.insert(predictions,
+                         batch_predictions[step][1 --[[sequence index]]])
+            table.insert(groundtruth,
+                         batch_groundtruth[step][1 --[[sequence index]]])
         end
 
         local current_mean_average_precision =
