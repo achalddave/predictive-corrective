@@ -59,7 +59,5 @@ learning_rates: [
 ###
 # Model options
 ###
-# Lua model file.
-# model_layout: './models/vgg_recurrent.lua'
-# Torch model to start training with. If specified, model_layout is ignored.
+# Torch model to start training with.
 model_init: '/data/achald/MultiTHUMOS/models/permuted_sampling_vgg/model_30_pyramid_seq4_start_avg_at_conv4_3_scalar_learned_weights.t7'

@@ -104,12 +104,10 @@ torch.setdefaulttensortype('torch.FloatTensor')
 
 -- Load model
 local single_model
-if config.model_init ~= nil then
-    print('Loading model from' .. config.model_init)
-    single_model = torch.load(config.model_init)
-else
-    single_model = require(config.model_layout)
-end
+assert(config.model_init ~= nil, 'Initial model must be specified.')
+print('Loading model from' .. config.model_init)
+single_model = torch.load(config.model_init)
+
 if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
     print('Getting first of DataParallelTable.')
     single_model = single_model:get(1)

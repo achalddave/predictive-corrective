@@ -63,9 +63,7 @@ learning_rates: [
 ###
 # Model options
 ###
-# Lua model file.
-# model_layout: './models/vgg_recurrent.lua'
-# Torch model to start training with. If specified, model_layout is ignored.
+# Torch model to start training with.
 model_init: '/data/achald/MultiTHUMOS/models/pretrained/c3d_pretrained/c3d_multithumos.t7'
 
 # Specifies what each dimension in the input tensor corresponds to.
