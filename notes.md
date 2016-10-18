@@ -3,7 +3,7 @@ experiments, but just a way to easily see how to use some of the scripts.
 
 # Training a network
 
-````
+````bash
 th main.lua \
     config/config-vgg-pyramid.yaml \
     /data/achald/MultiTHUMOS/models/vgg_hierarchical/residual_xavier_init_untie_last_sum_conv43_conv53_flipped_img_diffs/ \
@@ -12,7 +12,7 @@ th main.lua \
 
 # Evaluating a network
 
-````
+````bash
 th scripts/evaluate_model.lua \
        /data/achald/MultiTHUMOS/models/balanced_without_bg_sampling_vgg_new/from_scratch/model_30.t7 \
        /data/achald/MultiTHUMOS/frames@10fps/labeled_video_frames/valval.lmdb/ \
@@ -27,7 +27,7 @@ th scripts/evaluate_model.lua \
 
 # Computing activations for a video
 
-````
+````bash
 th scripts/compute_video_activations.lua \
        --model /data/achald/MultiTHUMOS/models/balanced_without_bg_sampling_vgg_new/model_30.t7 \
        --layer_spec 'cudnn.SpatialConvolution,2' \
