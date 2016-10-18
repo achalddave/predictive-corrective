@@ -420,21 +420,19 @@ function SequentialSampler:sample_keys(num_sequences)
     for sequence = 1, num_sequences do
         local sampled_key = self.next_frames[sequence]
         local sequence_valid = true
+        -- Add steps from the sequence to batch_keys until the sequence ends.
         for step = 1, self.sequence_length do
             sequence_valid = sequence_valid and self.keys_set[sampled_key]
-            if not sequence_valid then
-                table.insert(batch_keys[step], nil)
-            else
+            if sequence_valid then
                 table.insert(batch_keys[step], sampled_key)
             end
             sampled_key = Sampler.frame_offset_key(sampled_key, self.step_size)
         end
-        local last_key = batch_keys[step][#batch_keys[step]]
-        if self.keys_set[last_key] then
-            -- The last key we sampled was valid, so we want to output
-            -- sampled_key at the next sample.
-            -- Note that sampled_key may be nil if the video has ended, in which
-            -- case we will use the next batch to report the end of the
+        if #batch_keys == self.sequence_length then
+            -- The sequence filled the batch, so we want to output the
+            -- sampled_key as the next sample.
+            -- Note that sampled_key may be nil if the sequence just ended, in
+            -- which case we will use the next batch to report the end of the
             -- sequence.
             self.next_frames[sequence] = sampled_key
         else
