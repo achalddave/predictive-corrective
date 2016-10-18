@@ -36,3 +36,13 @@ th scripts/compute_video_activations.lua \
        --output_activations
        /data/achald/MultiTHUMOS/visualizations/balanced_sampling_vgg/model_30_video_validation_0000901_vis_conv1_2.t7
 ````
+
+# Create activations video
+````bash
+python create_activations_video.py \
+    --activations_t7 "/data/achald/MultiTHUMOS/visualizations/permuted_sampling_vgg_conv/model_30_${video}_vis_${layer}.t7"  \
+    --video "/data/achald/THUMOS/2014/temporal_detection_videos/val/${video}.mp4" \
+    --filter ${filter} \
+    --frames_per_second 10 \
+    --output "/data/achald/MultiTHUMOS/visualizations/permuted_sampling_vgg_conv/model_30_${video}_vis_${layer}_filter_${filter}.mp4"
+````
