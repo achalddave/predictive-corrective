@@ -37,8 +37,8 @@ parser:option('--weight_type',
               'tied: Tie weights between pyramid paths. \n' ..
               'untied: Untie the weights between pyramid paths. \n' ..
               'untie_last: Tie weight except for on the last frame. \n' ..
-              'residual_tied: Initialize and tie weights on all but last ' ..
-                             'frame. \n')
+              'residual_untie_last: Initialize and tie weights on all but ' ..
+                             'last frame. \n')
       :default('tied')
 parser:flag('--weighted_merge',
             'Whether to add learnable weights before merging. ' ..
@@ -57,7 +57,7 @@ local WEIGHT_TYPE_OPTIONS = {
     tied = 1,
     untied = 2,
     untie_last = 3,
-    residual_tied = 4
+    residual_untie_last = 4
 }
 
 local merge_type = MERGE_OPTIONS[args.merge_type]
@@ -168,7 +168,7 @@ for i, layer_index in ipairs(MERGE_LAYER_INDICES) do
             else
                 new_stub = stub:clone()
             end
-        elseif weight_type == WEIGHT_TYPE_OPTIONS.residual_tied then
+        elseif weight_type == WEIGHT_TYPE_OPTIONS.residual_untie_last then
             -- Share weights on all but the last frame.
             if step ~= input_length then
                 new_stub = reset_stub:sharedClone()
