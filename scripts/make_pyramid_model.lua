@@ -204,5 +204,4 @@ output_model:add(stub_to_output)
 -- DataParallelTable.
 output_model:add(nn.Unsqueeze(1))
 torch.save(args.output, output_model)
-print('Summing Conv5-3 and fc7!')
-print('Model saved to', output_model)
+print('Model saved to', args.output)
