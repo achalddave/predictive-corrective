@@ -375,15 +375,11 @@ function SequentialSampler:_init(
         use_boundary_frames (bool): Ignored for SequentialSampler.
         options:
             batch_size (int): Must be specified a-priori and cannot be changed.
-            sample_once (bool): Default false. If true, sample from each video
-                only once, and output nil keys once all videos are exhausted.
     ]]--
     self.imageless_path = lmdb_without_images_path
     self.sequence_length = sequence_length == nil and 1 or sequence_length
     self.step_size = step_size == nil and 1 or step_size
     assert(options.batch_size ~= nil)
-    self.sample_once = options.sample_once == nil and false
-                                                  or options.sample_once
     self.batch_size = options.batch_size
     self.keys = PermutedSampler.load_lmdb_keys(lmdb_without_images_path)
 
@@ -441,12 +437,6 @@ function SequentialSampler:sample_keys(num_sequences)
             -- case we will use the next batch to report the end of the
             -- sequence.
             self.next_frames[sequence] = sampled_key
-        elseif self.video_index == #self.video_start_keys and self.sample_once
-                then
-            -- We've exhausted all the videos and don't want to cycle.
-            -- TODO(achald): I think there needs to be more handling to support
-            -- sample_once.
-            self.next_frames[sequence] = nil
         else
             -- Move to the next video.
             self.video_index = self.video_index + 1
