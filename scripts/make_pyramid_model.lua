@@ -120,10 +120,10 @@ local function create_merger(
     local num_mergers = sequence_length / merge_input_length
     for merge_index = 1, num_mergers do
         -- Index of first frame in merge inputs.
-        local left_index = merge_index * merge_input_length - 1
+        local left_index = (merge_index - 1) * merge_input_length + 1
         local merger = nn.Sequential()
         -- Select merge inputs
-        merger:add(nn.NarrowTable(left_index, merge_input_lengt))
+        merger:add(nn.NarrowTable(left_index, merge_input_length))
         merger:add(merging_layer:clone()) -- Merge the current inputs.
         mergers:add(merger)
     end
