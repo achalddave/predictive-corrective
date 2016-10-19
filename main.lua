@@ -90,8 +90,10 @@ end
 
 local experiment_id = experiment_saver.read_and_increment_experiment_id(
     args.experiment_id_file)
-experiment_saver.copy_file_naive(
-    args.experiment_id_file, paths.concat(cache_dir, 'experiment-id.txt'))
+experiment_id_output = io.open(
+    paths.concat(cache_dir, 'experiment-id.txt'), 'w')
+experiment_id_output:write(experiment_id)
+experiment_id_output:close()
 print('===')
 print('Experiment id:', experiment_id)
 print('===')
