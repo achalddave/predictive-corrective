@@ -217,63 +217,56 @@ function SequentialEvaluator:evaluate_batch()
     Returns:
         loss: Output of criterion:forward on this batch.
         outputs (Tensor): Output of model:forward on this batch. The tensor
-            size should be either (sequence_length, batch_size, num_labels) or
-            (batch_size, num_labels), depending on the model.
+            size should be either (sequence_length, 1, num_labels). The
+            sequence_length may be shorter at the end of the sequence (if the
+            sequence ends before we get enough frames).
         labels (Tensor): True labels. Same size as the outputs.
     ]]--
-    local images_table, labels = self.data_loader:load_batch(self.batch_size)
+    local images_table, labels = self.data_loader:load_batch(1 --[[batch size]])
+    if images_table[1][1] == END_OF_SEQUENCE then
+        -- The sequence ended at the end of the last batch; reset the model and
+        -- start loading the next sequence in the next batch.
+        self.model:forget()
+        images_table, labels = self.data_loader:load_batch(1 --[[batch size]])
+    end
     -- Prefetch the next batch.
-    self.data_loader:fetch_batch_async(self.batch_size)
+    self.data_loader:fetch_batch_async(1 --[[batch size]])
 
     local num_steps = #images_table
     local num_channels = images_table[1][1]:size(1)
-    local images = torch.Tensor(num_steps, self.batch_size, num_channels,
+    local images = torch.Tensor(num_steps, 1 --[[batch size]], num_channels,
                                 self.crop_size, self.crop_size)
 
-    -- valid_step[step_i][sequence_j] = 0 indicates that this is an invalid
-    -- step, that is, if sequence_j has no frame for step_i because the sequence
-    -- has ended.
-    local valid_step = torch.ones(
-        num_steps, self.batch_size --[[num_sequences]])
+    local num_valid_steps = num_steps
     for step, step_images in ipairs(images_table) do
-        for sequence, img in ipairs(step_images) do
-            if img == nil then
-                valid_step[{step, sequence}] = 0
-            else
-                -- Process image after converting to the default Tensor type.
-                -- (Originally, it is a ByteTensor).
-                images[{step, sequence}] = image_util.augment_image_eval(
-                    img:typeAs(images), self.crop_size, self.crop_size,
-                    self.pixel_mean)
-            end
+        local img = step_images[1]
+        if img == END_OF_SEQUENCE then
+            -- We're out of frames for this sequence.
+            num_valid_steps = step - 1
+            break
+        else
+            -- Process image after converting to the default Tensor type.
+            -- (Originally, it is a ByteTensor).
+            images[step] = image_util.augment_image_eval(
+                img:typeAs(images), self.crop_size, self.crop_size,
+                self.pixel_mean)
         end
+    end
+    if num_valid_steps ~= num_steps then
+        labels = labels[{{1, num_valid_steps}}]
+        images = images[{{1, num_valid_steps}}]
     end
 
     self.gpu_inputs:resize(images:size()):copy(images)
     self.gpu_labels:resize(labels:size()):copy(labels)
 
-
     -- Should be of shape (sequence_length, batch_size, num_classes)
     local outputs = self.model:forward(self.gpu_inputs)
-    local valid_outputs
-    local valid_labels
-    if torch.all(valid_step) then
-        valid_outputs = outputs
-        valid_labels = self.gpu_labels
-    else
-        -- If there's an invalid step for at least one sequence, we'll
-        -- collect the valid sequences for each step in a table and ignore
-        -- the invalid frames.
-        valid_outputs = {}
-        valid_labels = {}
-        for step = 1, outputs:size(1) do
-            valid_outputs[step] = outputs[valid_step[step]]
-            valid_labels[step] = self.gpu_labels[valid_step[step]]
-        end
+    local loss = self.criterion:forward(outputs, self.gpu_labels)
+    if num_valid_steps ~= num_steps then
+        self.model:forget()
     end
-    local loss = self.criterion:forward(valid_outputs, valid_labels)
-
-    return loss, valid_outputs, valid_labels
+    return loss, outputs, labels
 end
 
 function SequentialEvaluator:evaluate_epoch(epoch, num_batches)
@@ -294,17 +287,15 @@ function SequentialEvaluator:evaluate_epoch(epoch, num_batches)
         local num_steps = torch.isTensor(batch_predictions) and
             batch_predictions:size(1) or #batch_predictions
         for step = 1, num_steps do
-            local step_predictions = batch_predictions[step]
-            local step_groundtruth = batch_groundtruth[step]
-            for sequence = 1, #step_predictions do
-                table.insert(predictions, step_predictions[sequence])
-                table.insert(groundtruth, step_groundtruth[sequence])
-            end
+            table.insert(predictions,
+                         batch_predictions[step][1 --[[sequence index]]])
+            table.insert(groundtruth,
+                         batch_groundtruth[step][1 --[[sequence index]]])
         end
     end
 
-    local mean_average_precision = compute_mean_average_precision(predictions,
-                                                                  groundtruth)
+    local mean_average_precision = compute_mean_average_precision(
+        torch.cat(predictions, 2):t(), torch.cat(groundtruth, 2):t())
     print(string.format(
         '%s: Epoch: [%d]VALIDATION SUMMARY] Total Time(s): %.2f\t' ..
         'average loss (per batch): %.5f \t mAP: %.5f',
