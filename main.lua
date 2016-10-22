@@ -214,7 +214,6 @@ local trainer = trainer_class {
     data_loader = train_loader,
     input_dimension_permutation = config.input_dimension_permutation,
     pixel_mean = config.pixel_mean,
-    epoch_size = config.epoch_size,
     batch_size = config.batch_size,
     crop_size = config.crop_size,
     num_labels = config.num_labels,
