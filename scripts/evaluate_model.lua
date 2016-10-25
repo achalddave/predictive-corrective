@@ -43,7 +43,7 @@ parser:argument('labeled_video_frames_without_images_lmdb',
                 'LMDB containing LabeledVideoFrames without images.')
 parser:option('--output_hdf5', 'HDF5 to output predictions to'):count('?')
 parser:option('--sequence_length', 'Number of input frames.')
-    :count('?'):default(2):convert(tonumber)
+    :count('?'):default(1):convert(tonumber)
 parser:option('--step_size', 'Size of step between frames.')
     :count('?'):default(1):convert(tonumber)
 parser:option('--experiment_id_file',
