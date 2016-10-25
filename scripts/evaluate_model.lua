@@ -269,8 +269,9 @@ for i = 1, all_predictions:size(2) do
     print(string.format('Class %d\t AP: %.5f', i, ap))
 end
 
-local map = torch.mean(aps[torch.ne(aps, -1)])
-print('mAP: ', map)
+assert(torch.all(torch.ne(aps, -1)))
+
+print('MultiTHUMOS mAP:', torch.mean(aps))
 
 do -- Compute accuracy across validation groups.
     local groups_file = torch.DiskFile(args.val_groups, 'r'):quiet()
