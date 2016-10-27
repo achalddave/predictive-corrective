@@ -1,8 +1,6 @@
-
 local nn = require 'nn'
 local torch = require 'torch'
 require 'layers/CRollingDiffTable'
-
 
 local function test_not_enough_inputs()
     local differ = nn.CRollingDiffTable(3)
