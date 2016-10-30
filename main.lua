@@ -97,7 +97,7 @@ end
 
 local experiment_id = experiment_saver.read_and_increment_experiment_id(
     args.experiment_id_file)
-experiment_id_output = io.open(
+local experiment_id_output = io.open(
     paths.concat(cache_dir, 'experiment-id.txt'), 'w')
 experiment_id_output:write(experiment_id)
 experiment_id_output:close()
