@@ -66,12 +66,17 @@ end
 if config.use_boundary_frames == nil then
     config.use_boundary_frames = false
 end
+
+if config.computational_batch_size == nil then
+    config.computational_batch_size = config.batch_size
+end
 if config.val_batch_size == nil then
     config.val_batch_size = config.batch_size
 end
 if config.val_epoch_size == nil then
     config.val_epoch_size = config.epoch_size
 end
+assert(config.batch_size % config.computational_batch_size == 0)
 -- TODO(achald): Validate config.
 
 -- Create cache_base
@@ -244,6 +249,7 @@ local trainer = trainer_class {
     input_dimension_permutation = config.input_dimension_permutation,
     pixel_mean = config.pixel_mean,
     batch_size = config.batch_size,
+    computational_batch_size = config.computational_batch_size,
     crop_size = config.crop_size,
     num_labels = config.num_labels,
     learning_rates = config.learning_rates,

@@ -25,6 +25,7 @@ function Trainer:_init(args)
               (batch_size, num_channels, seuquence_length, width, height)
         pixel_mean
         batch_size
+        computational_batch_size
         crop_size
         learning_rates: Array of tables containing keys 'start_epoch',
             'learning_rate'. E.g.
@@ -51,6 +52,7 @@ function Trainer:_init(args)
     end
     self.pixel_mean = torch.Tensor(args.pixel_mean)
     self.batch_size = args.batch_size
+    self.computational_batch_size = args.computational_batch_size
     self.crop_size = args.crop_size
     self.num_labels = args.num_labels
     self.weight_decay = args.weight_decay
@@ -96,6 +98,36 @@ function Trainer:update_optim_config(epoch)
     return regime_was_updated
 end
 
+function Trainer:_train_batch_accumulate_gradients(images, labels)
+    --[[
+    Accumulate gradients on this set of images and labels.
+
+    Args:
+        images ((sequence_length, batch_size, num_channels, width, height))
+        labels: Subset of output of data_loader:load_batch()
+    ]]--
+    if self.input_dimension_permutation then
+        images = images:permute(unpack(self.input_dimension_permutation))
+    end
+
+    self.gpu_inputs:resize(images:size()):copy(images)
+    self.gpu_labels:resize(labels:size()):copy(labels)
+
+    local outputs = self.model:forward(self.gpu_inputs)
+    -- If the output of the network is a single prediction for the sequence,
+    -- compare it to the label of the last frame.
+    if (outputs:size(1) == 1 or outputs:dim() == 2) and
+            self.gpu_labels:size(1) ~= 1 then
+        self.gpu_labels = self.gpu_labels[self.gpu_labels:size(1)]
+    end
+    local loss = self.criterion:forward(outputs, self.gpu_labels)
+    local criterion_gradients = self.criterion:backward(
+        outputs, self.gpu_labels)
+    self.model:backward(self.gpu_inputs, criterion_gradients)
+    self.gpu_inputs:resize(0)
+    return loss, outputs
+end
+
 function Trainer:train_batch()
     --[[
     Train on a batch of data
@@ -125,36 +157,37 @@ function Trainer:train_batch()
         end
     end
 
-    if self.input_dimension_permutation then
-        images = images:permute(unpack(self.input_dimension_permutation))
-    end
-
-    self.gpu_inputs:resize(images:size()):copy(images)
-    self.gpu_labels:resize(labels:size()):copy(labels)
-
-    -- TODO(achald): Allow smaller computational batch sizes while maintaining
-    -- optimization batch size (i.e. accumulate gradients across computational
-    -- batch sizes).
-    local loss, outputs
-    local function model_forward_backward(_)
-        self.model:zeroGradParameters()
-        outputs = self.model:forward(self.gpu_inputs)
-        -- If the output of the network is a single prediction for the sequence,
-        -- compare it to the label of the last frame.
-        if (outputs:size(1) == 1 or outputs:dim() == 2) and
-                self.gpu_labels:size(1) ~= 1 then
-            self.gpu_labels = self.gpu_labels[self.gpu_labels:size(1)]
+    local loss = 0
+    local outputs
+    self.model:zeroGradParameters()
+    for i = 1, self.batch_size / self.computational_batch_size do
+        local start_index = (i - 1) * self.computational_batch_size + 1
+        local end_index = i * self.computational_batch_size
+        local current_loss, current_outputs =
+            self:_train_batch_accumulate_gradients(
+                images[{{}, {start_index, end_index}}],
+                labels[{{}, {start_index, end_index}}])
+        -- The loss is averaged by the computational batch size; we want to
+        -- average by the actual batch size.
+        loss = loss + (
+            current_loss * self.computational_batch_size / self.batch_size)
+        if outputs == nil then
+            outputs = current_outputs
+        else
+            -- If the outputs are 3D, then they must be (sequence_length,
+            -- batch_size, num_labels). Otherwise, they are 2D and of shape
+            -- (batch_size, num_labels).
+            local batch_dimension = current_outputs:dim() == 3 and 2 or 1
+            outputs = torch.cat(outputs, current_outputs, batch_dimension)
         end
-        loss = self.criterion:forward(outputs, self.gpu_labels)
-        local criterion_gradients = self.criterion:backward(
-            outputs, self.gpu_labels)
-        self.model:backward(self.gpu_inputs, criterion_gradients)
-        return loss, self.model_grad_parameters
     end
 
     -- Updates self.model_parameters (and, in turn, the parameters of
     -- self.model) in place.
-    optim.sgd(model_forward_backward, self.model_parameters,
+    local function loss_grad_params()
+        return loss, self.model_grad_parameters
+    end
+    optim.sgd(loss_grad_params, self.model_parameters,
               self.optimization_config, self.optimization_state)
     return loss, outputs, labels
 end
