@@ -67,7 +67,7 @@ if config.use_boundary_frames == nil then
     config.use_boundary_frames = false
 end
 if config.val_batch_size == nil then
-    config.val_batch_size = config.computational_batch_size
+    config.val_batch_size = config.batch_size
 end
 if config.val_epoch_size == nil then
     config.val_epoch_size = config.epoch_size
@@ -276,7 +276,7 @@ for epoch = config.init_epoch, config.num_epochs do
     collectgarbage()
     collectgarbage()
 
-    evaluator:evaluate_epoch(epoch, config.epoch_size)
+    evaluator:evaluate_epoch(epoch, config.val_epoch_size)
     collectgarbage()
     collectgarbage()
 end
