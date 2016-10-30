@@ -182,12 +182,23 @@ local train_sampler = sampling_strategies[config.sampling_strategy:lower()](
     config.step_size,
     config.use_boundary_frames,
     config.sampling_strategy_options)
-local val_sampler = data_loader.PermutedSampler(
-    config.val_lmdb_without_images,
-    config.num_labels,
-    config.sequence_length,
-    config.step_size,
-    config.use_boundary_frames)
+local val_sampler
+if sequential_training then
+    val_sampler = data_loader.SequentialSampler(
+        config.val_lmdb_without_images,
+        config.num_labels,
+        config.sequence_length,
+        config.step_size,
+        config.use_boundary_frames,
+        config.sampling_strategy_options)
+else
+    val_sampler = data_loader.PermutedSampler(
+        config.val_lmdb_without_images,
+        config.num_labels,
+        config.sequence_length,
+        config.step_size,
+        config.use_boundary_frames)
+end
 
 local train_loader = data_loader.DataLoader(
     config.train_lmdb, train_sampler, config.num_labels)
