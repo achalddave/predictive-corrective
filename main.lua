@@ -82,10 +82,9 @@ experiment_saver.save_git_info(cache_dir)
 print('Saving run information to', cache_dir)
 
 -- Save config to cache_dir
-experiment_saver.copy_file_naive(args.config,
-                              paths.concat(cache_dir, 'config.yaml'))
+experiment_saver.copy_file(args.config, paths.concat(cache_dir, 'config.yaml'))
 if config.data_paths_config ~= nil then
-    experiment_saver.copy_file_naive(
+    experiment_saver.copy_file(
         config.data_paths_config,
         paths.concat(cache_dir, paths.basename(config.data_paths_config)))
 end

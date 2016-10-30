@@ -2,14 +2,11 @@ local function save_git_info(output_dir)
     os.execute('./dump_git_info.sh ' .. output_dir)
 end
 
-local function copy_file_naive(in_path, out_path)
-    -- TODO(achald): Use a library function, if one exists.
-    local in_file = io.open(in_path, 'r')
-    local in_contents = in_file:read('*all')
-    in_file:close()
-    local out_file = io.open(out_path, 'w')
-    out_file:write(in_contents)
-    out_file:close()
+local function copy_file(in_path, out_path)
+    -- TODO(achald): See if there is a portable way to copy a file in lua.
+    local cmd = string.format('cp %s %s', in_path, out_path)
+    print('Executing command:', cmd)
+    os.execute(cmd)
 end
 
 local function read_and_increment_experiment_id(experiment_id_path)
@@ -25,7 +22,7 @@ local function read_and_increment_experiment_id(experiment_id_path)
 end
 
 return {
-    copy_file_naive = copy_file_naive,
+    copy_file = copy_file,
     save_git_info = save_git_info,
     read_and_increment_experiment_id = read_and_increment_experiment_id
 }
