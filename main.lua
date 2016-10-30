@@ -108,6 +108,8 @@ torch.setdefaulttensortype('torch.FloatTensor')
 -- Load model
 local single_model
 assert(config.model_init ~= nil, 'Initial model must be specified.')
+experiment_saver.copy_file(config.model_init,
+                           paths.concat(cache_dir, 'model_init.t7'))
 print('Loading model from' .. config.model_init)
 single_model = torch.load(config.model_init)
 
