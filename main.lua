@@ -147,6 +147,9 @@ if config.criterion_wrapper == nil then
         config.criterion_wrapper = ''
     end
 end
+single_model = nil
+collectgarbage()
+collectgarbage()
 
 if config.criterion_wrapper:lower() == 'last_step_criterion' then
     criterion = nn.LastStepCriterion(criterion)
