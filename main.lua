@@ -259,6 +259,8 @@ for epoch = config.init_epoch, config.num_epochs do
     print(('Training epoch %d'):format(epoch))
     trainer:train_epoch(epoch, config.epoch_size)
     trainer:save(cache_dir, epoch)
+    torch.save(paths.concat(cache_dir, 'sampler_' .. epoch .. '.t7'),
+               train_sampler)
     collectgarbage()
     collectgarbage()
 
