@@ -155,6 +155,8 @@ if config.criterion_wrapper:lower() == 'last_step_criterion' then
     criterion = nn.LastStepCriterion(criterion)
 elseif config.criterion_wrapper:lower() == 'sequencer_criterion' then
     criterion = nn.SequencerCriterion(criterion)
+elseif config.criterion_wrapper ~= '' then
+    error('Unknown criterion wrapper', config.criterion_wraper)
 end
 print('Loaded model')
 
