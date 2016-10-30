@@ -4,6 +4,6 @@ local cutorch = require 'cutorch'
 local torch = require 'torch'
 local nn = require 'nn'
 require 'rnn'
-require 'layers/CAvgTable'
+require 'layers/init'
 require 'cunn'
 
