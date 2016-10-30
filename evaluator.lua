@@ -68,7 +68,8 @@ function Evaluator:evaluate_batch()
             -- Process image after converting to the default Tensor type.
             -- (Originally, it is a ByteTensor).
             images[{step, sequence}] = image_util.augment_image_eval(
-                img, self.crop_size, self.crop_size, self.pixel_mean)
+                img:typeAs(images), self.crop_size, self.crop_size,
+                self.pixel_mean)
         end
     end
     if self.input_dimension_permutation then
