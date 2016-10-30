@@ -93,6 +93,9 @@ function Trainer:update_optim_config(epoch)
     if regime_was_updated then
         self.optimization_config.learningRate = learning_rate
         self.optimization_config.weightDecay = self.weightDecay
+        self.optimization_state = nil
+        collectgarbage()
+        collectgarbage()
         self.optimization_state = {}
     end
     return regime_was_updated
@@ -208,6 +211,7 @@ function Trainer:train_epoch(epoch, num_batches)
     for batch_index = 1, num_batches do
         batch_timer:reset()
         collectgarbage()
+        collectgarbage()
         local loss, curr_predictions, curr_groundtruth = self:train_batch()
         loss_epoch = loss_epoch + loss
 
@@ -245,6 +249,11 @@ function Trainer:train_epoch(epoch, num_batches)
 
     local mean_average_precision = evaluator.compute_mean_average_precision(
         predictions, groundtruth)
+    predictions = nil
+    groundtruth = nil
+    collectgarbage()
+    collectgarbage()
+
 
     print(string.format(
         '%s: Epoch: [%d][TRAINING SUMMARY] Total Time(s): %.2f\t' ..
@@ -265,6 +274,8 @@ function Trainer:save(directory, epoch)
                self.optimization_config)
     torch.save(paths.concat(directory, 'optim_state_' .. epoch .. '.t7'),
                self.optimization_state)
+    collectgarbage()
+    collectgarbage()
 end
 
 function Trainer:_epoch_learning_rate(epoch)

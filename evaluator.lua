@@ -86,6 +86,8 @@ function Evaluator:evaluate_batch()
     end
     local loss = self.criterion:forward(outputs, self.gpu_labels)
 
+    self.gpu_inputs:resize(0)
+    self.gpu_labels:resize(0)
     return loss, outputs, labels
 end
 
@@ -128,12 +130,16 @@ function Evaluator:evaluate_epoch(epoch, num_batches)
 
     local mean_average_precision = compute_mean_average_precision(
         predictions, groundtruth)
+    predictions = nil
+    groundtruth = nil
+    collectgarbage()
+    collectgarbage()
+
     print(string.format(
         '%s: Epoch: [%d][VALIDATION SUMMARY] Total Time(s): %.2f\t' ..
         'average loss (per batch): %.5f \t mAP: %.5f',
         os.date('%X'), epoch, epoch_timer:time().real, loss_epoch / num_batches,
         mean_average_precision))
-    collectgarbage()
 end
 
 -- TODO(achald): Move this to a separate util file.
