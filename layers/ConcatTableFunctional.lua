@@ -23,6 +23,7 @@ function ConcatTableFunctional:_update(num_input)
                 self:_add_module(i)
             end
         end
+        self:type(self._type)
     end
 end
 
@@ -45,4 +46,9 @@ end
 function ConcatTableFunctional:accUpdateGradParameters(input, gradOutput, lr)
     self:_update(#input)
     return parent.accUpdateGradParameters(self, input, gradOutput, lr)
+end
+
+function ConcatTableFunctional:type(type, tensorCache)
+    self._type = type
+    return parent.type(self, type, tensorCache)
 end
