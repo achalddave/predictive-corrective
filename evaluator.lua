@@ -93,9 +93,9 @@ function Evaluator:evaluate_batch()
 end
 
 function Evaluator:evaluate_epoch(epoch, num_batches)
-    self.model:evaluate()
     local epoch_timer = torch.Timer()
     local batch_timer = torch.Timer()
+    self.model:evaluate()
 
     local predictions = torch.Tensor(
         num_batches * self.batch_size, self.num_labels)
