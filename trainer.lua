@@ -8,6 +8,7 @@ local torch = require 'torch'
 
 local evaluator = require 'evaluator'
 local image_util = require 'util/image_util'
+local END_OF_SEQUENCE = require('data_loader').END_OF_SEQUENCE
 
 local Trainer = classic.class('Trainer')
 
@@ -321,18 +322,17 @@ function SequentialTrainer:_init(args)
           'Currently, SequentialTrainer only supports batch size = 1. ' ..
           'See the "recurrent_batched_training" branch for some WIP on ' ..
           'allowing the batch size to be greater than 1.')
-    assert(torch.isTypeOf(self.model, 'nn.Sequencer'),
+    assert(self.model:findModules('nn.Sequencer') ~= nil,
            'SequentialTrainer requires that the input model be decorated ' ..
            'with nn.Sequencer.')
     assert(torch.isTypeOf(self.criterion, 'nn.SequencerCriterion'),
            'SequentialTrainer expects SequencerCriterion.')
     self.model:remember('both')
-    self.max_backprop_steps = args.max_backprop_steps
 end
 
 function SequentialTrainer:train_batch()
     --[[
-    Train on a batch of data
+    Train on a batch of data.
 
     Returns:
         loss: Output of criterion:forward on this batch.
@@ -341,13 +341,21 @@ function SequentialTrainer:train_batch()
             sequence_length may be shorter at the end of the sequence (if the
             sequence ends before we get enough frames).
         labels (Tensor): True labels. Same size as the outputs.
+        sequence_ended (bool): If true, specifies that this batch ends the
+            sequence.
     ]]--
+    self.model:zeroGradParameters()
+
     local images_table, labels = self.data_loader:load_batch(1 --[[batch size]])
-    if images_table[1][1] == nil then
+    if images_table[1][1] == END_OF_SEQUENCE then
         -- The sequence ended at the end of the last batch; reset the model and
         -- start loading the next sequence in the next batch.
+        for step = 1, #images_table do
+            -- The rest of the batch should be filled with END_OF_SEQUENCe.
+            assert(images_table[step][1] == END_OF_SEQUENCE)
+        end
         self.model:forget()
-        local images_table, labels = self.data_loader:load_batch(1 --[[batch size]])
+        return nil, nil, nil, true --[[sequence_ended]]
     end
     -- Prefetch the next batch.
     self.data_loader:fetch_batch_async(1 --[[batch size]])
@@ -360,7 +368,7 @@ function SequentialTrainer:train_batch()
     local num_valid_steps = num_steps
     for step, step_images in ipairs(images_table) do
         local img = step_images[1]
-        if img == nil then
+        if img == END_OF_SEQUENCE then
             -- We're out of frames for this sequence.
             num_valid_steps = step - 1
             break
@@ -372,9 +380,14 @@ function SequentialTrainer:train_batch()
                 self.pixel_mean)
         end
     end
-    if num_valid_steps ~= num_steps then
-        labels = labels[{1, num_valid_steps}]
-        images = images[{1, num_valid_steps}]
+    local sequence_ended = num_valid_steps ~= num_steps
+    if sequence_ended then
+        labels = labels[{{1, num_valid_steps}}]
+        images = images[{{1, num_valid_steps}}]
+        for step = num_valid_steps + 1, #images_table do
+            -- The rest of the batch should be filled with END_OF_SEQUENCe.
+            assert(images_table[step][1] == END_OF_SEQUENCE)
+        end
     end
 
     self.gpu_inputs:resize(images:size()):copy(images)
@@ -382,12 +395,11 @@ function SequentialTrainer:train_batch()
 
     local loss, outputs
     local function model_forward_backward(_)
-        self.model:zeroGradParameters()
         -- Should be of shape (sequence_length, batch_size, num_classes)
         outputs = self.model:forward(self.gpu_inputs)
-        loss = self.criterion:forward(outputs, labels)
+        loss = self.criterion:forward(outputs, self.gpu_labels)
         local criterion_gradients = self.criterion:backward(
-            outputs, loss)
+            outputs, self.gpu_labels)
         self.model:backward(self.gpu_inputs, criterion_gradients)
         return loss, self.model_grad_parameters
     end
@@ -396,50 +408,73 @@ function SequentialTrainer:train_batch()
     -- self.model) in place.
     optim.sgd(model_forward_backward, self.model_parameters,
               self.optimization_config, self.optimization_state)
-    if num_valid_steps ~= num_steps then
+    if sequence_ended then
         self.model:forget()
     end
-    return loss, outputs, labels
+    return loss, outputs, labels, sequence_ended
 end
 
-function SequentialTrainer:train_epoch(epoch, num_batches)
+function SequentialTrainer:train_epoch(epoch, num_sequences)
     self.model:clearState()
     self.model:training()
     self:update_optim_config(epoch)
     local epoch_timer = torch.Timer()
     local batch_timer = torch.Timer()
 
-    local predictions = {}
-    local groundtruth = {}
+    local predictions, groundtruth
 
-    local loss_epoch = 0
-    for batch_index = 1, num_batches do
+    local epoch_loss = 0
+    for sequence = 1, num_sequences do
         batch_timer:reset()
         collectgarbage()
-        local loss, batch_predictions, batch_groundtruth = self:train_batch()
-        loss_epoch = loss_epoch + loss
+        local sequence_ended = false
+        local sequence_predictions, sequence_groundtruth
+        local sequence_loss = 0
+        local num_steps_in_sequence = 0
+        while not sequence_ended do
+            local loss, batch_predictions, batch_groundtruth, sequence_ended_ =
+                self:train_batch()
+            -- HACK: Assign to definition outside of while loop.
+            sequence_ended = sequence_ended_
+            if loss == nil then
+                assert(sequence_ended)
+                break
+            end
+            sequence_loss = sequence_loss + loss
 
-        local num_steps = torch.isTensor(batch_predictions) and
-            batch_predictions:size(1) or #batch_predictions
-        for step = 1, num_steps do
-            table.insert(predictions,
-                         batch_predictions[step][1 --[[sequence index]]])
-            table.insert(groundtruth,
-                         batch_groundtruth[step][1 --[[sequence index]]])
+            assert(torch.isTensor(batch_predictions))
+            -- Remove sequence dimension.
+            num_steps_in_sequence = num_steps_in_sequence +
+                batch_predictions:size(1)
+            batch_predictions = batch_predictions[{{}, 1}]
+            batch_groundtruth = batch_groundtruth[{{}, 1}]
+            if sequence_predictions == nil then
+                sequence_predictions = batch_predictions
+                sequence_groundtruth = batch_groundtruth
+            else
+                sequence_predictions = torch.cat(
+                    sequence_predictions, batch_predictions, 1)
+                sequence_groundtruth = torch.cat(
+                    sequence_groundtruth, batch_groundtruth, 1)
+            end
         end
-
-        local current_mean_average_precision =
+        epoch_loss = epoch_loss + sequence_loss
+        local sequence_mean_average_precision =
             evaluator.compute_mean_average_precision(
-                torch.cat(predictions, 2):t(),
-                torch.cat(groundtruth, 2):t())
-
+                sequence_predictions, sequence_groundtruth)
         print(string.format(
-              '%s: Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f ' ..
-              'epoch mAP %.4f LR %.0e',
-              os.date('%X'), epoch, batch_index, num_batches,
-              batch_timer:time().real, loss,
-              current_mean_average_precision,
-              self.epoch_base_learning_rate))
+            '%s: Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f ' ..
+            'seq mAP %.4f LR %.0e',
+            os.date('%X'), epoch, sequence, num_sequences,
+            batch_timer:time().real, sequence_loss,
+            sequence_mean_average_precision, self.epoch_base_learning_rate))
+        if predictions == nil then
+            predictions = sequence_predictions
+            groundtruth = sequence_groundtruth
+        else
+            predictions = torch.cat(predictions, sequence_predictions, 1)
+            groundtruth = torch.cat(groundtruth, sequence_groundtruth, 1)
+        end
     end
 
     local mean_average_precision = evaluator.compute_mean_average_precision(
@@ -448,8 +483,8 @@ function SequentialTrainer:train_epoch(epoch, num_batches)
     print(string.format(
         '%s: Epoch: [%d][TRAINING SUMMARY] Total Time(s): %.2f\t' ..
         'average loss (per batch): %.5f \t mAP: %.5f',
-        os.date('%X'), epoch, epoch_timer:time().real, loss_epoch / num_batches,
-        mean_average_precision))
+        os.date('%X'), epoch, epoch_timer:time().real,
+        epoch_loss / num_sequences, mean_average_precision))
 end
 
 return {Trainer = Trainer, SequentialTrainer = SequentialTrainer}

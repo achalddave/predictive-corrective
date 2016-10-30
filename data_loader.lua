@@ -10,6 +10,8 @@ local torch = require 'torch'
 
 local video_frame_proto = require 'video_util.video_frames_pb'
 
+local END_OF_SEQUENCE = -1
+
 local Sampler = classic.class('Sampler')
 Sampler:mustHave('sample_keys')
 Sampler:mustHave('num_samples')
@@ -399,7 +401,6 @@ function SequentialSampler:_init(
     for i = 1, self.batch_size do
         self.next_frames[i] = self.video_start_keys[i]
     end
-    self.video_index = self.video_index + self.batch_size
 end
 
 function SequentialSampler:sample_keys(num_sequences)
@@ -425,6 +426,8 @@ function SequentialSampler:sample_keys(num_sequences)
             sequence_valid = sequence_valid and self.keys_set[sampled_key]
             if sequence_valid then
                 table.insert(batch_keys[step], sampled_key)
+            else
+                table.insert(batch_keys[step], END_OF_SEQUENCE)
             end
             sampled_key = Sampler.frame_offset_key(sampled_key, self.step_size)
         end
@@ -434,6 +437,10 @@ function SequentialSampler:sample_keys(num_sequences)
             -- Note that sampled_key may be nil if the sequence just ended, in
             -- which case we will use the next batch to report the end of the
             -- sequence.
+
+            -- if not self.keys_set[sampled_key] then
+            --     print('SequentialSampler: Sequence ended at end of batch')
+            -- end
             self.next_frames[sequence] = sampled_key
         else
             -- Move to the next video.
@@ -628,9 +635,11 @@ function DataLoader.static._load_images_labels_for_keys(
     for step = 1, num_steps do
         batch_images[step] = {}
         for i = 1, batch_size do
-            if keys[step][i] == nil then
-                table.insert(batch_images[step], nil)
+            if keys[step][i] == END_OF_SEQUENCE then
+                table.insert(batch_images[step], END_OF_SEQUENCE)
                 batch_labels[{step, i}]:zero()
+                -- A missing key indicates end of sequence; move on.
+                break
             else
                 -- Load LabeledVideoFrame.
                 local video_frame = video_frame_proto.LabeledVideoFrame()
@@ -662,5 +671,6 @@ return {
     Sampler = Sampler,
     BalancedSampler = BalancedSampler,
     PermutedSampler = PermutedSampler,
-    SequentialSampler = SequentialSampler
+    SequentialSampler = SequentialSampler,
+    END_OF_SEQUENCE = END_OF_SEQUENCE
 }
