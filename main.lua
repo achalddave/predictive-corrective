@@ -181,13 +181,19 @@ if sequential_training then
     config.sampling_strategy_options.batch_size = config.batch_size
 end
 
-local train_sampler = sampling_strategies[config.sampling_strategy:lower()](
-    config.train_lmdb_without_images,
-    config.num_labels,
-    config.sequence_length,
-    config.step_size,
-    config.use_boundary_frames,
-    config.sampling_strategy_options)
+local train_sampler
+if config.train_sampler_init then
+    print('Loading train sampler from disk.')
+    train_sampler = torch.load(config.train_sampler_init)
+else
+    train_sampler = sampling_strategies[config.sampling_strategy:lower()](
+        config.train_lmdb_without_images,
+        config.num_labels,
+        config.sequence_length,
+        config.step_size,
+        config.use_boundary_frames,
+        config.sampling_strategy_options)
+end
 local val_sampler
 if sequential_training then
     val_sampler = data_loader.SequentialSampler(
