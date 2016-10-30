@@ -133,10 +133,7 @@ for i = 1, 5 do
     end
 end
 local model = nn.DataParallelTable(batch_dimension)
-for _, gpu in ipairs(config.gpus) do
-    cutorch.setDevice(gpu)
-    model:add(single_model:clone():cuda(), gpu)
-end
+model:add(single_model, config.gpus)
 cutorch.setDevice(config.gpus[1])
 -- https://groups.google.com/forum/#!topic/torch7/HiBymc9NfIY
 model = model:cuda()
