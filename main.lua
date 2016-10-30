@@ -169,8 +169,9 @@ local sampling_strategies = {
 config.sampling_strategy_options = config.sampling_strategy_options == nil and
     {} or config.sampling_strategy_options
 
-if sampling_strategies[config.sampling_strategy:lower()] ==
-        sampling_strategies.sequential then
+local sequential_training = sampling_strategies[
+    config.sampling_strategy:lower()] == sampling_strategies.sequential
+if sequential_training then
     config.sampling_strategy_options.batch_size = config.batch_size
 end
 
