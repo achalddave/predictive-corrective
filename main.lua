@@ -17,6 +17,8 @@ local paths = require 'paths'
 local torch = require 'torch'
 require 'rnn'
 require 'last_step_criterion'
+require 'classic'
+require 'classic.torch'
 
 local data_loader = require 'data_loader'
 local evaluator = require 'evaluator'
