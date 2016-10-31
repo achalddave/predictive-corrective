@@ -77,7 +77,6 @@ local CROPS = {'c'}
 local FRAME_TO_PREDICT = args.sequence_length
 
 local max_batch_size_images = math.floor(args.batch_size / #CROPS)
-local max_batch_size_crops = max_batch_size_images * #CROPS
 
 math.randomseed(0)
 torch.manualSeed(0)
