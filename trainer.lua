@@ -93,7 +93,7 @@ function Trainer:update_optim_config(epoch)
     self.epoch_base_learning_rate = learning_rate
     if regime_was_updated then
         self.optimization_config.learningRate = learning_rate
-        self.optimization_config.weightDecay = self.weightDecay
+        self.optimization_config.weightDecay = self.weight_decay
         self.optimization_state = nil
         collectgarbage()
         collectgarbage()
