@@ -234,18 +234,21 @@ function Trainer:train_epoch(epoch, num_batches)
                       epoch_index_start + self.batch_size - 1},
                       {}}] = curr_groundtruth
 
-        local current_mean_average_precision =
-            evaluator.compute_mean_average_precision(
-                predictions[{{1, epoch_index_start + self.batch_size - 1}}],
-                groundtruth[{{1, epoch_index_start + self.batch_size - 1}}])
-
-        print(string.format(
-              '%s: Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f ' ..
-              'epoch mAP %.4f LR %.0e',
-              os.date('%X'), epoch, batch_index, num_batches,
-              batch_timer:time().real, loss,
-              current_mean_average_precision,
-              self.epoch_base_learning_rate))
+        local log_string = string.format(
+            '%s: Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f',
+            os.date('%X'), epoch, batch_index, num_batches,
+            batch_timer:time().real, loss)
+        if batch_index % 10 == 0 then
+            local current_mean_average_precision =
+                evaluator.compute_mean_average_precision(
+                    predictions[{{1, epoch_index_start + self.batch_size - 1}}],
+                    groundtruth[{{1, epoch_index_start + self.batch_size - 1}}])
+            log_string = log_string .. string.format(
+                ' epoch mAP %.4f', current_mean_average_precision)
+        end
+        log_string = log_string .. string.format(
+            ' LR %.0e', self.epoch_base_learning_rate)
+        print(log_string)
     end
 
     local mean_average_precision = evaluator.compute_mean_average_precision(

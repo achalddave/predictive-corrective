@@ -107,6 +107,7 @@ local single_model = torch.load(args.model)
 if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
     single_model = single_model:get(1)
 end
+
 if args.decorate_sequencer then
     if torch.isTypeOf(single_model, 'nn.Sequencer') then
         print('WARNING: --decorate_sequencer on model that is already ' ..
@@ -127,6 +128,8 @@ model:evaluate()
 print('Loaded model.')
 
 -- Open database.
+-- TODO(achald): Decide if we should be using boundary frames for the sampler.
+-- TODO(achald): Use SequentialSampler as it will likely be slightly faster.
 local sampler = data_loader.PermutedSampler(
     args.labeled_video_frames_without_images_lmdb,
     NUM_LABELS,
@@ -188,6 +191,7 @@ while true do
             for channel = 1, 3 do
                 img[{{channel}, {}, {}}]:add(-MEANS[channel])
             end
+
             for i, crop in ipairs(CROPS) do
                 local crop_index = ((batch_index - 1) * #CROPS) + i
                 images[{step, crop_index}] = image.crop(
@@ -228,6 +232,9 @@ while true do
     end
     labels = labels[FRAME_TO_PREDICT]
     batch_keys = batch_keys[args.sequence_length]
+
+    -- TODO(achald): Allow for checking predictions for each step of the
+    -- sequence.
 
     local predictions = torch.Tensor(batch_size_images, NUM_LABELS)
     for i = 1, batch_size_images do
