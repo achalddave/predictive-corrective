@@ -123,6 +123,12 @@ for _, gpu in ipairs(GPUS) do
     cutorch.setDevice(gpu)
     model:add(single_model:clone():cuda(), gpu)
 end
+collectgarbage()
+collectgarbage()
+single_model = nil
+collectgarbage()
+collectgarbage()
+
 cutorch.setDevice(GPUS[1])
 model:evaluate()
 print('Loaded model.')
