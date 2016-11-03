@@ -431,9 +431,9 @@ function SequentialSampler:sample_keys(num_sequences)
             end
             sampled_key = Sampler.frame_offset_key(sampled_key, self.step_size)
         end
-        if #batch_keys == self.sequence_length then
-            -- The sequence filled the batch, so we want to output the
-            -- sampled_key as the next sample.
+        if self.keys_set[batch_keys[#batch_keys][sequence]] then
+            -- The sequence filled the batch with valid keys, so we want to
+            -- output the sampled_key as the next sample.
             -- Note that sampled_key may be nil if the sequence just ended, in
             -- which case we will use the next batch to report the end of the
             -- sequence.
