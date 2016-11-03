@@ -261,14 +261,18 @@ while true do
     end
 
     samples_complete = samples_complete + to_load
-    local map_so_far = evaluator.compute_mean_average_precision(
-        all_predictions, all_labels)
-    local batch_map = evaluator.compute_mean_average_precision(
-        predictions, labels)
-    print(string.format(
-        '%s: Finished %d/%d. mAP so far: %.5f, batch mAP: %.5f',
-        os.date('%X'), samples_complete, loader:num_samples(), map_so_far,
-        batch_map))
+    local log_string = string.format(
+        '%s: Finished %d/%d.', os.date('%X'), samples_complete, loader:num_samples())
+    if samples_complete / max_batch_size_images % 100 == 0 then
+        local map_so_far = evaluator.compute_mean_average_precision(
+            all_predictions, all_labels)
+        local thumos_map_so_far = evaluator.compute_mean_average_precision(
+            all_predictions[{{}, {1, 20}}], all_labels[{{}, {1, 20}}])
+        log_string = log_string .. string.format('mAP: %.5f, THUMOS mAP: %.5f',
+                                                 map_so_far,
+                                                 thumos_map_so_far)
+    end
+    print(log_string)
     collectgarbage()
     collectgarbage()
 end
