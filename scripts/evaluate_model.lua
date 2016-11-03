@@ -133,149 +133,160 @@ cutorch.setDevice(GPUS[1])
 model:evaluate()
 print('Loaded model.')
 
--- Open database.
--- TODO(achald): Decide if we should be using boundary frames for the sampler.
--- TODO(achald): Use SequentialSampler as it will likely be slightly faster.
-local sampler = data_loader.PermutedSampler(
-    args.labeled_video_frames_without_images_lmdb,
-    NUM_LABELS,
-    args.sequence_length,
-    args.step_size,
-    false --[[ use_boundary_frames ]])
-local loader = data_loader.DataLoader(
-    args.labeled_video_frames_lmdb, sampler, NUM_LABELS)
-print('Initialized sampler.')
 
--- Pass each image in the database through the model, collect predictions and
--- groundtruth.
-local gpu_inputs = torch.CudaTensor()
-local all_predictions -- (num_samples, num_labels) tensor
-local all_labels -- (num_samples, num_labels) tensor
-local all_keys = {} -- (num_samples) length table
-local samples_complete = 0
+local function evaluate_model(model, frames_lmdb, frames_without_images_lmdb,
+                              sequence_length, step_size, max_batch_size_images,
+                              num_labels, c3d_input)
+    -- Open database.
+    -- TODO(achald): Decide if we should be using boundary frames for the sampler.
+    -- TODO(achald): Use SequentialSampler as it will likely be slightly faster.
+    local sampler = data_loader.PermutedSampler(
+        frames_without_images_lmdb,
+        num_labels,
+        sequence_length,
+        step_size,
+        false --[[ use_boundary_frames ]])
+        local loader = data_loader.DataLoader(
+            frames_lmdb, sampler, num_labels)
+        print('Initialized sampler.')
 
-while true do
-    if samples_complete == loader:num_samples() then
-        break
-    end
-    local to_load = max_batch_size_images
-    if samples_complete + max_batch_size_images > loader:num_samples() then
-        to_load = loader:num_samples() - samples_complete
-    end
-    local images_table, labels, batch_keys = loader:load_batch(
-        to_load, true --[[return_keys]])
-    if loader.sampler.key_index ~= samples_complete + to_load + 1 then
-        print('Data loader key index does not match samples_complete')
-        print(loader.sampler.key_index, samples_complete + to_load + 1)
-        os.exit(1)
-    end
-    -- Prefetch the next batch.
-    if samples_complete + to_load < loader:num_samples() then
-        -- Figure out how many images we will need in the next batch, and
-        -- prefetch them.
-        local next_samples_complete = samples_complete + to_load
-        local next_to_load = max_batch_size_images
-        if next_samples_complete + next_to_load > loader:num_samples() then
-            next_to_load = loader:num_samples() - next_samples_complete
+    -- Pass each image in the database through the model, collect predictions
+    -- and groundtruth.
+    local gpu_inputs = torch.CudaTensor()
+    local all_predictions -- (num_samples, num_labels) tensor
+    local all_labels -- (num_samples, num_labels) tensor
+    local all_keys = {} -- (num_samples) length table
+    local samples_complete = 0
+
+    while true do
+        if samples_complete == loader:num_samples() then
+            break
         end
-        loader:fetch_batch_async(next_to_load)
-    end
-
-    -- This may not be equal to max_batch_size_images and max_batch_size_crops
-    -- in the last batch!
-    local batch_size_images = to_load
-    local batch_size_crops = #CROPS * batch_size_images
-
-    local num_channels = images_table[1][1]:size(1)
-    local images = torch.Tensor(args.sequence_length, batch_size_crops,
-                                num_channels, CROP_SIZE, CROP_SIZE)
-    for step, step_images in ipairs(images_table) do
-        for batch_index, img in ipairs(step_images) do
-            -- Process image after converting to the default Tensor type.
-            -- (Originally, it is a ByteTensor).
-            img = img:typeAs(images)
-            for channel = 1, 3 do
-                img[{{channel}, {}, {}}]:add(-MEANS[channel])
+        local to_load = max_batch_size_images
+        if samples_complete + max_batch_size_images > loader:num_samples() then
+            to_load = loader:num_samples() - samples_complete
+        end
+        local images_table, labels, batch_keys = loader:load_batch(
+            to_load, true --[[return_keys]])
+        if loader.sampler.key_index ~= samples_complete + to_load + 1 then
+            print('Data loader key index does not match samples_complete')
+            print(loader.sampler.key_index, samples_complete + to_load + 1)
+            os.exit(1)
+        end
+        -- Prefetch the next batch.
+        if samples_complete + to_load < loader:num_samples() then
+            -- Figure out how many images we will need in the next batch, and
+            -- prefetch them.
+            local next_samples_complete = samples_complete + to_load
+            local next_to_load = max_batch_size_images
+            if next_samples_complete + next_to_load > loader:num_samples() then
+                next_to_load = loader:num_samples() - next_samples_complete
             end
+            loader:fetch_batch_async(next_to_load)
+        end
 
-            for i, crop in ipairs(CROPS) do
-                local crop_index = ((batch_index - 1) * #CROPS) + i
-                images[{step, crop_index}] = image.crop(
-                    img, crop, CROP_SIZE, CROP_SIZE)
+        -- This may not be equal to max_batch_size_images and max_batch_size_crops
+        -- in the last batch!
+        local batch_size_images = to_load
+        local batch_size_crops = #CROPS * batch_size_images
+
+        local num_channels = images_table[1][1]:size(1)
+        local images = torch.Tensor(sequence_length, batch_size_crops,
+                                    num_channels, CROP_SIZE, CROP_SIZE)
+        for step, step_images in ipairs(images_table) do
+            for batch_index, img in ipairs(step_images) do
+                -- Process image after converting to the default Tensor type.
+                -- (Originally, it is a ByteTensor).
+                img = img:typeAs(images)
+                for channel = 1, 3 do
+                    img[{{channel}, {}, {}}]:add(-MEANS[channel])
+                end
+
+                for i, crop in ipairs(CROPS) do
+                    local crop_index = ((batch_index - 1) * #CROPS) + i
+                    images[{step, crop_index}] = image.crop(
+                        img, crop, CROP_SIZE, CROP_SIZE)
+                end
             end
         end
+
+        if c3d_input then
+            -- Permute
+            -- from (sequence_length, batch_size_crops, num_channels, width, height)
+            -- to   (batch_size_crops, num_channels, sequence_length, width, height)
+            images = images:permute(2, 3, 1, 4, 5)
+        end
+
+        gpu_inputs:resize(images:size()):copy(images)
+
+        -- (sequence_length, #images_table, num_labels) array
+        local crop_predictions = model:forward(gpu_inputs):type(
+            torch.getdefaulttensortype())
+        -- We only care about the predictions for the last step of the sequence.
+        if torch.isTensor(crop_predictions) and
+            crop_predictions:dim() == 3 and
+            crop_predictions:size(1) == sequence_length then
+            -- If we are using nn.Sequencer
+            crop_predictions = crop_predictions[sequence_length]
+        elseif torch.isTensor(crop_predictions) and crop_predictions:size(1) == 1
+            then
+            -- If we are using, e.g. pyramid model.
+            crop_predictions = crop_predictions[1]
+        end
+
+        if not (crop_predictions:dim() == 2
+                and crop_predictions:size(1) == batch_size_crops
+                and crop_predictions:size(2) == NUM_LABELS) then
+            error(string.format('Unknown output predictions shape: %s',
+                                crop_predictions:size()))
+        end
+        labels = labels[FRAME_TO_PREDICT]
+        batch_keys = batch_keys[sequence_length]
+
+        -- TODO(achald): Allow for checking predictions for each step of the
+        -- sequence.
+
+        local predictions = torch.Tensor(batch_size_images, NUM_LABELS)
+        for i = 1, batch_size_images do
+            local start_crops = (i - 1) * #CROPS + 1
+            local end_crops = i * #CROPS
+            predictions[i] = crop_predictions[{{start_crops, end_crops},
+                                            {}}]:mean(1)
+        end
+        -- Concat batch_keys to all_keys.
+        for i = 1, batch_size_images do table.insert(all_keys, batch_keys[i]) end
+
+        if all_predictions == nil then
+            all_predictions = predictions
+            all_labels = labels
+        else
+            all_predictions = torch.cat(all_predictions, predictions, 1)
+            all_labels = torch.cat(all_labels, labels, 1)
+        end
+
+        samples_complete = samples_complete + to_load
+        local log_string = string.format(
+            '%s: Finished %d/%d.', os.date('%X'), samples_complete, loader:num_samples())
+        if samples_complete / max_batch_size_images % 100 == 0 then
+            local map_so_far = evaluator.compute_mean_average_precision(
+                all_predictions, all_labels)
+            local thumos_map_so_far = evaluator.compute_mean_average_precision(
+                all_predictions[{{}, {1, 20}}], all_labels[{{}, {1, 20}}])
+            log_string = log_string .. string.format('mAP: %.5f, THUMOS mAP: %.5f',
+                                                    map_so_far,
+                                                    thumos_map_so_far)
+        end
+        print(log_string)
+        collectgarbage()
+        collectgarbage()
     end
-
-    if args.c3d_input then
-        -- Permute
-        -- from (sequence_length, batch_size_crops, num_channels, width, height)
-        -- to   (batch_size_crops, num_channels, sequence_length, width, height)
-        images = images:permute(2, 3, 1, 4, 5)
-    end
-
-    gpu_inputs:resize(images:size()):copy(images)
-
-    -- (sequence_length, #images_table, num_labels) array
-    local crop_predictions = model:forward(gpu_inputs):type(
-        torch.getdefaulttensortype())
-    -- We only care about the predictions for the last step of the sequence.
-    if torch.isTensor(crop_predictions) and
-        crop_predictions:dim() == 3 and
-        crop_predictions:size(1) == args.sequence_length then
-        -- If we are using nn.Sequencer
-        crop_predictions = crop_predictions[args.sequence_length]
-    elseif torch.isTensor(crop_predictions) and crop_predictions:size(1) == 1
-        then
-        -- If we are using, e.g. pyramid model.
-        crop_predictions = crop_predictions[1]
-    end
-
-    if not (crop_predictions:dim() == 2
-            and crop_predictions:size(1) == batch_size_crops
-            and crop_predictions:size(2) == NUM_LABELS) then
-        error(string.format('Unknown output predictions shape: %s',
-                            crop_predictions:size()))
-    end
-    labels = labels[FRAME_TO_PREDICT]
-    batch_keys = batch_keys[args.sequence_length]
-
-    -- TODO(achald): Allow for checking predictions for each step of the
-    -- sequence.
-
-    local predictions = torch.Tensor(batch_size_images, NUM_LABELS)
-    for i = 1, batch_size_images do
-        local start_crops = (i - 1) * #CROPS + 1
-        local end_crops = i * #CROPS
-        predictions[i] = crop_predictions[{{start_crops, end_crops},
-                                           {}}]:mean(1)
-    end
-    -- Concat batch_keys to all_keys.
-    for i = 1, batch_size_images do table.insert(all_keys, batch_keys[i]) end
-
-    if all_predictions == nil then
-        all_predictions = predictions
-        all_labels = labels
-    else
-        all_predictions = torch.cat(all_predictions, predictions, 1)
-        all_labels = torch.cat(all_labels, labels, 1)
-    end
-
-    samples_complete = samples_complete + to_load
-    local log_string = string.format(
-        '%s: Finished %d/%d.', os.date('%X'), samples_complete, loader:num_samples())
-    if samples_complete / max_batch_size_images % 100 == 0 then
-        local map_so_far = evaluator.compute_mean_average_precision(
-            all_predictions, all_labels)
-        local thumos_map_so_far = evaluator.compute_mean_average_precision(
-            all_predictions[{{}, {1, 20}}], all_labels[{{}, {1, 20}}])
-        log_string = log_string .. string.format('mAP: %.5f, THUMOS mAP: %.5f',
-                                                 map_so_far,
-                                                 thumos_map_so_far)
-    end
-    print(log_string)
-    collectgarbage()
-    collectgarbage()
+    return all_predictions, all_labels, all_keys
 end
+
+local all_predictions, all_labels, all_keys = evaluate_model(
+    model, args.labeled_video_frames_lmdb,
+    args.labeled_video_frames_without_images_lmdb, args.sequence_length,
+    args.step_size, max_batch_size_images, NUM_LABELS, args.c3d_input)
 
 -- Compute AP for each class.
 local aps = torch.zeros(all_predictions:size(2))
