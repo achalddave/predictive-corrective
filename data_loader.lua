@@ -388,10 +388,6 @@ function SequentialSampler:_init(
     -- List of all valid keys.
     self.keys_set = {}
     for _, key in ipairs(self.keys) do self.keys_set[key] = true end
-    if not self.use_boundary_frames then
-        self.keys = PermutedSampler.filter_boundary_frames(
-            self.keys, self.sequence_length, self.step_size)
-    end
 
     -- TODO(achald): Should we sort these by length of videos?
     self.video_start_keys = Sampler.permute(
