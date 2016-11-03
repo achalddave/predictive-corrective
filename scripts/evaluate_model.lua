@@ -31,7 +31,7 @@ local data_loader = require 'data_loader'
 local evaluator = require 'evaluator'
 local experiment_saver = require 'util/experiment_saver'
 local string_util = require 'util/strings'
-require 'CAvgTable'
+require 'layers/init'
 
 local parser = argparse() {
     description = 'Evaluate a Torch model on MultiTHUMOS.'
