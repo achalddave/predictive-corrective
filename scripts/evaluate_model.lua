@@ -270,6 +270,7 @@ while true do
         os.date('%X'), samples_complete, loader:num_samples(), map_so_far,
         batch_map))
     collectgarbage()
+    collectgarbage()
 end
 
 -- Compute AP for each class.
