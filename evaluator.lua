@@ -155,6 +155,8 @@ function compute_mean_average_precision(predictions, groundtruth)
     Returns:
         mean_average_precision (num)
     ]]--
+    -- TODO: Make these be the 'default' tensor, not float necessarily.
+    predictions = predictions:float()
     local num_labels = predictions:size(2)
     local average_precisions = torch.Tensor(num_labels):zero()
     local label_has_sample = torch.ByteTensor(num_labels):zero()
@@ -175,16 +177,14 @@ function compute_mean_average_precision(predictions, groundtruth)
                 label_predictions, 1, true --[[descending]])
             local true_positives = 0
             local average_precision = 0
-            for num_guesses = 1, label_predictions:nElement() do
-                local sample_index = sorted_indices[num_guesses]
-                if label_groundtruth[sample_index] == 1 then
-                    true_positives = true_positives + 1
-                    local precision = true_positives / num_guesses
-                    average_precision = average_precision + precision
-                end
-            end
-            average_precisions[label] =
-                average_precision / label_groundtruth:sum()
+
+            local sorted_groundtruth = label_groundtruth:index(
+                1, sorted_indices):float()
+            local true_positives = torch.cumsum(sorted_groundtruth)
+            local num_guesses = torch.range(1, label_predictions:nElement())
+            local precisions = torch.cdiv(true_positives, num_guesses)
+            precisions = precisions[torch.eq(sorted_groundtruth, 1)]
+            average_precisions[label] = precisions:mean()
         end
     end
     -- Return mean of average precisions for labels which had at least 1 sample
