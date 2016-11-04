@@ -133,22 +133,97 @@ cutorch.setDevice(GPUS[1])
 model:evaluate()
 print('Loaded model.')
 
+local function crop_and_zero_center_images(
+    images_table, crops, crop_size, image_mean)
+    --[[
+    Args:
+        images (Array of array of ByteTensors): Contains image sequences for
+            the batch. Each element is a step in the sequence, so that images is
+            an array of length sequence_length, whose elements are arrays of
+            length batch_size.
+        crops (Array of crop formats): E.g. {'c', 'tl', 'tr', 'bl' or 'br'}
+    ]]--
+    local sequence_length = #images_table
+    local num_crops = #crops * #images_table[1]
+    local num_channels = 3
+    local images = torch.Tensor(
+        sequence_length, num_crops, num_channels, crop_size, crop_size)
+    for step, step_images in ipairs(images_table) do
+        for batch_index, img in ipairs(step_images) do
+            -- Process image after converting to the default Tensor type.
+            -- (Originally, it is a ByteTensor).
+            img = img:typeAs(images)
+            img = image_util.subtract_pixel_mean(img, image_mean)
 
-local function evaluate_model(model, frames_lmdb, frames_without_images_lmdb,
-                              sequence_length, step_size, max_batch_size_images,
-                              num_labels, c3d_input)
+            for i, crop in ipairs(crops) do
+                local crop_index = ((batch_index - 1) * #crops) + i
+                images[{step, crop_index}] = image.crop(
+                    img, crop, crop_size, crop_size)
+            end
+        end
+    end
+    return images
+end
+
+local function average_crop_predictions(crop_predictions, num_crops)
+    --[[
+        Args:
+            crop_predictions (sequence_length, num_images*num_crops, num_labels)
+            num_crops (int)
+
+        Returns:
+            predictions (sequence_length, num_images, num_labels)
+    ]]--
+    assert(crop_predictions:size(2) % num_crops == 0)
+    local num_images = crop_predictions:size(2) / num_crops
+    local predictions = torch.Tensor(
+        crop_predictions:size(1), num_images, crop_predictions:size(3))
+    for i = 1, num_images do
+        local start_crops = (i - 1) * num_crops + 1
+        local end_crops = i * num_crops
+        predictions[{{}, i}] = crop_predictions[
+            {{}, {start_crops, end_crops}}]:mean(2)
+    end
+    return predictions
+end
+
+local function evaluate_model(options)
+    --[[
+        Args:
+            model
+            frames_lmdb
+            frames_without_images_lmdb
+            sequence_length
+            step_size
+            max_batch_size_images
+            num_labels
+            crops
+            crop_size
+            pixel_mean
+            c3d_input
+    ]]--
+    local model = options.model
+    local frames_lmdb = options.frames_lmdb
+    local frames_without_images_lmdb = options.frames_without_images_lmdb
+    local sequence_length = options.sequence_length
+    local step_size = options.step_size
+    local max_batch_size_images = options.max_batch_size_images
+    local num_labels = options.num_labels
+    local crops = options.crops
+    local crop_size = options.crop_size
+    local pixel_mean = options.pixel_mean
+    local c3d_input = options.c3d_input
+
     -- Open database.
     -- TODO(achald): Decide if we should be using boundary frames for the sampler.
     -- TODO(achald): Use SequentialSampler as it will likely be slightly faster.
-    local sampler = data_loader.PermutedSampler(
-        frames_without_images_lmdb,
-        num_labels,
-        sequence_length,
-        step_size,
-        false --[[ use_boundary_frames ]])
-        local loader = data_loader.DataLoader(
-            frames_lmdb, sampler, num_labels)
-        print('Initialized sampler.')
+    local sampler = data_loader.PermutedSampler(frames_without_images_lmdb,
+                                                num_labels,
+                                                sequence_length,
+                                                step_size,
+                                                false --[[use_boundary_frames]])
+    local loader = data_loader.DataLoader(frames_lmdb, sampler, num_labels)
+    print('Initialized sampler.')
 
     -- Pass each image in the database through the model, collect predictions
     -- and groundtruth.
@@ -185,35 +260,16 @@ local function evaluate_model(model, frames_lmdb, frames_without_images_lmdb,
             loader:fetch_batch_async(next_to_load)
         end
 
-        -- This may not be equal to max_batch_size_images and max_batch_size_crops
-        -- in the last batch!
+        -- This may not be equal to max_batch_size_images in the last batch!
         local batch_size_images = to_load
-        local batch_size_crops = #CROPS * batch_size_images
 
-        local num_channels = images_table[1][1]:size(1)
-        local images = torch.Tensor(sequence_length, batch_size_crops,
-                                    num_channels, CROP_SIZE, CROP_SIZE)
-        for step, step_images in ipairs(images_table) do
-            for batch_index, img in ipairs(step_images) do
-                -- Process image after converting to the default Tensor type.
-                -- (Originally, it is a ByteTensor).
-                img = img:typeAs(images)
-                for channel = 1, 3 do
-                    img[{{channel}, {}, {}}]:add(-MEANS[channel])
-                end
-
-                for i, crop in ipairs(CROPS) do
-                    local crop_index = ((batch_index - 1) * #CROPS) + i
-                    images[{step, crop_index}] = image.crop(
-                        img, crop, CROP_SIZE, CROP_SIZE)
-                end
-            end
-        end
+        local images = crop_and_zero_center_images(
+            images_table, crops, crop_size, pixel_mean)
 
         if c3d_input then
             -- Permute
-            -- from (sequence_length, batch_size_crops, num_channels, width, height)
-            -- to   (batch_size_crops, num_channels, sequence_length, width, height)
+            -- from (sequence_length, batch_size, num_channels, width, height)
+            -- to   (batch_size, num_channels, sequence_length, width, height)
             images = images:permute(2, 3, 1, 4, 5)
         end
 
@@ -222,37 +278,30 @@ local function evaluate_model(model, frames_lmdb, frames_without_images_lmdb,
         -- (sequence_length, #images_table, num_labels) array
         local crop_predictions = model:forward(gpu_inputs):type(
             torch.getdefaulttensortype())
-        -- We only care about the predictions for the last step of the sequence.
-        if torch.isTensor(crop_predictions) and
-            crop_predictions:dim() == 3 and
-            crop_predictions:size(1) == sequence_length then
-            -- If we are using nn.Sequencer
-            crop_predictions = crop_predictions[sequence_length]
-        elseif torch.isTensor(crop_predictions) and crop_predictions:size(1) == 1
-            then
-            -- If we are using, e.g. pyramid model.
-            crop_predictions = crop_predictions[1]
-        end
+        local predictions = average_crop_predictions(crop_predictions, #crops)
 
-        if not (crop_predictions:dim() == 2
-                and crop_predictions:size(1) == batch_size_crops
-                and crop_predictions:size(2) == NUM_LABELS) then
-            error(string.format('Unknown output predictions shape: %s',
-                                crop_predictions:size()))
+        -- We only care about the predictions for the last step of the sequence.
+        if torch.isTensor(predictions) and
+            predictions:dim() == 3 and
+            predictions:size(1) == sequence_length then
+            -- If there is an output for each step of the sequence; e.g. if we
+            -- are using a recurrent model.
+            predictions = predictions[sequence_length]
+        elseif torch.isTensor(predictions) and predictions:size(1) == 1
+            then
+            -- If there is one output for the sequence; e.g. for the old
+            -- hierarchical model.
+            predictions = predictions[1]
         end
+        assert(predictions:dim() == 2
+               and predictions:size(1) == batch_size_images
+               and predictions:size(2) == num_labels,
+               string.format('Unknown output predictions shape: %s',
+                             predictions:size()))
+
         labels = labels[FRAME_TO_PREDICT]
         batch_keys = batch_keys[sequence_length]
 
-        -- TODO(achald): Allow for checking predictions for each step of the
-        -- sequence.
-
-        local predictions = torch.Tensor(batch_size_images, NUM_LABELS)
-        for i = 1, batch_size_images do
-            local start_crops = (i - 1) * #CROPS + 1
-            local end_crops = i * #CROPS
-            predictions[i] = crop_predictions[{{start_crops, end_crops},
-                                            {}}]:mean(1)
-        end
         -- Concat batch_keys to all_keys.
         for i = 1, batch_size_images do table.insert(all_keys, batch_keys[i]) end
 
@@ -283,10 +332,18 @@ local function evaluate_model(model, frames_lmdb, frames_without_images_lmdb,
     return all_predictions, all_labels, all_keys
 end
 
-local all_predictions, all_labels, all_keys = evaluate_model(
-    model, args.labeled_video_frames_lmdb,
-    args.labeled_video_frames_without_images_lmdb, args.sequence_length,
-    args.step_size, max_batch_size_images, NUM_LABELS, args.c3d_input)
+local all_predictions, all_labels, all_keys = evaluate_model({
+    model = model,
+    frames_lmdb = args.labeled_video_frames_lmdb,
+    frames_without_images_lmdb = args.labeled_video_frames_without_images_lmdb,
+    sequence_length = args.sequence_length,
+    step_size = args.step_size,
+    max_batch_size_images = max_batch_size_images,
+    num_labels = NUM_LABELS,
+    crops = CROPS,
+    crop_size = CROP_SIZE,
+    pixel_mean = PIXEL_MEAN,
+    c3d_input = args.c3d_input})
 
 -- Compute AP for each class.
 local aps = torch.zeros(all_predictions:size(2))
