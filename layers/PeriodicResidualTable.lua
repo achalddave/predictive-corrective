@@ -24,12 +24,31 @@ end
 function PeriodicResidualTable:_add_module(i)
     local module = nn.Sequential()
     module:add(nn.SelectTable(i))
-    if (i - 1) % self.reinitialize_rate == 0 then
+    -- self.init and self.residual have to be in self.modules so that any call
+    -- to self.modules will also be made to self.init and self.residual (e.g.
+    -- model:training()).
+    if i == 1 then
+        module:add(self.init)
+    elseif i == 2 then
+        module:add(self.residual)
+    elseif (i - 1) % self.reinitialize_rate == 0 then
         module:add(self.init:sharedClone())
     else
         module:add(self.residual:sharedClone())
     end
     table.insert(self.modules, module)
+end
+
+function PeriodicResidualTable:read(file, versionNumber)
+    parent.read(self, file, versionNumber)
+    if #self.modules > 0 and self.modules[1]:get(2) ~= self.init then
+        -- Model was created with old code that didn't set the first and second
+        -- modules to be equivalently self.init. Reset the self.modules array.
+        print('PeriodicResidualTable: Resetting self.modules for old ' ..
+              'model; this is for backwards compatibility and can be ignored.')
+        self.modules = {}
+        self:_update(self.reinitialize_rate)
+    end
 end
 
 function PeriodicResidualTable:__tostring__()
