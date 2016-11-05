@@ -425,7 +425,9 @@ function SequentialSampler:sample_keys(num_sequences)
             else
                 table.insert(batch_keys[step], END_OF_SEQUENCE)
             end
-            sampled_key = Sampler.frame_offset_key(sampled_key, self.step_size)
+            if sampled_key ~= nil then
+                sampled_key = Sampler.frame_offset_key(sampled_key, self.step_size)
+            end
         end
         if self.keys_set[batch_keys[#batch_keys][sequence]] then
             -- The sequence filled the batch with valid keys, so we want to
