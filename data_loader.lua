@@ -634,8 +634,6 @@ function DataLoader.static._load_images_labels_for_keys(
             if keys[step][i] == END_OF_SEQUENCE then
                 table.insert(batch_images[step], END_OF_SEQUENCE)
                 batch_labels[{step, i}]:zero()
-                -- A missing key indicates end of sequence; move on.
-                break
             else
                 -- Load LabeledVideoFrame.
                 local video_frame = video_frame_proto.LabeledVideoFrame()
