@@ -72,7 +72,7 @@ local args = parser:parse()
 -- More config variables.
 local NUM_LABELS = 65
 local GPUS = {1, 2, 3, 4}
-local MEANS = {96.8293, 103.073, 101.662}
+local PIXEL_MEAN = {96.8293, 103.073, 101.662}
 local CROP_SIZE = 224
 local CROPS = {'c'}
 local FRAME_TO_PREDICT = args.sequence_length
