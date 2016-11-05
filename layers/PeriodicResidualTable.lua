@@ -19,7 +19,6 @@ function PeriodicResidualTable:__init(reinitialize_rate, init, residual)
     self.init = init
     self.residual = residual
     self:_update(self.reinitialize_rate)
-    self.module = self.modules[1]
 end
 
 function PeriodicResidualTable:_add_module(i)

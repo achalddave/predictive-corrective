@@ -16,7 +16,6 @@ function CRollingDiffTable:__init(reinitialize_rate)
     parent.__init(self)
     self.reinitialize_rate = reinitialize_rate
     self:_update(reinitialize_rate)
-    self.module = self.modules[1]
 end
 
 function CRollingDiffTable:_create_differencer(start)
