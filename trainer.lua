@@ -151,13 +151,15 @@ function Trainer:train_batch()
     local num_channels = images_table[1][1]:size(1)
     local images = torch.Tensor(num_steps, self.batch_size, num_channels,
                                 self.crop_size, self.crop_size)
+    local sequence_states = {}
     for step, step_images in ipairs(images_table) do
         for sequence, img in ipairs(step_images) do
             -- Process image after converting to the default Tensor type.
             -- (Originally, it is a ByteTensor).
-            images[{step, sequence}] = image_util.augment_image_train(
-                img:typeAs(images), self.crop_size, self.crop_size,
-                self.pixel_mean)
+            images[{step, sequence}], sequence_states[sequence] =
+                image_util.augment_image_train(
+                    img:typeAs(images), self.crop_size, self.crop_size,
+                    self.pixel_mean, sequence_states[sequence])
         end
     end
 
