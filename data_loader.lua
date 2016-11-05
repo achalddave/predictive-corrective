@@ -377,12 +377,16 @@ function SequentialSampler:_init(
         use_boundary_frames (bool): Ignored for SequentialSampler.
         options:
             batch_size (int): Must be specified a-priori and cannot be changed.
+            sample_once (bool): If true, only do one pass through the videos.
+                Useful for evaluating.
     ]]--
+    assert(options.batch_size ~= nil)
     self.imageless_path = lmdb_without_images_path
     self.sequence_length = sequence_length == nil and 1 or sequence_length
     self.step_size = step_size == nil and 1 or step_size
-    assert(options.batch_size ~= nil)
     self.batch_size = options.batch_size
+    self.sample_once = options.sample_once
+    self.sampled_all_videos = false
     self.keys = PermutedSampler.load_lmdb_keys(lmdb_without_images_path)
 
     -- List of all valid keys.
@@ -392,10 +396,36 @@ function SequentialSampler:_init(
     -- TODO(achald): Should we sort these by length of videos?
     self.video_start_keys = Sampler.permute(
         SequentialSampler.get_start_frames(self.keys))
-    self.video_index = 1
     self.next_frames = {}
     for i = 1, self.batch_size do
         self.next_frames[i] = self.video_start_keys[i]
+    end
+    -- Set to the last video that we are currently outputting; when a video
+    -- ends, this will be advanced by 1 and a new video will be output.
+    self.video_index = self.batch_size
+end
+
+function SequentialSampler:advance_video_index(offset)
+    if offset == nil then offset = 1 end
+    self.video_index = self.video_index + offset
+    if self.video_index > #self.video_start_keys then
+        print(string.format(
+                '%s: Finished pass through videos, repermuting!',
+                os.date('%X')))
+        self.video_start_keys = Sampler.permute(
+            self.video_start_keys)
+        self.video_index = 1
+        self.sampled_all_videos = true
+    end
+end
+
+function SequentialSampler:update_start_frame(sequence)
+    if self.sample_once and self.sampled_all_videos then
+        -- Don't sample any more frames.
+        self.next_frames[sequence] = nil
+    else
+        self.next_frames[sequence] =
+            self.video_start_keys[self.video_index]
     end
 end
 
@@ -442,15 +472,10 @@ function SequentialSampler:sample_keys(num_sequences)
             self.next_frames[sequence] = sampled_key
         else
             -- Move to the next video.
-            self.video_index = self.video_index + 1
-            if self.video_index > #self.video_start_keys then
-                print(string.format(
-                    '%s: Finished pass through videos, repermuting!',
-                    os.date('%X')))
-                self.video_start_keys = Sampler.permute(self.video_start_keys)
-                self.video_index = 1
+            if not (self.sample_once and self.sampled_all_videos) then
+                self:advance_video_index()
             end
-            self.next_frames[sequence] = self.video_start_keys[self.video_index]
+            self:update_start_frame(sequence)
         end
     end
     return batch_keys
