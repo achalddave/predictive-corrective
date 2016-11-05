@@ -216,11 +216,9 @@ local function evaluate_model(options)
     -- Open database.
     -- TODO(achald): Decide if we should be using boundary frames for the sampler.
     -- TODO(achald): Use SequentialSampler as it will likely be slightly faster.
-    local sampler = data_loader.PermutedSampler(frames_without_images_lmdb,
-                                                num_labels,
-                                                sequence_length,
-                                                step_size,
-                                                false --[[use_boundary_frames]])
+    local sampler = data_loader.PermutedSampler(
+        frames_without_images_lmdb, num_labels, sequence_length, step_size,
+        false --[[use_boundary_frames]])
     local loader = data_loader.DataLoader(frames_lmdb, sampler, num_labels)
     print('Initialized sampler.')
 
@@ -320,9 +318,8 @@ local function evaluate_model(options)
                 all_predictions, all_labels)
             local thumos_map_so_far = evaluator.compute_mean_average_precision(
                 all_predictions[{{}, {1, 20}}], all_labels[{{}, {1, 20}}])
-            log_string = log_string .. string.format('mAP: %.5f, THUMOS mAP: %.5f',
-                                                    map_so_far,
-                                                    thumos_map_so_far)
+            log_string = log_string .. string.format(
+                ' mAP: %.5f, THUMOS mAP: %.5f', map_so_far, thumos_map_so_far)
         end
         print(log_string)
         collectgarbage()
