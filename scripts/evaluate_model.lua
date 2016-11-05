@@ -83,6 +83,7 @@ torch.manualSeed(0)
 cutorch.manualSeedAll(0)
 cutorch.setDevice(GPUS[1])
 torch.setdefaulttensortype('torch.FloatTensor')
+torch.setheaptracking(true)
 
 print('Git status information:')
 print('===')
@@ -123,8 +124,6 @@ for _, gpu in ipairs(GPUS) do
     cutorch.setDevice(gpu)
     model:add(single_model:clone():cuda(), gpu)
 end
-collectgarbage()
-collectgarbage()
 single_model = nil
 collectgarbage()
 collectgarbage()
