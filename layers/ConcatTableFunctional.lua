@@ -24,6 +24,7 @@ function ConcatTableFunctional:_update(num_input)
             end
         end
         self:type(self._type)
+        if self._training then self:training() else self:evaluate() end
     end
 end
 
@@ -51,4 +52,14 @@ end
 function ConcatTableFunctional:type(type, tensorCache)
     self._type = type
     return parent.type(self, type, tensorCache)
+end
+
+function ConcatTableFunctional:training()
+    parent.training(self)
+    self._training = true
+end
+
+function ConcatTableFunctional:evaluate()
+    parent.evaluate(self)
+    self._training = false
 end
