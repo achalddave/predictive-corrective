@@ -30,6 +30,7 @@ require 'rnn'
 local data_loader = require 'data_loader'
 local evaluator = require 'evaluator'
 local experiment_saver = require 'util/experiment_saver'
+local image_util = require 'util/image_util'
 local string_util = require 'util/strings'
 require 'layers/init'
 
