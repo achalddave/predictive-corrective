@@ -66,6 +66,14 @@ parser:flag('--decorate_sequencer',
 parser:flag('--c3d_input',
             'If specified, use C3D input format, which is of size ' ..
             '(batch_size, num_channels, sequence_length, width, height)')
+-- TODO(achald): Describe this flag better. Essentially, this allows for
+-- evaluating recurrently instead of with a sliding window with a stride of 1,
+-- which is the efault.
+parser:flag('--recurrent',
+            'If specified, evaluate "recurrently"; i.e. with a sliding ' ..
+            'window with a stride = sequence_length instead of stride = 1, ' ..
+            'which is the default. Assumes that the model outputs ' ..
+            'sequence_length predictions for sequence_length inputs.')
 
 local args = parser:parse()
 
@@ -152,13 +160,21 @@ local function crop_and_zero_center_images(
         for batch_index, img in ipairs(step_images) do
             -- Process image after converting to the default Tensor type.
             -- (Originally, it is a ByteTensor).
-            img = img:typeAs(images)
-            img = image_util.subtract_pixel_mean(img, image_mean)
+            if img == data_loader.END_OF_SEQUENCE then
+                for i, _ in ipairs(crops) do
+                    local crop_index = ((batch_index - 1) * #crops) + i
+                    images[{step, crop_index}] = torch.zeros(
+                        num_channels, crop_size, crop_size)
+                end
+            else
+                img = img:typeAs(images)
+                img = image_util.subtract_pixel_mean(img, image_mean)
 
-            for i, crop in ipairs(crops) do
-                local crop_index = ((batch_index - 1) * #crops) + i
-                images[{step, crop_index}] = image.crop(
-                    img, crop, crop_size, crop_size)
+                for i, crop in ipairs(crops) do
+                    local crop_index = ((batch_index - 1) * #crops) + i
+                    images[{step, crop_index}] = image.crop(
+                        img, crop, crop_size, crop_size)
+                end
             end
         end
     end
@@ -185,6 +201,128 @@ local function average_crop_predictions(crop_predictions, num_crops)
             {{}, {start_crops, end_crops}}]:mean(2)
     end
     return predictions
+end
+
+local function evaluate_model_sequential(options)
+    --[[
+        Args:
+            model
+            frames_lmdb
+            frames_without_images_lmdb
+            sequence_length
+            step_size
+            max_batch_size_images
+            num_labels
+            crops
+            crop_size
+            pixel_mean
+    ]]--
+    print('Using evaluate model sequential.')
+    local model = options.model
+    local frames_lmdb = options.frames_lmdb
+    local frames_without_images_lmdb = options.frames_without_images_lmdb
+    local sequence_length = options.sequence_length
+    local step_size = options.step_size
+    local batch_size_sequences = options.max_batch_size_images
+    local num_labels = options.num_labels
+    local crops = options.crops
+    local crop_size = options.crop_size
+    local pixel_mean = options.pixel_mean
+
+    local sampler_options = {
+        batch_size = batch_size_sequences,
+        sample_once = true
+    }
+    local sampler = data_loader.SequentialSampler(
+        frames_without_images_lmdb, num_labels, sequence_length, step_size,
+        nil --[[ use boundary frames]], sampler_options)
+    local loader = data_loader.DataLoader(frames_lmdb, sampler, num_labels)
+    print('Initialized sampler.')
+
+    local keys_seen = {}
+    -- Pass each image in the database through the model, collect predictions
+    -- and groundtruth.
+    local gpu_inputs = torch.CudaTensor()
+    local all_predictions = nil -- (num_samples, num_labels) tensor
+    local all_labels = nil -- (num_samples, num_labels) tensor
+    local all_keys = {} -- (num_samples) length table
+
+    local num_iter = 0
+    while true do
+        local images_table, labels, batch_keys = loader:load_batch(
+            batch_size_sequences, true --[[return_keys]])
+        loader:fetch_batch_async(batch_size_sequences)
+        local images = crop_and_zero_center_images(
+            images_table, crops, crop_size, pixel_mean)
+        gpu_inputs:resize(images:size()):copy(images)
+
+        -- (sequence_length, batch_size_crops, num_labels) array
+        local crop_predictions = model:forward(gpu_inputs):type(
+            torch.getdefaulttensortype())
+        -- (sequence_length, batch_size_sequences, num_labels) array
+        local predictions = average_crop_predictions(crop_predictions, #crops)
+
+        -- Concat batch_keys to all_keys.
+        for sequence = 1, batch_size_sequences do
+            for step = 1, sequence_length do
+                if batch_keys[step][sequence] ~= data_loader.END_OF_SEQUENCE
+                    then
+                    if keys_seen[batch_keys[step][sequence]] ~= nil then
+                        error('Duplicate key!', batch_keys[step][sequence])
+                    else
+                        keys_seen[batch_keys[step][sequence]] = true
+                    end
+                    table.insert(all_keys, batch_keys[step][sequence])
+                    local curr_predictions = predictions[{
+                        step, sequence}]:reshape(1, num_labels)
+                    local curr_labels = labels[{step, sequence}]:reshape(
+                        1, num_labels)
+                    if all_predictions == nil then
+                        all_predictions = curr_predictions
+                        all_labels = curr_labels
+                    else
+                        all_predictions = torch.cat(
+                            all_predictions, curr_predictions, 1)
+                        all_labels = torch.cat(all_labels, curr_labels, 1)
+                    end
+                else
+                    break
+                end
+                collectgarbage()
+                collectgarbage()
+            end
+        end
+
+        -- At every 10th iteration, and on the first and last iteration, show
+        -- progress.
+        if (num_iter + 1) % 10 == 0 or
+                num_iter == 0 or #all_keys == sampler:num_samples() then
+            local log_string = string.format(
+                '%s: Finished %d/%d.', os.date('%X'),#all_keys,
+                loader:num_samples())
+            local map_so_far = evaluator.compute_mean_average_precision(
+                all_predictions, all_labels)
+            local thumos_map_so_far = evaluator.compute_mean_average_precision(
+                all_predictions[{{}, {1, 20}}], all_labels[{{}, {1, 20}}])
+            log_string = log_string ..
+                string.format(' mAP: %.5f, THUMOS mAP: %.5f',
+                              map_so_far, thumos_map_so_far)
+            print(log_string)
+        end
+
+        images_table = nil
+        images = nil
+        predictions = nil
+        batch_keys = nil
+        collectgarbage()
+        collectgarbage()
+        if #all_keys == sampler:num_samples() then
+            break
+        end
+        num_iter = num_iter + 1
+    end
+
+    return all_predictions, all_labels, all_keys
 end
 
 local function evaluate_model(options)
@@ -216,7 +354,6 @@ local function evaluate_model(options)
 
     -- Open database.
     -- TODO(achald): Decide if we should be using boundary frames for the sampler.
-    -- TODO(achald): Use SequentialSampler as it will likely be slightly faster.
     local sampler = data_loader.PermutedSampler(
         frames_without_images_lmdb, num_labels, sequence_length, step_size,
         false --[[use_boundary_frames]])
@@ -328,7 +465,7 @@ local function evaluate_model(options)
     return all_predictions, all_labels, all_keys
 end
 
-local all_predictions, all_labels, all_keys = evaluate_model({
+local eval_options = {
     model = model,
     frames_lmdb = args.labeled_video_frames_lmdb,
     frames_without_images_lmdb = args.labeled_video_frames_without_images_lmdb,
@@ -338,8 +475,20 @@ local all_predictions, all_labels, all_keys = evaluate_model({
     num_labels = NUM_LABELS,
     crops = CROPS,
     crop_size = CROP_SIZE,
-    pixel_mean = PIXEL_MEAN,
-    c3d_input = args.c3d_input})
+    pixel_mean = PIXEL_MEAN
+}
+local all_predictions = nil
+local all_labels = nil
+local all_keys = nil
+if args.recurrent then
+    print('NOTE: --recurrent specified; evaluating recurrently.')
+    all_predictions, all_labels, all_keys = evaluate_model_sequential(
+        eval_options)
+else
+    eval_options.c3d_input = args.c3d_input
+    all_predictions, all_labels, all_keys = evaluate_model(
+        eval_options)
+end
 
 -- Compute AP for each class.
 local aps = torch.zeros(all_predictions:size(2))
