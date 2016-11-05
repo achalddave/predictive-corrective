@@ -22,7 +22,7 @@ function CCumSumTable:_create_sum(start)
     for i = start + 1, start + self.reinitialize_rate - 1 do
         local sum = nn.Sequential()
         -- Select x_{t-1}, x_t.
-        sum:add(nn.NarrowTable(start, i))
+        sum:add(nn.NarrowTable(start, i - start + 1))
         -- Compute x_{t-1} - x_t, then multiply by -1.
         sum:add(nn.CAddTable())
         table.insert(modules, sum)
@@ -31,7 +31,7 @@ function CCumSumTable:_create_sum(start)
 end
 
 function CCumSumTable:_add_module(i)
-    if (i - 1) % self.reinitialize_rate and not self.modules[i] then
+    if (i - 1) % self.reinitialize_rate == 0 and not self.modules[i] then
         local modules = self:_create_sum(i)
         for j, module in ipairs(modules) do
             self.modules[i + j - 1] = modules[j]
