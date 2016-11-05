@@ -558,9 +558,7 @@ if args.output_hdf5 ~= nil then
         local prediction = all_predictions[i]
         -- Keys are of the form '<filename>-<frame_number>'.
         -- Find the index of the '-'
-        local _, split_index = string.find(key, '.*-')
-        local filename = string.sub(key, 1, split_index - 1)
-        local frame_number = tonumber(string.sub(key, split_index + 1, -1))
+        local filename, frame_number = data_loader.Sampler.parse_frame_key(key)
         if predictions_by_filename[filename] == nil then
             predictions_by_filename[filename] = {}
         end
