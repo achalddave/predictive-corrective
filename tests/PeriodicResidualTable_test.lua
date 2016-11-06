@@ -96,9 +96,33 @@ local function test_long_input_vs_short_input()
     assert(test_util.almost_equals(c_output[4], a_output[8]))
 end
 
+local function test_clearState()
+    local init = nn.MulConstant(1)
+    local residual = nn.MulConstant(2)
+
+    local periodic = nn.PeriodicResidualTable(4, init, residual)
+    local a = {}
+    for i = 1, 8 do a[i] = torch.rand(5, 5) end
+
+    local a_output = periodic:forward(a)
+    for i = 1, 8 do a_output[i] = a_output[i]:clone() end
+
+    periodic:clearState()
+
+    local b = {}
+    for i = 1, 4 do b[i] = a[i] end
+    local b_output = periodic:forward(b)
+
+    assert(test_util.almost_equals(a_output[1], b_output[1]))
+    assert(test_util.almost_equals(a_output[2], b_output[2]))
+    assert(test_util.almost_equals(a_output[3], b_output[3]))
+    assert(test_util.almost_equals(a_output[4], b_output[4]))
+end
+
 test_util.run_test(test_single_block, 'Single block')
 test_util.run_test(test_reinit, 'Reinit')
 test_util.run_test(test_reinit_with_incomplete_block,
                    'Reinit with incomplete block')
 test_util.run_test(test_long_input_vs_short_input,
-                   "Long sequences vs. multiple short sequences")
+                   'Long sequences vs. multiple short sequences')
+test_util.run_test(test_clearState, 'Clear state')
