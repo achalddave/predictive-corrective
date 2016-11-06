@@ -18,7 +18,6 @@ function PeriodicResidualTable:__init(reinitialize_rate, init, residual)
     self.reinitialize_rate = reinitialize_rate
     self.init = init
     self.residual = residual
-    self:_update(self.reinitialize_rate)
 end
 
 function PeriodicResidualTable:_add_module(i)
@@ -55,4 +54,11 @@ function PeriodicResidualTable:__tostring__()
     local str = torch.type(self)
     str = str .. ' { reinitialize_rate ' .. self.reinitialize_rate .. ' }'
     return str
+end
+
+function PeriodicResidualTable:clearState()
+   for i = 1, #self.modules do
+      self.modules[i] = nil
+   end
+   parent.clearState(self)
 end

@@ -54,3 +54,10 @@ function CCumSumTable:__tostring__()
     str = str .. ' { reinitialize_rate ' .. self.reinitialize_rate .. ' }'
     return str
 end
+
+function CCumSumTable:clearState()
+   for i = 1, #self.modules do
+      self.modules[i] = nil
+   end
+   parent.clearState(self)
+end

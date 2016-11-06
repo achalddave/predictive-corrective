@@ -15,7 +15,6 @@ local CRollingDiffTable, parent = torch.class('nn.CRollingDiffTable',
 function CRollingDiffTable:__init(reinitialize_rate)
     parent.__init(self)
     self.reinitialize_rate = reinitialize_rate
-    self:_update(reinitialize_rate)
 end
 
 function CRollingDiffTable:_create_differencer(start)
@@ -55,4 +54,11 @@ function CRollingDiffTable:__tostring__()
     local str = torch.type(self)
     str = str .. ' { reinitialize_rate ' .. self.reinitialize_rate .. ' }'
     return str
+end
+
+function CRollingDiffTable:clearState()
+   for i = 1, #self.modules do
+      self.modules[i] = nil
+   end
+   parent.clearState(self)
 end
