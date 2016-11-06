@@ -178,7 +178,7 @@ function Trainer:train_batch()
         loss = loss + (
             current_loss * self.computational_batch_size / self.batch_size)
         if outputs == nil then
-            outputs = current_outputs
+            outputs = current_outputs:clone()
         else
             -- If the outputs are 3D, then they must be (sequence_length,
             -- batch_size, num_labels). Otherwise, they are 2D and of shape
