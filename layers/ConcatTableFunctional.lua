@@ -9,7 +9,7 @@ function ConcatTableFunctional:__init()
 end
 
 function ConcatTableFunctional:_add_module(i)
-    assert(false, 'Should be implemented by child class.')
+    error('_add_module should be implemented by child class.')
 end
 
 function ConcatTableFunctional:_update(num_input)

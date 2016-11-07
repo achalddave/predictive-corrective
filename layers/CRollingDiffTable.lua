@@ -7,33 +7,23 @@ output: {x_1, x_2 - x_1, x_3 - x_2, x_4, x_5 - x_4, x_6 - x_5}
 
 local nn = require 'nn'
 local torch = require 'torch'
-require 'layers/ConcatTableFunctional'
+require 'layers/ConcatTableFunctionalReinit'
 
 local CRollingDiffTable, parent = torch.class('nn.CRollingDiffTable',
-                                              'nn.ConcatTableFunctional')
+                                              'nn.ConcatTableFunctionalReinit')
 
-function CRollingDiffTable:__init(reinitialize_rate)
-    self.reinitialize_rate = reinitialize_rate
-    parent.__init(self)
-
-    self:_update(self.reinitialize_rate)
+function CRollingDiffTable:_add_reinit(i)
+    self.modules[i] = nn.SelectTable(i)
 end
 
-function CRollingDiffTable:_add_module(i)
-    if self.modules[i] ~= nil then
-        return
-    end
-    if (i - 1) % self.reinitialize_rate == 0 then
-        self.modules[i] = nn.SelectTable(i)
-    else
-        local differencer = nn.Sequential()
-        -- Select x_{t-1}, x_t.
-        differencer:add(nn.NarrowTable(i - 1, 2))
-        -- Compute x_{t-1} - x_t, then multiply by -1.
-        differencer:add(nn.CSubTable())
-        differencer:add(nn.MulConstant(-1))
-        self.modules[i] = differencer
-    end
+function CRollingDiffTable:_add_update(i)
+    local differencer = nn.Sequential()
+    -- Select x_{t-1}, x_t.
+    differencer:add(nn.NarrowTable(i - 1, 2))
+    -- Compute x_{t-1} - x_t, then multiply by -1.
+    differencer:add(nn.CSubTable())
+    differencer:add(nn.MulConstant(-1))
+    self.modules[i] = differencer
 end
 
 function CRollingDiffTable:updateOutput(input)

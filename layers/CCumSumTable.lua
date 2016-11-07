@@ -7,34 +7,22 @@ output: {y_1, x_1 + x_2, x_1 + x_2 + x_3, x_4, x_5 - x_4, x_6 - x_5}
 
 local nn = require 'nn'
 local torch = require 'torch'
-require 'layers/ConcatTableFunctional'
+require 'layers/ConcatTableFunctionalReinit'
 
 local CCumSumTable, parent = torch.class('nn.CCumSumTable',
-                                         'nn.ConcatTableFunctional')
+                                         'nn.ConcatTableFunctionalReinit')
 
-function CCumSumTable:__init(reinitialize_rate)
-    self.reinitialize_rate = reinitialize_rate
-    parent.__init(self)
-
-    self:_update(self.reinitialize_rate)
+function CCumSumTable:_add_reinit(i)
+    self.modules[i] = nn.SelectTable(i)
 end
 
-function CCumSumTable:_add_module(i)
-    if self.modules[i] ~= nil then
-        return
-    end
-    if (i - 1) % self.reinitialize_rate == 0 then
-        self.modules[i] = nn.SelectTable(i)
-    else
-        local sum = nn.Sequential()
-        local last_reinit = (
-            math.floor((i - 1) / self.reinitialize_rate)
-                * self.reinitialize_rate + 1)
-        -- Select x_{last reinit} to x_t.
-        sum:add(nn.NarrowTable(last_reinit, i - last_reinit + 1))
-        sum:add(nn.CAddTable())
-        self.modules[i] = sum
-    end
+function CCumSumTable:_add_update(i)
+    local sum = nn.Sequential()
+    local last_reinit = self:_last_reinit(i)
+    -- Select x_{last reinit} to x_t.
+    sum:add(nn.NarrowTable(last_reinit, i - last_reinit + 1))
+    sum:add(nn.CAddTable())
+    self.modules[i] = sum
 end
 
 function CCumSumTable:updateOutput(input)

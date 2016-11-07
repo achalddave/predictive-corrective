@@ -7,22 +7,19 @@
 
 local nn = require 'nn'
 local torch = require 'torch'
-require 'layers/ConcatTableFunctional'
+require 'layers/ConcatTableFunctionalReinit'
 require 'dpnn'  -- for sharedClone()
 
-local PeriodicResidualTable, parent = torch.class('nn.PeriodicResidualTable',
-                                                  'nn.ConcatTableFunctional')
+local PeriodicResidualTable, parent = torch.class(
+    'nn.PeriodicResidualTable', 'nn.ConcatTableFunctionalReinit')
 
 function PeriodicResidualTable:__init(reinitialize_rate, init, residual)
-    self.reinitialize_rate = reinitialize_rate
     self.init = init
     self.residual = residual
-    parent.__init(self)
-
-    self:_update(self.reinitialize_rate)
+    parent.__init(self, reinitialize_rate)
 end
 
-function PeriodicResidualTable:_add_module(i)
+function PeriodicResidualTable:_add_reinit(i)
     local module = nn.Sequential()
     module:add(nn.SelectTable(i))
     -- self.init and self.residual have to be in self.modules so that any call
@@ -30,14 +27,21 @@ function PeriodicResidualTable:_add_module(i)
     -- model:training()).
     if i == 1 then
         module:add(self.init)
-    elseif i == 2 then
-        module:add(self.residual)
-    elseif (i - 1) % self.reinitialize_rate == 0 then
+    else
         module:add(self.init:sharedClone())
+    end
+    self.modules[i] = module
+end
+
+function PeriodicResidualTable:_add_update(i)
+    local module = nn.Sequential()
+    module:add(nn.SelectTable(i))
+    if i == 2 then
+        module:add(self.residual)
     else
         module:add(self.residual:sharedClone())
     end
-    table.insert(self.modules, module)
+    self.modules[i] = module
 end
 
 function PeriodicResidualTable:read(file, versionNumber)
