@@ -110,6 +110,7 @@ function Trainer:_train_batch_accumulate_gradients(images, labels)
         images ((sequence_length, batch_size, num_channels, width, height))
         labels: Subset of output of data_loader:load_batch()
     ]]--
+    local num_images = images:size(2)
     if self.input_dimension_permutation then
         images = images:permute(unpack(self.input_dimension_permutation))
     end
@@ -124,10 +125,12 @@ function Trainer:_train_batch_accumulate_gradients(images, labels)
             self.gpu_labels:size(1) ~= 1 then
         self.gpu_labels = self.gpu_labels[self.gpu_labels:size(1)]
     end
-    local loss = self.criterion:forward(outputs, self.gpu_labels)
+    local loss = self.criterion:forward(outputs, self.gpu_labels) * (
+        num_images / self.batch_size)
     local criterion_gradients = self.criterion:backward(
-        outputs, self.gpu_labels)
-    self.model:backward(self.gpu_inputs, criterion_gradients)
+        outputs, self.gpu_labels, num_images / self.batch_size)
+    self.model:backward(
+        self.gpu_inputs, criterion_gradients, num_images / self.batch_size)
     self.gpu_inputs:resize(0)
     return loss, outputs
 end
@@ -166,17 +169,17 @@ function Trainer:train_batch()
     local loss = 0
     local outputs
     self.model:zeroGradParameters()
-    for i = 1, self.batch_size / self.computational_batch_size do
+    for i = 1, math.ceil(self.batch_size / self.computational_batch_size) do
         local start_index = (i - 1) * self.computational_batch_size + 1
-        local end_index = i * self.computational_batch_size
+        local end_index = math.min(
+            i * self.computational_batch_size, self.batch_size)
         local current_loss, current_outputs =
             self:_train_batch_accumulate_gradients(
                 images[{{}, {start_index, end_index}}],
                 labels[{{}, {start_index, end_index}}])
         -- The loss is averaged by the computational batch size; we want to
         -- average by the actual batch size.
-        loss = loss + (
-            current_loss * self.computational_batch_size / self.batch_size)
+        loss = loss + current_loss
         if outputs == nil then
             outputs = current_outputs:clone()
         else
