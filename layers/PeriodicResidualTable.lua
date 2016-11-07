@@ -60,5 +60,7 @@ function PeriodicResidualTable:clearState()
    for i = 1, #self.modules do
       self.modules[i] = nil
    end
+   self.init:clearState()
+   self.residual:clearState()
    parent.clearState(self)
 end
