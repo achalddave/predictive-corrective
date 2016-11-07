@@ -48,7 +48,8 @@ local MERGE_LAYER_INDICES = {29} -- 22 --[[conv43]], 29 --[[conv53]]}
 -- How many consecutive inputs to merge at each merging step.
 local REINITIALIZE_RATES = {4} -- , 2}
 assert(#REINITIALIZE_RATES == #MERGE_LAYER_INDICES)
-
+print('Merge layer indices:', MERGE_LAYER_INDICES)
+print('Reinitialize rates:', REINITIALIZE_RATES)
 local model = torch.load(args.model)
 print('Loaded model.')
 if torch.isTypeOf(model, 'nn.DataParallelTable') then
