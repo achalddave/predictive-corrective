@@ -76,7 +76,6 @@ end
 if config.val_epoch_size == nil then
     config.val_epoch_size = config.epoch_size
 end
-assert(config.batch_size % config.computational_batch_size == 0)
 -- TODO(achald): Validate config.
 
 -- Create cache_base
