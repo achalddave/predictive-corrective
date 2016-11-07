@@ -19,28 +19,20 @@ function CRollingDiffTable:__init(reinitialize_rate)
     self:_update(self.reinitialize_rate)
 end
 
-function CRollingDiffTable:_create_differencer(start)
-    local modules = {nn.SelectTable(start)}
-    for i = start + 1, start + self.reinitialize_rate - 1 do
+function CRollingDiffTable:_add_module(i)
+    if self.modules[i] ~= nil then
+        return
+    end
+    if (i - 1) % self.reinitialize_rate == 0 then
+        self.modules[i] = nn.SelectTable(i)
+    else
         local differencer = nn.Sequential()
         -- Select x_{t-1}, x_t.
         differencer:add(nn.NarrowTable(i - 1, 2))
         -- Compute x_{t-1} - x_t, then multiply by -1.
         differencer:add(nn.CSubTable())
         differencer:add(nn.MulConstant(-1))
-        table.insert(modules, differencer)
-    end
-    return modules
-end
-
-function CRollingDiffTable:_add_module(i)
-    if (i - 1) % self.reinitialize_rate and not self.modules[i] then
-        local modules = self:_create_differencer(i)
-        for j, module in ipairs(modules) do
-            self.modules[i + j - 1] = modules[j]
-        end
-    else
-        assert(self.modules[i] ~= nil)
+        self.modules[i] = differencer
     end
 end
 

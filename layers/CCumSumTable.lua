@@ -19,26 +19,21 @@ function CCumSumTable:__init(reinitialize_rate)
     self:_update(self.reinitialize_rate)
 end
 
-function CCumSumTable:_create_sum(start)
-    local modules = {nn.SelectTable(start)}
-    for i = start + 1, start + self.reinitialize_rate - 1 do
-        local sum = nn.Sequential()
-        -- Select x_1 to x_t.
-        sum:add(nn.NarrowTable(start, i - start + 1))
-        sum:add(nn.CAddTable())
-        table.insert(modules, sum)
-    end
-    return modules
-end
-
 function CCumSumTable:_add_module(i)
-    if (i - 1) % self.reinitialize_rate == 0 and not self.modules[i] then
-        local modules = self:_create_sum(i)
-        for j, module in ipairs(modules) do
-            self.modules[i + j - 1] = modules[j]
-        end
+    if self.modules[i] ~= nil then
+        return
+    end
+    if (i - 1) % self.reinitialize_rate == 0 then
+        self.modules[i] = nn.SelectTable(i)
     else
-        assert(self.modules[i] ~= nil)
+        local sum = nn.Sequential()
+        local last_reinit = (
+            math.floor((i - 1) / self.reinitialize_rate)
+                * self.reinitialize_rate + 1)
+        -- Select x_{last reinit} to x_t.
+        sum:add(nn.NarrowTable(last_reinit, i - last_reinit + 1))
+        sum:add(nn.CAddTable())
+        self.modules[i] = sum
     end
 end
 
