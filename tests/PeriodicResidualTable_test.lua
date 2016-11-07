@@ -119,6 +119,37 @@ local function test_clearState()
     assert(test_util.almost_equals(a_output[4], b_output[4]))
 end
 
+local function test_load_save()
+    local init = nn.MulConstant(1)
+    local residual = nn.MulConstant(2)
+    local periodic = nn.PeriodicResidualTable(4, init, residual)
+
+    local a = {}
+    for i = 1, 8 do a[i] = torch.rand(5, 5) end
+
+    local a_output = periodic:forward(a)
+    for i = 1, 8 do a_output[i] = a_output[i]:clone() end
+
+    periodic:clearState()
+
+    local f = torch.MemoryFile()
+    f:writeObject(periodic)
+    f:seek(1)
+
+    periodic = f:readObject()
+    local a_output_after_load = periodic:forward(a)
+    for i = 1, 8 do a_output_after_load[i] = a_output_after_load[i]:clone() end
+
+    assert(test_util.almost_equals(a_output[1], a_output_after_load[1]))
+    assert(test_util.almost_equals(a_output[2], a_output_after_load[2]))
+    assert(test_util.almost_equals(a_output[3], a_output_after_load[3]))
+    assert(test_util.almost_equals(a_output[4], a_output_after_load[4]))
+    assert(test_util.almost_equals(a_output[5], a_output_after_load[5]))
+    assert(test_util.almost_equals(a_output[6], a_output_after_load[6]))
+    assert(test_util.almost_equals(a_output[7], a_output_after_load[7]))
+    assert(test_util.almost_equals(a_output[8], a_output_after_load[8]))
+end
+
 function test_reset_reinit()
     local init = nn.MulConstant(1)
     local residual = nn.MulConstant(2)
@@ -158,4 +189,5 @@ test_util.run_test(test_reinit_with_incomplete_block,
 test_util.run_test(test_long_input_vs_short_input,
                    'Long sequences vs. multiple short sequences')
 test_util.run_test(test_clearState, 'Clear state')
+test_util.run_test(test_load_save, 'Test loading after saving')
 test_util.run_test(test_reset_reinit, 'Reset reinitialize rate')
