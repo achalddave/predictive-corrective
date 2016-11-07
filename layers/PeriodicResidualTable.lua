@@ -14,10 +14,12 @@ local PeriodicResidualTable, parent = torch.class('nn.PeriodicResidualTable',
                                                   'nn.ConcatTableFunctional')
 
 function PeriodicResidualTable:__init(reinitialize_rate, init, residual)
-    parent.__init(self)
     self.reinitialize_rate = reinitialize_rate
     self.init = init
     self.residual = residual
+    parent.__init(self)
+
+    self:_update(self.reinitialize_rate)
 end
 
 function PeriodicResidualTable:_add_module(i)
@@ -40,7 +42,7 @@ end
 
 function PeriodicResidualTable:read(file, versionNumber)
     parent.read(self, file, versionNumber)
-    if #self.modules > 0 and self.modules[1]:get(2) ~= self.init then
+    if #self.modules == 0 or self.modules[1]:get(2) ~= self.init then
         -- Model was created with old code that didn't set the first and second
         -- modules to be equivalently self.init. Reset the self.modules array.
         print('PeriodicResidualTable: Repopulating self.modules for old ' ..

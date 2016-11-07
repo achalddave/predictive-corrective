@@ -13,8 +13,10 @@ local CCumSumTable, parent = torch.class('nn.CCumSumTable',
                                          'nn.ConcatTableFunctional')
 
 function CCumSumTable:__init(reinitialize_rate)
-    parent.__init(self)
     self.reinitialize_rate = reinitialize_rate
+    parent.__init(self)
+
+    self:_update(self.reinitialize_rate)
 end
 
 function CCumSumTable:_create_sum(start)

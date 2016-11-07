@@ -13,8 +13,10 @@ local CRollingDiffTable, parent = torch.class('nn.CRollingDiffTable',
                                               'nn.ConcatTableFunctional')
 
 function CRollingDiffTable:__init(reinitialize_rate)
-    parent.__init(self)
     self.reinitialize_rate = reinitialize_rate
+    parent.__init(self)
+
+    self:_update(self.reinitialize_rate)
 end
 
 function CRollingDiffTable:_create_differencer(start)
