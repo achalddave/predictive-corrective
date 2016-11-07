@@ -41,6 +41,8 @@ parser:flag('--decorate_sequencer',
             'If specified, decorate model with nn.Sequencer.' ..
             'This is necessary if the model does not expect a table as ' ..
             'input.')
+parser:flag('--debug', "Indicates that we are only debugging; " ..
+            "Speeds up some things, such as not saving models to disk.")
 
 local args = parser:parse()
 local config = lyaml.load(io.open(args.config, 'r'):read('*a'))
@@ -118,9 +120,11 @@ torch.setdefaulttensortype('torch.FloatTensor')
 -- Load model
 local single_model
 assert(config.model_init ~= nil, 'Initial model must be specified.')
-experiment_saver.copy_file(config.model_init,
-                           paths.concat(cache_dir, 'model_init.t7'))
-print('Loading model from' .. config.model_init)
+if not args.debug then
+    experiment_saver.copy_file(config.model_init,
+                            paths.concat(cache_dir, 'model_init.t7'))
+end
+print('Loading model from ' .. config.model_init)
 single_model = torch.load(config.model_init)
 
 if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
@@ -269,15 +273,21 @@ local evaluator = evaluator_class {
 }
 
 print('Initialized trainer and evaluator.')
-print('Config:')
-print(config)
-trainer:save(cache_dir, 0)
+if not args.debug then
+    print('Config:')
+    print(config)
+    trainer:save(cache_dir, 0)
+end
+collectgarbage()
+collectgarbage()
 for epoch = config.init_epoch, config.num_epochs do
     print(('Training epoch %d'):format(epoch))
     trainer:train_epoch(epoch, config.epoch_size)
-    trainer:save(cache_dir, epoch)
-    torch.save(paths.concat(cache_dir, 'sampler_' .. epoch .. '.t7'),
-               train_sampler)
+    if not args.debug then
+        trainer:save(cache_dir, epoch)
+        torch.save(paths.concat(cache_dir, 'sampler_' .. epoch .. '.t7'),
+                train_sampler)
+    end
     collectgarbage()
     collectgarbage()
 
