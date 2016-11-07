@@ -119,6 +119,38 @@ local function test_clearState()
     assert(test_util.almost_equals(a_output[4], b_output[4]))
 end
 
+function test_reset_reinit()
+    local init = nn.MulConstant(1)
+    local residual = nn.MulConstant(2)
+    local periodic = nn.PeriodicResidualTable(2, init, residual)
+
+    local a = {}
+    for i = 1, 4 do a[i] = torch.rand(5, 5) end
+
+    local b = periodic:forward(a)
+    assert(#b == #a)
+    assert(test_util.equals(b[1], a[1]))
+    assert(test_util.equals(b[2], 2*a[2]))
+    assert(test_util.equals(b[3], a[3]))
+    assert(test_util.equals(b[4], 2*a[4]))
+
+    periodic:set_reinitialize_rate(4)
+    a = {}
+    for i = 1, 8 do a[i] = torch.rand(5, 5) end
+
+    b = periodic:forward(a)
+    assert(#b == #a)
+
+    assert(test_util.equals(b[1],   a[1]))
+    assert(test_util.equals(b[2], 2*a[2]))
+    assert(test_util.equals(b[3], 2*a[3]))
+    assert(test_util.equals(b[4], 2*a[4]))
+    assert(test_util.equals(b[5],   a[5]))
+    assert(test_util.equals(b[6], 2*a[6]))
+    assert(test_util.equals(b[7], 2*a[7]))
+    assert(test_util.equals(b[8], 2*a[8]))
+end
+
 test_util.run_test(test_single_block, 'Single block')
 test_util.run_test(test_reinit, 'Reinit')
 test_util.run_test(test_reinit_with_incomplete_block,
@@ -126,3 +158,4 @@ test_util.run_test(test_reinit_with_incomplete_block,
 test_util.run_test(test_long_input_vs_short_input,
                    'Long sequences vs. multiple short sequences')
 test_util.run_test(test_clearState, 'Clear state')
+test_util.run_test(test_reset_reinit, 'Reset reinitialize rate')

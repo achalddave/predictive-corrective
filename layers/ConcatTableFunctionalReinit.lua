@@ -33,6 +33,13 @@ function ConcatTableFunctionalReinit:_add_update(_)
     error('_add_update should be implemented by child class.')
 end
 
+function ConcatTableFunctionalReinit:set_reinitialize_rate(reinitialize_rate)
+    self.reinitialize_rate = reinitialize_rate
+    local num_modules = #self.modules
+    self.modules = {}
+    self:_update(num_modules)
+end
+
 function ConcatTableFunctionalReinit:_last_reinit(i)
     -- When did we last reinitialize before the ith input?
     return (math.floor((i - 1) / self.reinitialize_rate)
