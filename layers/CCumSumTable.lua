@@ -21,9 +21,8 @@ function CCumSumTable:_create_sum(start)
     local modules = {nn.SelectTable(start)}
     for i = start + 1, start + self.reinitialize_rate - 1 do
         local sum = nn.Sequential()
-        -- Select x_{t-1}, x_t.
+        -- Select x_1 to x_t.
         sum:add(nn.NarrowTable(start, i - start + 1))
-        -- Compute x_{t-1} - x_t, then multiply by -1.
         sum:add(nn.CAddTable())
         table.insert(modules, sum)
     end
