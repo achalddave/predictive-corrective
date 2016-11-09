@@ -535,16 +535,17 @@ do -- Compute accuracy across validation groups.
         end
     end
 
-    local mAPs = torch.zeros(#file_groups)
+    local group_mAPs = torch.zeros(#file_groups)
     for group_index = 1, #file_groups do
         if group_predictions[group_index] ~= nil then
-            mAPs[group_index] = evaluator.compute_mean_average_precision(
+            group_mAPs[group_index] = evaluator.compute_mean_average_precision(
                 group_predictions[group_index],
                 group_labels[group_index])
         end
-        print(string.format('Group %d mAP:', group_index), mAPs[group_index])
+        print(string.format('Group %d mAP:', group_index),
+              group_mAPs[group_index])
     end
-    print('Group mAPs STD:', mAPs:std())
+    print('Group mAPs STD:', group_mAPs:std())
 end
 
 if args.output_hdf5 ~= nil then
