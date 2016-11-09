@@ -561,10 +561,13 @@ if args.output_hdf5 ~= nil then
         predictions_by_filename[filename][frame_number] = prediction
     end
     for filename, predictions_table in pairs(predictions_by_filename) do
-        -- We don't have predictions for the first `FRAME_TO_PREDICT-1` frames.
-        -- So, set them to be -1.
-        for i = 1, FRAME_TO_PREDICT-1 do
-            predictions_by_filename[filename][i] = torch.zeros(NUM_LABELS) - 1
+        if not args.recurrent then
+            -- We don't have predictions for the first `FRAME_TO_PREDICT-1`
+            -- frames.  So, set them to be -1.
+            for i = 1, FRAME_TO_PREDICT-1 do
+                predictions_by_filename[filename][i] =
+                    torch.zeros(NUM_LABELS) - 1
+            end
         end
         predictions_by_filename[filename] = torch.cat(predictions_table, 2):t()
     end
