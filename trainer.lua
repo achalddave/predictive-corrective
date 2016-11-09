@@ -278,7 +278,11 @@ function Trainer:save(directory, epoch)
     -- Clear intermediate states in the model before saving to disk to minimize
     -- disk space usage.
     self.model:clearState()
-    torch.save(paths.concat(directory, 'model_' .. epoch .. '.t7'), self.model)
+    local model = self.model
+    if torch.isTypeOf(self.model, 'nn.DataParallelTable') then
+        model = model:get(1)
+    end
+    torch.save(paths.concat(directory, 'model_' .. epoch .. '.t7'), model)
     torch.save(paths.concat(directory, 'optim_config_' .. epoch .. '.t7'),
                self.optimization_config)
     torch.save(paths.concat(directory, 'optim_state_' .. epoch .. '.t7'),
