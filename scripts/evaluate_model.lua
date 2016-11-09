@@ -118,6 +118,7 @@ local single_model = torch.load(args.model)
 if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
     single_model = single_model:get(1)
 end
+single_model:clearState()
 
 if args.decorate_sequencer then
     if torch.isTypeOf(single_model, 'nn.Sequencer') then
