@@ -444,7 +444,7 @@ local function evaluate_model(options)
         end
 
         samples_complete = samples_complete + to_load
-        if samples_complete / max_batch_size_images % 100 == 0 then
+        if samples_complete / max_batch_size_images % 10 == 0 then
             local map_so_far = evaluator.compute_mean_average_precision(
                 all_predictions, all_labels)
             local thumos_map_so_far = evaluator.compute_mean_average_precision(
