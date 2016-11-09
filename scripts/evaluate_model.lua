@@ -59,6 +59,7 @@ parser:option('--val_groups',
       :count(1)
       :default('/data/achald/MultiTHUMOS/val_split/val_val_groups.txt')
 parser:option('--batch_size', 'Batch size'):convert(tonumber):default(64)
+parser:option('--reinit_rate', 'Reinit rate'):convert(tonumber):default(-1)
 parser:flag('--decorate_sequencer',
             'If specified, decorate model with nn.Sequencer.' ..
             'This is necessary if the model does not expect a table as ' ..
@@ -125,6 +126,19 @@ if args.decorate_sequencer then
     end
     single_model = nn.Sequencer(single_model)
 end
+
+if args.reinit_rate ~= -1 then
+    print('Resetting reinit rate to', args.reinit_rate)
+    local reinit_types = {
+        'nn.CRollingDiffTable', 'nn.PeriodicResidualTable', 'nn.CCumSumTable'}
+    for _, reinit_type in ipairs(reinit_types) do
+        local reinit_layers, _ = single_model:findModules(reinit_type)
+        for _, reinit_layer in ipairs(reinit_layers) do
+            reinit_layer:set_reinitialize_rate(args.reinit_rate)
+        end
+    end
+end
+
 -- DataParallel across the 2nd dimension, which will be batch size. Our 1st
 -- dimension is a step in the sequence.
 local batch_dimension = args.c3d_input and 1 or 2
