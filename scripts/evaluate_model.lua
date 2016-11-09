@@ -293,22 +293,17 @@ local function evaluate_model_sequential(options)
             end
         end
 
-        -- At every 10th iteration, and on the first and last iteration, show
-        -- progress.
-        if (num_iter + 1) % 10 == 0 or
-                num_iter == 0 or #all_keys == sampler:num_samples() then
-            local log_string = string.format(
-                '%s: Finished %d/%d.', os.date('%X'),#all_keys,
-                loader:num_samples())
-            local map_so_far = evaluator.compute_mean_average_precision(
-                all_predictions, all_labels)
-            local thumos_map_so_far = evaluator.compute_mean_average_precision(
-                all_predictions[{{}, {1, 20}}], all_labels[{{}, {1, 20}}])
-            log_string = log_string ..
-                string.format(' mAP: %.5f, THUMOS mAP: %.5f',
-                              map_so_far, thumos_map_so_far)
-            print(log_string)
-        end
+        local log_string = string.format(
+            '%s: Finished %d/%d.', os.date('%X'),#all_keys,
+            loader:num_samples())
+        local map_so_far = evaluator.compute_mean_average_precision(
+            all_predictions, all_labels)
+        local thumos_map_so_far = evaluator.compute_mean_average_precision(
+            all_predictions[{{}, {1, 20}}], all_labels[{{}, {1, 20}}])
+        log_string = log_string ..
+            string.format(' mAP: %.5f, THUMOS mAP: %.5f',
+                            map_so_far, thumos_map_so_far)
+        print(log_string)
 
         images_table = nil
         images = nil
