@@ -46,3 +46,19 @@ python create_activations_video.py \
     --frames_per_second 10 \
     --output "/data/achald/MultiTHUMOS/visualizations/permuted_sampling_vgg_conv/model_30_${video}_vis_${layer}_filter_${filter}.mp4"
 ````
+
+# Plot correlations
+Use this to get a random list of videos:
+
+```
+shuf /data/achald/MultiTHUMOS/val_split/val_val_vids.txt \
+    | head -10 \
+    | paste -s -d','
+````
+
+Then, take the output of this, and run, for example,
+````
+py scripts/plot_correlations.py \
+    /scratch/achald/valval.lmdb
+    video_validation_0000944,video_validation_0000262,video_validation_0000283,video_validation_0000490,video_validation_0000269,video_validation_0000946,video_validation_0000368,video_validation_0000168,video_validation_0000183,video_validation_0000204
+````
