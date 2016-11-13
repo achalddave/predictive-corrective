@@ -14,3 +14,7 @@ local nn = require 'nn'
 require 'rnn'
 require 'layers/init'
 require 'cunn'
+
+function eq(a, b)
+    return torch.all(torch.eq(a, b))
+end
