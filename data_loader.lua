@@ -655,7 +655,9 @@ function DataLoader.static._load_images_labels_for_keys(
     local batch_images = {}
     for step = 1, num_steps do
         batch_images[step] = {}
-        for i = 1, batch_size do
+    end
+    for i = 1, batch_size do
+        for step = 1, num_steps do
             if keys[step][i] == END_OF_SEQUENCE then
                 table.insert(batch_images[step], END_OF_SEQUENCE)
                 batch_labels[{step, i}]:zero()
