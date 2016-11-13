@@ -409,13 +409,15 @@ function SequentialSampler:advance_video_index(offset)
     if offset == nil then offset = 1 end
     self.video_index = self.video_index + offset
     if self.video_index > #self.video_start_keys then
-        print(string.format(
-                '%s: Finished pass through videos, repermuting!',
-                os.date('%X')))
-        self.video_start_keys = Sampler.permute(
-            self.video_start_keys)
-        self.video_index = 1
         self.sampled_all_videos = true
+        if not self.sample_once then
+            print(string.format(
+                    '%s: Finished pass through videos, repermuting!',
+                    os.date('%X')))
+            self.video_start_keys = Sampler.permute(
+                self.video_start_keys)
+            self.video_index = 1
+        end
     end
 end
 
