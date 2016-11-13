@@ -1,8 +1,20 @@
+"""Plot pixel correlation between consecutive frames and frame differences.
+
+That is, plot a scatter plot of frame1 pixel values vs frame2 pixel values,
+and frame1 pixel values vs (frame2-frame1) difference pixel values.
+
+To run this on a few videos, you can do
+
+    python scripts/plot_correlations.py \
+        /path/to/groundtruth.lmdb \
+        $(shuf /path/to/videos_list | head -10 | paste -s -d',')
+"""
 from __future__ import division
 
 import argparse
 import collections
 import logging
+import math
 import random
 
 import lmdb
@@ -43,8 +55,14 @@ if __name__ == "__main__":
         description=__doc__.split('\n')[0] if __doc__ else '',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('groundtruth_lmdb')
-    parser.add_argument('video_name')
-    parser.add_argument('--frame', type=int)
+    parser.add_argument('videos', help='Comma separated list of videos')
+    parser.add_argument('--frames', help='Comma separated frames')
+    parser.add_argument('--num-frames',
+                        help='Number of random frames to plot.',
+                        default=100)
+    parser.add_argument('--num-pixels',
+                        help='Number of random pixels to plot.',
+                        default=500)
 
     args = parser.parse_args()
 
@@ -52,66 +70,74 @@ if __name__ == "__main__":
     logging.basicConfig(format='%(asctime)s.%(msecs).03d: %(message)s',
                         datefmt='%H:%M:%S')
 
-    # This is in bgr format.
-    images = read_images(args.groundtruth_lmdb, args.video_name).astype(float)
-    # For now, let's just use one channel.
-    images = images[:, :, :, 0]
-    # Downsample
+    videos = args.videos.split(',')
+    num_frames_per_video = int(math.ceil(args.num_frames / len(videos)))
+    frame1_values = []
+    frame2_values = []
+    diff_values = []
+    for video_name in args.videos.split(','):
+        # This is in BGR format.
+        images = read_images(args.groundtruth_lmdb, video_name).astype(float)
+        # For now, let's just use one channel.
+        images = images[:, :, :, 0]
 
-    num_frames = images.shape[0]
+        num_frames = images.shape[0]
 
-    if args.frame is not None:
-        frame_indices = [args.frame]
-    else:
-        frame_indices = list(range(1, num_frames - 1))
-        random.shuffle(frame_indices)
-    for frame in frame_indices:
-        frame1_values = images[frame].reshape(-1)
-        frame2_values = images[frame + 1].reshape(-1)
-        diff_values = frame2_values - frame1_values
+        if args.frames is not None:
+            frame_indices = [int(x) for x in args.frames.split(',')]
+        else:
+            frame_indices = list(range(1, num_frames - 1))
+            random.shuffle(frame_indices)
+            frame_indices = frame_indices[:num_frames_per_video]
 
-        plt.clf()
-        plt.suptitle("Frame %d and %d (Red Channel)" % (frame, frame + 1))
-        ax1 = plt.subplot(2, 2, 1)
-        ax1.scatter(frame1_values, frame2_values, alpha=0.01)
-        ax1.set_xlim(0, 255)
-        ax1.set_ylim(0, 255)
-        ax1.set_xlabel('$x_1$', fontsize=20)
-        ax1.set_ylabel('$x_2$', fontsize=20)
+        for frame in frame_indices:
+            curr_frame1_values = images[frame].reshape(-1)
+            curr_frame2_values = images[frame + 1].reshape(-1)
+            curr_diff_values = curr_frame2_values - curr_frame1_values
 
-        # Attempt at setting colors based on (x, y) occurrences counts.
-        # scatter_values = [(frame1_values[i], frame2_values[i])
-        #                   for i in range(frame1_values.shape[0])]
-        # counter = collections.Counter(scatter_values)
-        # scatter_x, scatter_y = zip(*counter.keys())
-        # max_val = max(counter.values())
-        # print(counter.values()[:10])
-        # print(max_val)
-        # print([x / max_val for x in counter.values()][:10])
-        # ax1.scatter(scatter_x,
-        #             scatter_y,
-        #             s=2,
-        #             vmin=-50,
-        #             vmax=max_val,
-        #             c=counter.values(),
-        #             linewidths=0,
-        #             cmap='Blues')
+            total_num_pixels = curr_frame1_values.shape[0]
+            pixel_indices = np.random.choice(total_num_pixels,
+                                             args.num_pixels,
+                                             replace=False)
 
-        ax2 = plt.subplot(2, 2, 3)
-        ax2.scatter(frame1_values, diff_values, alpha=0.01)
-        ax2.set_xlim(0, 255)
-        ax2.set_ylim(-255, 255)
-        ax2.set_xlabel('$x_1$', fontsize=20)
-        ax2.set_ylabel('$x_2 - x_1$', fontsize=20)
+            frame1_values.extend(curr_frame1_values[pixel_indices].tolist())
+            frame2_values.extend(curr_frame2_values[pixel_indices].tolist())
+            diff_values.extend(curr_diff_values[pixel_indices].tolist())
 
-        ax3 = plt.subplot(2, 2, 2)
-        ax3.imshow(images[frame], cmap='gray', interpolation='none')
-        ax3.set_title('Frame 1 ($x_1$)', fontsize=15)
-        ax3.axis('off')
+    plt.clf()
+    ax1 = plt.subplot(1, 2, 1)
+    ax1.scatter(frame1_values, frame2_values, alpha=0.01)
+    ax1.set_xlim(0, 255)
+    ax1.set_ylim(0, 255)
+    ax1.set_xlabel('$x_1$', fontsize=20)
+    ax1.set_ylabel('$x_2$', fontsize=20)
 
-        ax4 = plt.subplot(2, 2, 4)
-        ax4.imshow(images[frame + 1], cmap='gray', interpolation='none')
-        ax4.set_title('Frame 2 ($x_2$)', fontsize=15)
-        ax4.axis('off')
+    # Attempt at setting colors based on (x, y) occurrences counts.
+    # scatter_values = [(frame1_values[i], frame2_values[i])
+    #                   for i in range(frame1_values.shape[0])]
+    # counter = collections.Counter(scatter_values)
+    # scatter_x, scatter_y = zip(*counter.keys())
+    # max_val = max(counter.values())
+    # print(counter.values()[:10])
+    # print(max_val)
+    # print([x / max_val for x in counter.values()][:10])
+    # ax1.scatter(scatter_x,
+    #             scatter_y,
+    #             s=2,
+    #             vmin=-50,
+    #             vmax=max_val,
+    #             c=counter.values(),
+    #             linewidths=0,
+    #             cmap='Blues')
 
-        plt.waitforbuttonpress()
+    ax2 = plt.subplot(1, 2, 2)
+    ax2.scatter(frame1_values, diff_values, alpha=0.01)
+    ax2.set_xlim(0, 255)
+    ax2.set_ylim(-255, 255)
+    ax2.set_xlabel('$x_1$', fontsize=20)
+    ax2.set_ylabel('$x_2 - x_1$', fontsize=20)
+
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.85)
+    plt.suptitle("Blue channel correlations")
+    plt.show()
