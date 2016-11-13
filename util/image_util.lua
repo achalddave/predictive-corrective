@@ -130,5 +130,6 @@ end
 
 return {
     augment_image_train = augment_image_train,
-    augment_image_eval = augment_image_eval
+    augment_image_eval = augment_image_eval,
+    subtract_pixel_mean = subtract_pixel_mean
 }
