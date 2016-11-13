@@ -467,10 +467,6 @@ function SequentialSampler:sample_keys(num_sequences)
             -- Note that sampled_key may be nil if the sequence just ended, in
             -- which case we will use the next batch to report the end of the
             -- sequence.
-
-            -- if not self.keys_set[sampled_key] then
-            --     print('SequentialSampler: Sequence ended at end of batch')
-            -- end
             self.next_frames[sequence] = sampled_key
         else
             -- Move to the next video.
