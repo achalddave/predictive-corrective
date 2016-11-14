@@ -56,13 +56,17 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('groundtruth_lmdb')
     parser.add_argument('videos', help='Comma separated list of videos')
+    parser.add_argument('output', help='Output image name')
     parser.add_argument('--frames', help='Comma separated frames')
     parser.add_argument('--num-frames',
                         help='Number of random frames to plot.',
+                        type=int,
                         default=100)
     parser.add_argument('--num-pixels',
                         help='Number of random pixels to plot.',
+                        type=int,
                         default=500)
+    parser.add_argument('--seed', help='Random seed', type=int, default=0)
 
     args = parser.parse_args()
 
@@ -70,12 +74,16 @@ if __name__ == "__main__":
     logging.basicConfig(format='%(asctime)s.%(msecs).03d: %(message)s',
                         datefmt='%H:%M:%S')
 
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+
     videos = args.videos.split(',')
     num_frames_per_video = int(math.ceil(args.num_frames / len(videos)))
     frame1_values = []
     frame2_values = []
     diff_values = []
     for video_name in args.videos.split(','):
+        print(video_name)
         # This is in BGR format.
         images = read_images(args.groundtruth_lmdb, video_name).astype(float)
         # For now, let's just use one channel.
@@ -106,11 +114,11 @@ if __name__ == "__main__":
 
     plt.clf()
     ax1 = plt.subplot(1, 2, 1)
-    ax1.scatter(frame1_values, frame2_values, alpha=0.01)
+    ax1.scatter(frame1_values, frame2_values, alpha=0.01, rasterized=True)
     ax1.set_xlim(0, 255)
     ax1.set_ylim(0, 255)
-    ax1.set_xlabel('$x_1$', fontsize=20)
-    ax1.set_ylabel('$x_2$', fontsize=20)
+    ax1.set_xlabel('$x_1$', fontsize=40)
+    ax1.set_ylabel('$x_2$', fontsize=40)
 
     # Attempt at setting colors based on (x, y) occurrences counts.
     # scatter_values = [(frame1_values[i], frame2_values[i])
@@ -131,13 +139,14 @@ if __name__ == "__main__":
     #             cmap='Blues')
 
     ax2 = plt.subplot(1, 2, 2)
-    ax2.scatter(frame1_values, diff_values, alpha=0.01)
+    ax2.scatter(frame1_values, diff_values, alpha=0.01, rasterized=True)
     ax2.set_xlim(0, 255)
     ax2.set_ylim(-255, 255)
-    ax2.set_xlabel('$x_1$', fontsize=20)
-    ax2.set_ylabel('$x_2 - x_1$', fontsize=20)
+    ax2.set_xlabel('$x_1$', fontsize=40)
+    ax2.set_ylabel('$x_2 - x_1$', fontsize=40)
 
     plt.tight_layout()
     plt.subplots_adjust(top=0.85)
-    plt.suptitle("Blue channel correlations")
+    # plt.suptitle("Blue channel correlations", fontsize=40)
     plt.show()
+    # plt.savefig(args.output, bbox_inches='tight')
