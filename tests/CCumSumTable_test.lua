@@ -103,7 +103,7 @@ local function test_clearState()
     assert(test_util.almost_equals(a_output[4], b_output[4]))
 end
 
-function test_reset_reinit()
+local function test_reset_slower_reinit()
     local summer = nn.CCumSumTable(2)
     local a = {}
     for i = 1, 4 do a[i] = torch.rand(5, 5) end
@@ -118,7 +118,7 @@ function test_reset_reinit()
     summer:set_reinitialize_rate(4)
     a = {}
     for i = 1, 8 do a[i] = torch.rand(5, 5) end
-    local b = summer:forward(a)
+    b = summer:forward(a)
     assert(#b == #a)
     assert(test_util.equals(b[1], a[1]))
     assert(test_util.equals(b[2], a[1] + a[2]))
@@ -130,9 +130,38 @@ function test_reset_reinit()
     assert(test_util.equals(b[8], a[5] + a[6] + a[7] + a[8]))
 end
 
+local function test_reset_faster_reinit()
+    local summer = nn.CCumSumTable(4)
+    local a = {}
+    for i = 1, 8 do a[i] = torch.rand(5, 5) end
+    local b = summer:forward(a)
+    assert(#b == #a)
+    assert(test_util.equals(b[1], a[1]))
+    assert(test_util.equals(b[2], a[1] + a[2]))
+    assert(test_util.equals(b[3], a[1] + a[2] + a[3]))
+    assert(test_util.equals(b[4], a[1] + a[2] + a[3] + a[4]))
+    assert(test_util.equals(b[5], a[5]))
+    assert(test_util.equals(b[6], a[5] + a[6]))
+    assert(test_util.equals(b[7], a[5] + a[6] + a[7]))
+    assert(test_util.equals(b[8], a[5] + a[6] + a[7] + a[8]))
+
+    summer:set_reinitialize_rate(2)
+    a = {}
+    for i = 1, 4 do a[i] = torch.rand(5, 5) end
+    b = summer:forward(a)
+    assert(#b == #a)
+    assert(test_util.equals(b[1], a[1]))
+    assert(test_util.equals(b[2], a[2] + a[1]))
+    assert(test_util.equals(b[3], a[3]))
+    assert(test_util.equals(b[4], a[4] + a[3]))
+end
 test_util.run_test(test_single_diff, 'Single summerence')
 test_util.run_test(test_reinit, 'Reinit')
+test_util.run_test(test_small_input_after_larger_input,
+                   'Small input after larger input')
 test_util.run_test(test_long_input_vs_short_input,
                    'Long input vs multiple short inputs')
 test_util.run_test(test_clearState, 'Clear state')
-test_util.run_test(test_reset_reinit, 'Reset reinitialize rate')
+test_util.run_test(test_reset_slower_reinit,
+                   'Reset to slower reinitialize rate')
+test_util.run_test(test_reset_faster_reinit, 'Reset to faster reinit rate')
