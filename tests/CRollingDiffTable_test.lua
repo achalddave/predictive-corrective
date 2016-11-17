@@ -3,13 +3,6 @@ local torch = require 'torch'
 local test_util = require 'tests/test_util'
 require 'layers/CRollingDiffTable'
 
-local function test_not_enough_inputs()
-    local differ = nn.CRollingDiffTable(3)
-    local a = {torch.rand(5, 5)}
-    local status, err = pcall(function () differ:forward(a) end)
-    assert(status == false)
-end
-
 local function test_single_diff()
     local differ = nn.CRollingDiffTable(2)
     local a = {}
@@ -137,7 +130,6 @@ function test_reset_reinit()
     assert(test_util.equals(b[8], a[8] - a[7]))
 end
 
-test_util.run_test(test_not_enough_inputs, 'Not enough inputs')
 test_util.run_test(test_single_diff, 'Single difference')
 test_util.run_test(test_reinit, 'Reinit')
 test_util.run_test(test_long_input_vs_short_input,

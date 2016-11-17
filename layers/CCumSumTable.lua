@@ -26,10 +26,6 @@ function CCumSumTable:_add_update(i)
 end
 
 function CCumSumTable:updateOutput(input)
-    assert(#input % self.reinitialize_rate == 0,
-           string.format('Input length (%d) should be a multiple of '..
-                         'reinitialize rate (%d).',
-                         #input, self.reinitialize_rate))
     return parent.updateOutput(self, input)
 end
 
