@@ -1,3 +1,11 @@
 *_pb2*
 *.log
 *.pyc
+config/*.yaml
+!config/config-c3d.yaml
+!config/config-resnet.yaml
+!config/config-vgg-pyramid.yaml
+!config/config-vgg-recurrent.yaml
+!config/config-vgg.yaml
+!config/data_paths.yaml
+!config/local_data_paths.yaml
