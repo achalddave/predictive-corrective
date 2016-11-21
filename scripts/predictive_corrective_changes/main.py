@@ -112,8 +112,6 @@ def compute_frames_of_interest(predictions_hdf5,
             # We are only interested in frames where predictions change.
             switching_labels = set()
             for other_frame in range(frame + 1, end_frame):
-                assert np.all(guesses[other_frame, matching_labels] ==
-                              video_labels[other_frame, matching_labels])
                 # Indices into matching_labels
                 curr_switching_labels = np.where(guesses[other_frame,
                     matching_labels] != guesses[frame, matching_labels])[0]
@@ -126,7 +124,6 @@ def compute_frames_of_interest(predictions_hdf5,
                 for label in switching_labels:
                     # Add the first frame in the sequence to frames of
                     # interest.
-                    assert(video_labels[frame, label] == guesses[frame, label])
                     frames_of_interest.append((video_name, frame, label))
 
     # List of FramePrediction objects
@@ -138,7 +135,6 @@ def compute_frames_of_interest(predictions_hdf5,
         for frame in range(start_frame, min(start_frame + sequence_length,
                                             num_frames)):
             if groundtruth[video_name][frame, label]:
-                assert(predictions[video_name][frame, label] > 0)
                 groundtruth_labels.append(label_names[label])
             else:
                 groundtruth_labels.append('{}')
