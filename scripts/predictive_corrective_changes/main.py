@@ -74,7 +74,8 @@ def read_groundtruth_lmdb(groundtruth_without_images_lmdb):
 
 def compute_frames_of_interest(predictions_hdf5,
                                groundtruth_without_images_lmdb,
-                               sequence_length=4):
+                               sequence_length=4,
+                               only_correct=False):
     """
     Find a set of `sequence_length` consecutive frames where
         - we predict action A at first, then stop predicting action A
@@ -99,9 +100,12 @@ def compute_frames_of_interest(predictions_hdf5,
         for frame in range(0, num_frames, sequence_length):
             end_frame = min(frame + sequence_length, num_frames)
             # If we don't match with groundtruth, skip this.
-            matching_labels = np.where(np.all(
-                video_labels[frame:end_frame] == guesses[frame:end_frame],
-                axis=0))[0]
+            if only_correct:
+                matching_labels = np.where(np.all(
+                    video_labels[frame:end_frame] == guesses[frame:end_frame],
+                    axis=0))[0]
+            else:
+                matching_labels = range(guesses.shape[1])
             if not len(matching_labels):
                 continue
 
@@ -136,9 +140,11 @@ def compute_frames_of_interest(predictions_hdf5,
             if groundtruth[video_name][frame, label]:
                 assert(predictions[video_name][frame, label] > 0)
                 groundtruth_labels.append(label_names[label])
-                predicted_labels.append(label_names[label])
             else:
                 groundtruth_labels.append('{}')
+            if predictions[video_name][frame, label] > 0:
+                predicted_labels.append(label_names[label])
+            else:
                 predicted_labels.append('{}')
 
         frame_prediction_of_interest.append(FramePrediction(
@@ -150,10 +156,10 @@ def compute_frames_of_interest(predictions_hdf5,
 
 
 def main(predictions_hdf5, groundtruth_without_images_lmdb, frames_dir,
-         num_output, name, output, command_string):
+         num_output, name, output, command_string, only_correct):
     frames_of_interest = compute_frames_of_interest(
-        predictions_hdf5, groundtruth_without_images_lmdb)
-    for interest in frames_of_interest: print(interest)
+        predictions_hdf5, groundtruth_without_images_lmdb, only_correct)
+    # for interest in frames_of_interest: print(interest)
 
     jinja_env = jinja2.Environment(
         loader=jinja2.PackageLoader(__name__, 'templates'))
@@ -205,6 +211,7 @@ if __name__ == "__main__":
     parser.add_argument('--name', default='Predictive-Corrective')
     parser.add_argument('--num_output', type=int, default=100)
     parser.add_argument('--seed', default=0)
+    parser.add_argument('--only_correct', action='store_true', default=False)
 
     args = parser.parse_args()
 
@@ -220,4 +227,5 @@ if __name__ == "__main__":
          num_output=args.num_output,
          name=args.name,
          output=args.output_html,
-         command_string=command)
+         command_string=command,
+         only_correct=args.only_correct)
