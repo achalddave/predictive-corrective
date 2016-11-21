@@ -148,18 +148,23 @@ def main(left_predictions_hdf5, right_predictions_hdf5,
 
     diff_template = jinja_env.get_template('prediction_diff.html')
     diff_templates_combined = ''
+    print(len(frames_of_interest))
     for frame_prediction in random.sample(frames_of_interest, num_output):
         video_name = frame_prediction.video_name
         frame_number = frame_prediction.frame_number + 1
-        image = path.join(frames_dir, video_name, 'frame%04d.png' %
-                          frame_number)
+        images = [path.join(frames_dir, video_name, 'frame%04d.png' %
+                            x) for x in [max([frame_number - 3, 1]), max([frame_number - 2, 1]), max([frame_number - 1, 1]), frame_number]]
         diff_templates_combined += diff_template.render({
-            'image': image,
+            'image0': images[0],
+            'image1': images[1],
+            'image2': images[2],
+            'image3': images[3],
             'left_name': left_name,
             'right_name': right_name,
             'left_predictions': ', '.join(frame_prediction.left_predictions),
             'right_predictions': ', '.join(frame_prediction.right_predictions),
-            'groundtruth': ', '.join(frame_prediction.groundtruth)
+            'groundtruth': ', '.join(frame_prediction.groundtruth),
+            'frame_id': '%s-%s' % (video_name, frame_number)
         })
     with open(output, 'wb') as f:
         f.write(root_template.render(frame_diffs=diff_templates_combined,
