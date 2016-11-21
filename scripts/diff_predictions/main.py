@@ -150,7 +150,7 @@ def main(left_predictions_hdf5, right_predictions_hdf5,
     diff_templates_combined = ''
     for frame_prediction in random.sample(frames_of_interest, num_output):
         video_name = frame_prediction.video_name
-        frame_number = frame_prediction.frame_number
+        frame_number = frame_prediction.frame_number + 1
         image = path.join(frames_dir, video_name, 'frame%04d.png' %
                           frame_number)
         diff_templates_combined += diff_template.render({
