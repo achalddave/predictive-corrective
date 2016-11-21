@@ -3,6 +3,8 @@ from __future__ import division
 import argparse
 import logging
 import random
+import subprocess
+import sys
 from collections import defaultdict, namedtuple
 from os import path
 
@@ -135,7 +137,7 @@ def compute_frames_of_interest(left_predictions_hdf5, right_predictions_hdf5,
 
 def main(left_predictions_hdf5, right_predictions_hdf5,
          groundtruth_without_images_lmdb, frames_dir, num_output, diff_method,
-         left_name, right_name, output):
+         left_name, right_name, output, command_string):
     frames_of_interest = compute_frames_of_interest(
         left_predictions_hdf5, right_predictions_hdf5,
         groundtruth_without_images_lmdb, diff_method)
@@ -160,7 +162,8 @@ def main(left_predictions_hdf5, right_predictions_hdf5,
             'groundtruth': ', '.join(frame_prediction.groundtruth)
         })
     with open(output, 'wb') as f:
-        f.write(root_template.render(frame_diffs=diff_templates_combined))
+        f.write(root_template.render(frame_diffs=diff_templates_combined,
+                                     command_string=command_string))
 
 
 if __name__ == "__main__":
@@ -194,6 +197,9 @@ if __name__ == "__main__":
     parser.add_argument('--num_output', type=int, default=100)
 
     args = parser.parse_args()
+
+    # Courtesy <http://stackoverflow.com/a/12411695/1291812>
+    command = '%s %s' % (sys.argv[0], subprocess.list2cmdline(sys.argv[1:]))
     main(left_predictions_hdf5=args.left_predictions,
          left_name=args.left_name,
          right_predictions_hdf5=args.right_predictions,
@@ -202,4 +208,5 @@ if __name__ == "__main__":
          frames_dir=args.frames_dir,
          diff_method=args.diff_method,
          num_output=args.num_output,
-         output=args.output_html)
+         output=args.output_html,
+         command_string=command)
