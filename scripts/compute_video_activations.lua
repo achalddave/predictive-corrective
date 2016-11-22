@@ -14,6 +14,7 @@ local lmdb = require 'lmdb'
 local torch = require 'torch'
 local nn = require 'nn'
 rnn = require 'rnn'
+require 'layers/init'
 
 local data_loader = require 'data_loader'
 
@@ -28,9 +29,15 @@ parser:option('--layer_spec',
               '"nn.ParallelTable:2>cudnn.SpatialConvolution:13"' ..
               'will select the 13th SpatialConvolution layer in the 2nd ' ..
               'ParallelTable module.')
-parser:option('--frames_lmdb')
+parser:option('--groundtruth_lmdb')
 parser:option('--video_name')
 parser:option('--output_activations')
+parser:option('--sequence_length', 'Number of input frames.')
+    :count('?'):default(1):convert(tonumber)
+parser:option('--step_size', 'Size of step between frames.')
+    :count('?'):default(1):convert(tonumber)
+parser:option('--num_labels', 'Number of labels. Default: 65 (MultiTHUMOS)')
+    :count('?'):default(65):convert(tonumber)
 parser:option('--batch_size'):convert(tonumber):default(64)
 parser:flag('--decorate_sequencer')
 
@@ -46,12 +53,6 @@ nn.DataParallelTable.deserializeNGPUs = 1
 local MEANS = {96.8293, 103.073, 101.662}
 local CROP_SIZE = 224
 -- Unfortunately, this is necessary due to the way DataLoader is implemented.
-local NUM_LABELS = 65
--- If this is a Sequencer, only the activations for the last step will be
--- provided.
-local SEQUENCE_LENGTH = 4
--- assert(SEQUENCE_LENGTH == 1) -- Only sequence length of 1 is supported.
-local STEP_SIZE = 1
 
 math.randomseed(0)
 torch.manualSeed(0)
@@ -63,10 +64,21 @@ torch.setdefaulttensortype('torch.FloatTensor')
 -- Load list of frame keys for video.
 ---
 local VideoSampler = classic.class('VideoSampler', data_loader.Sampler)
-function VideoSampler:_init(frames_lmdb, video_name, sequence_length, step_size)
-    self.video_keys = data_loader.PermutedSampler.filter_boundary_frames(
-        VideoSampler.get_video_keys(frames_lmdb, video_name),
-        sequence_length, 1 --[[step size]])
+function VideoSampler:_init(
+    frames_lmdb, _ --[[num_labels]], sequence_length, step_size,
+    use_boundary_frames, options)
+    --[[ Return consecutive frames from a given video.
+
+    Args:
+        options:
+            - video_name
+    ]]--
+    self.video_name = options.video_name
+    self.video_keys = VideoSampler.get_video_keys(frames_lmdb, self.video_name)
+    if not use_boundary_frames then
+        self.video_keys = data_loader.PermutedSampler.filter_boundary_frames(
+            self.video_keys, sequence_length, step_size)
+    end
     self.sequence_length = sequence_length
     self.step_size = step_size
     self.key_index = 1
@@ -149,20 +161,26 @@ print('Extracting from layer:', layer_to_extract)
 -- Pass frames through model
 ---
 local sampler = VideoSampler(
-    args.frames_lmdb, args.video_name, SEQUENCE_LENGTH, STEP_SIZE)
+    args.groundtruth_lmdb,
+    nil --[[num_labels]],
+    args.sequence_length,
+    args.step_size,
+    true --[[use boundary frames]],
+    {video_name = args.video_name})
 local loader = data_loader.DataLoader(
-    args.frames_lmdb, sampler, NUM_LABELS)
+    args.groundtruth_lmdb, sampler, args.num_labels)
 
 local gpu_inputs = torch.CudaTensor()
 local samples_complete = 0
 local relus = model:findModules('cudnn.ReLU')
+-- Disable in-place ReLUs so that we don't accidentally compute the ReLU'd
+-- version of activations.
 for _, relu in ipairs(relus) do
     relu.inplace = false
-    print('Disabling')
 end
-print('Disabled in place relus')
+print('Disabled in-place ReLUs.')
 
-local frame_activations = {}
+local frame_activations = nil
 while samples_complete ~= sampler:num_samples() do
     local to_load = args.batch_size
     if samples_complete + args.batch_size > sampler:num_samples() then
@@ -170,11 +188,13 @@ while samples_complete ~= sampler:num_samples() do
     end
     local images_table, _, batch_keys = loader:load_batch(
         to_load, true --[[return_keys]])
-    batch_keys = batch_keys[SEQUENCE_LENGTH]
+    -- TODO(achald): This assumes that the layer we extract maps to the last
+    -- frame. That's not necessarily true!
+    batch_keys = batch_keys[args.sequence_length]
 
     local batch_size = #images_table[1]
     local num_channels = images_table[1][1]:size(1)
-    local images = torch.Tensor(SEQUENCE_LENGTH, batch_size,
+    local images = torch.Tensor(args.sequence_length, batch_size,
                                 num_channels, CROP_SIZE, CROP_SIZE)
     for step, step_images in ipairs(images_table) do
         for batch_index, img in ipairs(step_images) do
@@ -191,27 +211,28 @@ while samples_complete ~= sampler:num_samples() do
 
     gpu_inputs:resize(images:size()):copy(images)
     model:forward(gpu_inputs)
+    if frame_activations == nil then
+        local activation_map_size = torch.totable(
+            layer_to_extract.output[1]:size())
+        frame_activations = torch.Tensor(
+            sampler:num_samples() + args.sequence_length - 1,
+            unpack(activation_map_size))
+    end
     for i = 1, batch_size do
-        frame_activations[batch_keys[i]] = layer_to_extract.output[i]:float()
+        local _, frame_number = data_loader.Sampler.parse_frame_key(
+            batch_keys[i])
+        frame_activations[frame_number] = layer_to_extract.output[i]:float()
     end
     samples_complete = samples_complete + to_load
     print(string.format('Computed activations for %d/%d.',
                         samples_complete, sampler:num_samples()))
+    collectgarbage()
+    collectgarbage()
 end
 print('Finished computing activations.')
 
 ---
 -- Create activations tensor.
 ---
-print('Creating activations tensor.')
-local activation_map_size = torch.totable(layer_to_extract.output[1]:size())
-local activations_tensor = torch.zeros(
-    sampler:num_samples() + SEQUENCE_LENGTH - 1, unpack(activation_map_size))
-for key, activation in pairs(frame_activations) do
-    -- Keys are of the form '<filename>-<frame_number>'.
-    -- Find the index of the '-'
-    local _, split_index = string.find(key, '.*-')
-    local frame_number = tonumber(string.sub(key, split_index + 1, -1))
-    activations_tensor[frame_number] = activation
-end
-torch.save(args.output_activations, activations_tensor)
+print('Saving activations to disk.')
+torch.save(args.output_activations, frame_activations)
