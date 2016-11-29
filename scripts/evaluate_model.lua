@@ -339,14 +339,16 @@ local function evaluate_model_sequential(options)
         local log_string = string.format(
             '%s: Finished %d/%d.', os.date('%X'),#all_keys,
             loader:num_samples())
-        local map_so_far = evaluator.compute_mean_average_precision(
-            all_predictions, all_labels)
-        local thumos_map_so_far = evaluator.compute_mean_average_precision(
-            all_predictions[{{}, {1, 20}}], all_labels[{{}, {1, 20}}])
-        log_string = log_string ..
-            string.format(' mAP: %.5f, THUMOS mAP: %.5f',
-                            map_so_far, thumos_map_so_far)
-        print(log_string)
+        if num_iter % 10 == 0 then
+            local map_so_far = evaluator.compute_mean_average_precision(
+                all_predictions, all_labels)
+            local thumos_map_so_far = evaluator.compute_mean_average_precision(
+                all_predictions[{{}, {1, 20}}], all_labels[{{}, {1, 20}}])
+            log_string = log_string ..
+                string.format(' mAP: %.5f, THUMOS mAP: %.5f',
+                                map_so_far, thumos_map_so_far)
+            print(log_string)
+        end
 
         images_table = nil
         images = nil
