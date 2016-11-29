@@ -207,6 +207,7 @@ def main():
     parser.add_argument('--video', required=True)
     parser.add_argument(
         '--filter',
+        default=0,
         help="""Either a number, or one of "max", "avg", "max_var".
                 Ignored if --offset_action is align.""")
     parser.add_argument(
