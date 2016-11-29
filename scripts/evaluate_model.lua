@@ -289,33 +289,50 @@ local function evaluate_model_sequential(options)
         local predictions = average_crop_predictions(crop_predictions, #crops)
 
         -- Concat batch_keys to all_keys.
+        local valid_up_to_step = {}
         for sequence = 1, batch_size_sequences do
+            valid_up_to_step[sequence] = 0
             for step = 1, sequence_length do
                 if batch_keys[step][sequence] ~= data_loader.END_OF_SEQUENCE
                     then
-                    if keys_seen[batch_keys[step][sequence]] ~= nil then
-                        error('Duplicate key!', batch_keys[step][sequence])
-                    else
-                        keys_seen[batch_keys[step][sequence]] = true
-                    end
+                    valid_up_to_step[sequence] = step
                     table.insert(all_keys, batch_keys[step][sequence])
-                    local curr_predictions = predictions[{
-                        step, sequence}]:reshape(1, num_labels)
-                    local curr_labels = labels[{step, sequence}]:reshape(
-                        1, num_labels)
-                    if all_predictions == nil then
-                        all_predictions = curr_predictions
-                        all_labels = curr_labels
-                    else
-                        all_predictions = torch.cat(
-                            all_predictions, curr_predictions, 1)
-                        all_labels = torch.cat(all_labels, curr_labels, 1)
-                    end
                 else
                     break
                 end
-                collectgarbage()
-                collectgarbage()
+            end
+        end
+
+        -- We can't put this all into the same loop because repeated torch.cat
+        -- calls cause excessive memory usage that is not cleared unless
+        -- collectgarbage() is called twice in every step of the inner loop
+        -- above; doing this slows down the code drastically.
+        local batch_predictions, batch_groundtruth
+        for sequence = 1, batch_size_sequences do
+            if valid_up_to_step[sequence] >= 1 then
+                if batch_predictions == nil then
+                    batch_predictions = predictions[{
+                        {1, valid_up_to_step[sequence]}, sequence}]
+                    batch_labels = labels[{
+                        {1, valid_up_to_step[sequence]}, sequence}]
+                else
+                    batch_predictions = torch.cat(
+                        batch_predictions, predictions[{
+                            {1, valid_up_to_step[sequence]}, sequence}], 1)
+                    batch_labels = torch.cat(batch_labels, labels[{
+                        {1, valid_up_to_step[sequence]}, sequence}], 1)
+                end
+            end
+        end
+
+        if all_predictions == nil then
+            all_predictions = batch_predictions
+            all_labels = batch_labels
+        else
+            if batch_predictions ~= nil then
+                all_predictions = torch.cat(
+                    all_predictions, batch_predictions, 1)
+                all_labels = torch.cat(all_labels, batch_labels, 1)
             end
         end
 
