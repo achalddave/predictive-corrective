@@ -394,7 +394,7 @@ local function evaluate_model(options)
     -- TODO(achald): Decide if we should be using boundary frames for the sampler.
     local sampler = data_loader.PermutedSampler(
         frames_without_images_lmdb, num_labels, sequence_length, step_size,
-        false --[[use_boundary_frames]])
+        true --[[use_boundary_frames]])
     local loader = data_loader.DataLoader(frames_lmdb, sampler, num_labels)
     print('Initialized sampler.')
 
