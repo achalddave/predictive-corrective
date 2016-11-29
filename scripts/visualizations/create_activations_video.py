@@ -222,6 +222,7 @@ def main():
             default=1)
     parser.add_argument('--frames_per_second', type=int, required=True)
     parser.add_argument('--output', required=True)
+    parser.add_argument('--abs', action='store_true')
 
     args = parser.parse_args()
 
@@ -257,6 +258,8 @@ def main():
         # Pass all filter activations for alignment.
         activations = compute_offset_alignment(all_activations, args.offset)
 
+    if args.abs:
+        activations = abs(activations)
     min_value = activations.min()
     max_value = activations.max()
     activations = (activations - min_value) / (max_value - min_value) * 255
