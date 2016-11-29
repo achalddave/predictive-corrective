@@ -36,17 +36,17 @@ function ConcatTableFunctional:updateOutput(input)
 end
 
 function ConcatTableFunctional:updateGradInput(input, gradOutput)
-    self:_update(#input)
+    assert(#input == #self.modules)
     return parent.updateGradInput(self, input, gradOutput)
 end
 
 function ConcatTableFunctional:accGradParameters(input, gradOutput, scale)
-    self:_update(#input)
+    assert(#input == #self.modules)
     return parent.accGradParameters(self, input, gradOutput, scale)
 end
 
 function ConcatTableFunctional:accUpdateGradParameters(input, gradOutput, lr)
-    self:_update(#input)
+    assert(#input == #self.modules)
     return parent.accUpdateGradParameters(self, input, gradOutput, lr)
 end
 
