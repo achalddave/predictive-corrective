@@ -97,6 +97,10 @@ def compute_offset_hdiffmap(activations, offset):
 
 
 def compute_offset_vdiffmap(activations, offset):
+    """
+    For each (x, y) location, return the vertical offset with the smallest
+    diff. 0 indicates (x, y-1), 1 indicates (x, y) and 2 indicates (x, y+1).
+    """
     vdiffs = np.zeros((3, activations.shape[0], activations.shape[1],
                        activations.shape[2]))
     right_frames = activations[offset:]
