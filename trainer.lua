@@ -128,7 +128,7 @@ function Trainer:_train_batch_accumulate_gradients(images, labels)
     local loss = self.criterion:forward(outputs, self.gpu_labels) * (
         num_images / self.batch_size)
     local criterion_gradients = self.criterion:backward(
-        outputs, self.gpu_labels, num_images / self.batch_size)
+        outputs, self.gpu_labels)
     self.model:backward(
         self.gpu_inputs, criterion_gradients, num_images / self.batch_size)
     self.gpu_inputs:resize(0)
