@@ -6,6 +6,7 @@ local ConcatTableFunctional, parent = torch.class('nn.ConcatTableFunctional',
 
 function ConcatTableFunctional:__init()
     parent.__init(self)
+    self._training = true
 end
 
 function ConcatTableFunctional:_add_module(i)
