@@ -74,25 +74,35 @@ local model_stubs = {}
 for i, layer_index in ipairs(MERGE_LAYER_INDICES) do
     local reinitialize_rate = REINITIALIZE_RATES[i]
 
-    print(os.date('%X'), 'Creating differencer')
-    local differencer = nn.CRollingDiffTable(reinitialize_rate)
 
-    print(os.date('%X'), 'Creating residual')
     local stub = extract_stub(model, previous_layer_index + 1, layer_index)
-    local periodic_stubs = nn.PeriodicResidualTable(
-        reinitialize_rate,
-        stub --[[init]],
-        stub:clone() --[[residual]])
+    if reinitialize_rate == 1 then
+        -- Adding the whole PredictiveCorrective block is expensive and
+        -- unnecessary if the re-initialization rate is set to 1, anyway, so
+        -- just add the initial network in this case.
+        local mapper = nn.MapTable()
+        mapper:add(stub)
+        table.insert(model_stubs, mapper)
+    else
+        print(os.date('%X'), 'Creating differencer')
+        local differencer = nn.CRollingDiffTable(reinitialize_rate)
 
-    print(os.date('%X'), 'Creating cumulative sum')
-    local cumulative_sum = nn.CCumSumTable(reinitialize_rate)
+        print(os.date('%X'), 'Creating residual')
+        local periodic_stubs = nn.PeriodicResidualTable(
+            reinitialize_rate,
+            stub --[[init]],
+            stub:clone() --[[residual]])
 
-    print(os.date('%X'), 'Combining pieces')
-    local processing_block = nn.Sequential()
-    processing_block:add(differencer)
-    processing_block:add(periodic_stubs)
-    processing_block:add(cumulative_sum)
-    table.insert(model_stubs, processing_block)
+        print(os.date('%X'), 'Creating cumulative sum')
+        local cumulative_sum = nn.CCumSumTable(reinitialize_rate)
+
+        print(os.date('%X'), 'Combining pieces')
+        local processing_block = nn.Sequential()
+        processing_block:add(differencer)
+        processing_block:add(periodic_stubs)
+        processing_block:add(cumulative_sum)
+        table.insert(model_stubs, processing_block)
+    end
 
     previous_layer_index = layer_index
 end
