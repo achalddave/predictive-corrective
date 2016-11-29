@@ -543,7 +543,8 @@ assert(torch.all(torch.ne(aps, -1)))
 
 print('MultiTHUMOS mAP:', torch.mean(aps))
 
-do -- Compute accuracy across validation groups.
+local group_mAPs
+if args.val_groups ~= '' then -- Compute accuracy across validation groups.
     local groups_file = torch.DiskFile(args.val_groups, 'r'):quiet()
     local file_groups = {{}}
     while true do
@@ -580,7 +581,7 @@ do -- Compute accuracy across validation groups.
         end
     end
 
-    local group_mAPs = torch.zeros(#file_groups)
+    group_mAPs = torch.zeros(#file_groups)
     for group_index = 1, #file_groups do
         if group_predictions[group_index] ~= nil then
             group_mAPs[group_index] = evaluator.compute_mean_average_precision(
