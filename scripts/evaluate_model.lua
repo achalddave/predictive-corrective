@@ -99,9 +99,18 @@ torch.setheaptracking(true)
 
 print('Git status information:')
 print('===')
+
+print('Executing command: git --no-pager diff scripts/evaluate_model.lua')
 os.execute('git --no-pager diff scripts/evaluate_model.lua')
+
+print('Executing command: git --no-pager diff layers/')
+os.execute('git --no-pager diff layers/')
+
+print('Executing command: git --no-pager rev-parse HEAD')
 os.execute('git --no-pager rev-parse HEAD')
+
 print('===')
+
 print('Evaluating model. Args:')
 print(args)
 print('FRAME_TO_PREDICT: ', FRAME_TO_PREDICT)
