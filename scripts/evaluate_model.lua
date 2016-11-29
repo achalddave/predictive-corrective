@@ -43,6 +43,8 @@ parser:argument('labeled_video_frames_lmdb',
 parser:argument('labeled_video_frames_without_images_lmdb',
                 'LMDB containing LabeledVideoFrames without images.')
 parser:option('--output_hdf5', 'HDF5 to output predictions to'):count('?')
+parser:option('--num_labels', 'Number of labels')
+    :count('?'):default(65):convert(tonumber)
 parser:option('--sequence_length', 'Number of input frames.')
     :count('?'):default(1):convert(tonumber)
 parser:option('--step_size', 'Size of step between frames.')
@@ -79,7 +81,7 @@ parser:flag('--recurrent',
 local args = parser:parse()
 
 -- More config variables.
-local NUM_LABELS = 65
+local NUM_LABELS = args.num_labels
 local GPUS = {1, 2, 3, 4}
 local PIXEL_MEAN = {96.8293, 103.073, 101.662}
 local CROP_SIZE = 224
