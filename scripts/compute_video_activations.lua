@@ -211,9 +211,11 @@ while samples_complete ~= sampler:num_samples() do
 
     gpu_inputs:resize(images:size()):copy(images)
     model:forward(gpu_inputs)
+    -- Should be of shape
+    -- (batch_size, activation_size_1, activation_size_2, ...)
+    local outputs = layer_to_extract.output
     if frame_activations == nil then
-        local activation_map_size = torch.totable(
-            layer_to_extract.output[1]:size())
+        local activation_map_size = torch.totable(outputs[1]:size())
         frame_activations = torch.Tensor(
             sampler:num_samples() + args.sequence_length - 1,
             unpack(activation_map_size))
@@ -221,7 +223,7 @@ while samples_complete ~= sampler:num_samples() do
     for i = 1, batch_size do
         local _, frame_number = data_loader.Sampler.parse_frame_key(
             batch_keys[i])
-        frame_activations[frame_number] = layer_to_extract.output[i]:float()
+        frame_activations[frame_number] = outputs[i]:float()
     end
     samples_complete = samples_complete + to_load
     print(string.format('Computed activations for %d/%d.',
