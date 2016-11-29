@@ -111,7 +111,9 @@ local function create_merger(
         if merge_type == MERGE_OPTIONS['sum'] then
             merging_layer = nn.CAddTable()
         elseif merge_type == MERGE_OPTIONS['avg'] then
-            merging_layer = nn.CAvgTable()
+            merging_layer = nn.Sequential()
+            merging_layer:add(nn.CAddTable())
+            merging_layer:add(nn.MulConstant(1.0 / merge_input_length))
         end
     end
 
