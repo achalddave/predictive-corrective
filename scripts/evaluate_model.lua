@@ -265,7 +265,6 @@ local function evaluate_model_sequential(options)
     local loader = data_loader.DataLoader(frames_lmdb, sampler, num_labels)
     print('Initialized sampler.')
 
-    local keys_seen = {}
     -- Pass each image in the database through the model, collect predictions
     -- and groundtruth.
     local gpu_inputs = torch.CudaTensor()
