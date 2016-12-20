@@ -1,6 +1,5 @@
 require 'layers/ConcatTableFunctional'
 require 'layers/ConcatTableFunctionalReinit'
-require 'layers/CAvgTable'
 require 'layers/CRollingDiffTable'
 require 'layers/CCumSumTable'
 require 'layers/PeriodicResidualTable'
