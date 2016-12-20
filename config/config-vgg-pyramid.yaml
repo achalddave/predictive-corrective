@@ -42,6 +42,8 @@ batch_size: 50
 computational_batch_size: 30
 val_batch_size: 30
 val_epoch_size: 800
+criterion_wrapper: 'sequencer_criterion'
+
 # One of 'permuted', 'balanced' (case-insensitive)
 sampling_strategy: 'balanced'
 sampling_strategy_options: {
