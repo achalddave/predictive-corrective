@@ -34,8 +34,14 @@ epoch_size: 500
 # Specify epoch to start at (e.g. if we are continuing to train a model from
 # earlier).
 init_epoch: 1
-# Number of examples in batch.
+# Number of examples in batch. This is how many examples we use to compute
+# a gradient update.
 batch_size: 50
+# The computational batch size. This is how many examples we forward/backward at
+# a time computationally. Must evenly divide batch_size.
+computational_batch_size: 30
+val_batch_size: 30
+val_epoch_size: 800
 # One of 'permuted', 'balanced' (case-insensitive)
 sampling_strategy: 'balanced'
 sampling_strategy_options: {
