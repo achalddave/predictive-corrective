@@ -33,7 +33,6 @@ num_epochs: 1000000
 epoch_size: 500
 # Specify epoch to start at (e.g. if we are continuing to train a model from
 # earlier).
-init_epoch: 1
 # Number of examples in batch. This is how many examples we use to compute
 # a gradient update.
 batch_size: 50
@@ -47,9 +46,10 @@ criterion_wrapper: 'sequencer_criterion'
 # One of 'permuted', 'balanced' (case-insensitive)
 sampling_strategy: 'balanced'
 sampling_strategy_options: {
-    include_bg: True
+    background_weight: 20
 }
 sequence_length: 4
+use_boundary_frames: False
 
 ###
 # Optimization options
@@ -69,3 +69,4 @@ learning_rates: [
 ###
 # Torch model to start training with.
 model_init: '/data/achald/MultiTHUMOS/models/permuted_sampling_vgg/model_30_pyramid_seq4_start_avg_at_conv4_3_scalar_learned_weights.t7'
+init_epoch: 1
