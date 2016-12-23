@@ -62,6 +62,16 @@ parser:option('--val_groups',
       :default('/data/achald/MultiTHUMOS/val_split/val_val_groups.txt')
 parser:option('--batch_size', 'Batch size'):convert(tonumber):default(64)
 parser:option('--reinit_rate', 'Reinit rate'):convert(tonumber):default(-1)
+parser:option('--min_reinit_rate',
+              'Min reinit rate (for PredictiveCorrectiveBlock)')
+      :convert(tonumber)
+      :default(-1)
+parser:option('--reinit_threshold', 'Threshold over which to reinitialize')
+      :convert(tonumber)
+      :default(-1)
+parser:option('--ignore_threshold', 'Threshold under which to ignore frames')
+      :convert(tonumber)
+      :default(-1)
 parser:flag('--decorate_sequencer',
             'If specified, decorate model with nn.Sequencer.' ..
             'This is necessary if the model does not expect a table as ' ..
@@ -148,6 +158,23 @@ if args.reinit_rate ~= -1 then
         for _, reinit_layer in ipairs(reinit_layers) do
             reinit_layer:set_reinitialize_rate(args.reinit_rate)
         end
+    end
+end
+
+local pcbs, _ = single_model:findModules('nn.PredictiveCorrectiveBlock')
+if args.min_reinit_rate ~= -1 then
+    for _, pcb in ipairs(pcbs) do
+        pcb.max_update = args.min_reinit_rate
+    end
+end
+if args.ignore_threshold ~= -1 then
+    for _, pcb in ipairs(pcbs) do
+        pcb.ignore_threshold = args.ignore_threshold
+    end
+end
+if args.reinit_threshold ~= -1 then
+    for _, pcb in ipairs(pcbs) do
+        pcb.init_threshold = args.reinit_threshold
     end
 end
 
