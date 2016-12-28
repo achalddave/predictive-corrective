@@ -15,6 +15,7 @@ local lyaml = require 'lyaml'
 local nn = require 'nn'
 local paths = require 'paths'
 local torch = require 'torch'
+local signal = require 'posix.signal'
 require 'rnn'
 require 'classic'
 require 'classic.torch'
@@ -280,13 +281,26 @@ if not args.debug then
 end
 collectgarbage()
 collectgarbage()
-for epoch = config.init_epoch, config.num_epochs do
+
+local epoch = config.init_epoch
+function save_intermediate(epoch)
+    trainer:save(cache_dir, epoch)
+    torch.save(paths.concat(cache_dir, 'sampler_' .. epoch .. '.t7'),
+            train_sampler)
+end
+
+signal.signal(signal.SIGINT, function(signum)
+    print('Caught ctrl-c, saving model')
+    save_intermediate(epoch - 1)
+    os.exit(signum)
+end)
+
+while epoch <= config.num_epochs do
     print(('Training epoch %d'):format(epoch))
     trainer:train_epoch(epoch, config.epoch_size)
-    if not args.debug then
-        trainer:save(cache_dir, epoch)
-        torch.save(paths.concat(cache_dir, 'sampler_' .. epoch .. '.t7'),
-                train_sampler)
+    if not args.debug and (epoch % 5 == 0 or epoch == config.init_epoch) then
+        -- TODO: Add a signal handler that saves the model on SIGINT/ctrl-c.
+        save_intermediate(epoch)
     end
     collectgarbage()
     collectgarbage()
@@ -294,4 +308,5 @@ for epoch = config.init_epoch, config.num_epochs do
     evaluator:evaluate_epoch(epoch, config.val_epoch_size)
     collectgarbage()
     collectgarbage()
+    epoch = epoch + 1
 end
