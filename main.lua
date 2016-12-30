@@ -48,38 +48,56 @@ parser:flag('--debug', "Indicates that we are only debugging; " ..
 local args = parser:parse()
 local config = lyaml.load(io.open(args.config, 'r'):read('*a'))
 
-if config.data_paths_config ~= nil then
-    local data_paths = lyaml.load(
-        io.open(config.data_paths_config, 'r'):read('*a'))
-    local train_path = data_paths[config.train_split]
-    local val_path = data_paths[config.val_split]
-    config.train_lmdb = train_path.with_images
-    config.train_lmdb_without_images = train_path.without_images
-    config.val_lmdb = val_path.with_images
-    config.val_lmdb_without_images = val_path.without_images
+function normalize_config(config)
+    if config.data_paths_config ~= nil then
+        local data_paths = lyaml.load(
+            io.open(config.data_paths_config, 'r'):read('*a'))
+        local train_path = data_paths[config.train_split]
+        local val_path = data_paths[config.val_split]
+        config.train_lmdb = train_path.with_images
+        config.train_lmdb_without_images = train_path.without_images
+        config.val_lmdb = val_path.with_images
+        config.val_lmdb_without_images = val_path.without_images
+    end
+
+    config.sequence_length = config.sequence_length == nil
+                            and 1
+                            or config.sequence_length
+    config.step_size = config.step_size == nil and 1 or config.step_size
+    if config.input_dimension_permutation == nil then
+        config.input_dimension_permutation = {1, 2, 3, 4, 5}
+    end
+    if config.use_boundary_frames == nil then
+        config.use_boundary_frames = false
+    end
+
+    if config.computational_batch_size == nil then
+        config.computational_batch_size = config.batch_size
+    end
+    if config.val_batch_size == nil then
+        config.val_batch_size = config.batch_size
+    end
+    if config.val_epoch_size == nil then
+        config.val_epoch_size = config.epoch_size
+    end
+
+    if config.sampling_strategy_options == nil then
+        config.sampling_strategy_options = {}
+    end
+    if config.sampling_strategy:lower() == 'sequential' and
+            config.sampling_strategy_options.batch_size == nil then
+        config.sampling_strategy_options.batch_size = config.batch_size
+    end
+
+    if (config.optim_config == nil) ~= (config.optim_state == nil) then
+        error('optim_config and optim_state must either both be specified, ' ..
+            'or both left empty')
+    end
+
+    return config
 end
 
-config.sequence_length = config.sequence_length == nil
-                         and 1
-                         or config.sequence_length
-config.step_size = config.step_size == nil and 1 or config.step_size
-if config.input_dimension_permutation == nil then
-    config.input_dimension_permutation = {1, 2, 3, 4, 5}
-end
-if config.use_boundary_frames == nil then
-    config.use_boundary_frames = false
-end
-
-if config.computational_batch_size == nil then
-    config.computational_batch_size = config.batch_size
-end
-if config.val_batch_size == nil then
-    config.val_batch_size = config.batch_size
-end
-if config.val_epoch_size == nil then
-    config.val_epoch_size = config.epoch_size
-end
--- TODO(achald): Validate config.
+config = normalize_config(config)
 
 -- Create cache_base
 if not paths.dirp(args.cache_base) and not paths.mkdir(args.cache_base) then
@@ -123,10 +141,20 @@ local single_model
 assert(config.model_init ~= nil, 'Initial model must be specified.')
 if not args.debug then
     experiment_saver.copy_file(config.model_init,
-                            paths.concat(cache_dir, 'model_init.t7'))
+                               paths.concat(cache_dir, 'model_init.t7'))
 end
 print('Loading model from ' .. config.model_init)
 single_model = torch.load(config.model_init)
+single_model:clearState()
+if config.criterion_wrapper == nil then
+    if torch.isTypeOf(single_model, 'nn.Sequencer') then
+        print('nn.Sequencer models are wrapped by LastStepCriterion if ' ..
+              'config.criterion_wrapper is not set.')
+        config.criterion_wrapper = 'last_step_criterion'
+    else
+        config.criterion_wrapper = ''
+    end
+end
 
 if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
     print('Getting first of DataParallelTable.')
@@ -150,18 +178,10 @@ end
 local model = nn.DataParallelTable(batch_dimension)
 model:add(single_model, config.gpus)
 cutorch.setDevice(config.gpus[1])
--- https://groups.google.com/forum/#!topic/torch7/HiBymc9NfIY
 model = model:cuda()
+
 local criterion = nn.MultiLabelSoftMarginCriterion():cuda()
-if config.criterion_wrapper == nil then
-    if torch.isTypeOf(single_model, 'nn.Sequencer') then
-        print('nn.Sequencer models are wrapped by LastStepCriterion if ' ..
-            'config.criterion_wrapper is not set.')
-        config.criterion_wrapper = 'last_step_criterion'
-    else
-        config.criterion_wrapper = ''
-    end
-end
+
 single_model = nil
 collectgarbage()
 collectgarbage()
@@ -181,15 +201,6 @@ local sampling_strategies = {
     sequential = data_loader.SequentialSampler
 }
 
-config.sampling_strategy_options = config.sampling_strategy_options == nil and
-    {} or config.sampling_strategy_options
-
-local sequential_training = sampling_strategies[
-    config.sampling_strategy:lower()] == sampling_strategies.sequential
-if sequential_training then
-    config.sampling_strategy_options.batch_size = config.batch_size
-end
-
 local train_sampler
 if config.train_sampler_init then
     print('Loading train sampler from disk.')
@@ -203,8 +214,9 @@ else
         config.use_boundary_frames,
         config.sampling_strategy_options)
 end
+
 local val_sampler
-if sequential_training then
+if config.sampling_strategy:lower() == 'sequential' then
     val_sampler = data_loader.SequentialSampler(
         config.val_lmdb_without_images,
         config.num_labels,
@@ -231,9 +243,6 @@ if config.optim_config ~= nil and config.optim_state ~= nil then
     optim_config = torch.load(config.optim_config)
     optim_state = torch.load(config.optim_state)
     print('Loading optim_config, optim_state from disk.')
-elseif not (config.optim_config == nil and config.optim_state == nil) then
-    error('optim_config and optim_state must either both be specified, ' ..
-          'or both left empty')
 end
 
 local trainer_class, evaluator_class
