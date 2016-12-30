@@ -102,9 +102,201 @@ function Trainer:update_optim_config(epoch)
     return regime_was_updated
 end
 
-function Trainer:_train_batch_accumulate_gradients(images, labels)
+function Trainer:train_epoch(epoch, num_batches)
+    self:_train_or_evaluate_epoch(epoch, num_batches, true --[[train_mode]])
+end
+
+function Trainer:evaluate_epoch(epoch, num_batches)
+    self:_train_or_evaluate_epoch(epoch, num_batches, false --[[train_mode]])
+end
+
+function Trainer:train_batch()
     --[[
-    Accumulate gradients on this set of images and labels.
+    Train on a batch of data
+
+    Returns:
+        loss: Output of criterion:forward on this batch.
+        outputs (Tensor): Output of model:forward on this batch. The tensor
+            size should be either (sequence_length, batch_size, num_labels) or
+            (batch_size, num_labels), depending on the model.
+        labels (Tensor): True labels. Same size as the outputs.
+    ]]--
+    local images, labels = self:_load_batch()
+
+    local loss = 0
+    local outputs
+    local function forward_backward()
+        self.model:zeroGradParameters()
+        for i = 1, math.ceil(self.batch_size / self.computational_batch_size) do
+            local start_index = (i - 1) * self.computational_batch_size + 1
+            local end_index = math.min(
+                i * self.computational_batch_size, self.batch_size)
+            local current_loss, current_outputs =
+                self:_forward_backward(
+                    images[{{}, {start_index, end_index}}],
+                    labels[{{}, {start_index, end_index}}],
+                    true --[[train_mode]])
+            -- The loss is averaged by the computational batch size; we want to
+            -- average by the actual batch size.
+            loss = loss + current_loss
+            if outputs == nil then
+                outputs = current_outputs:clone()
+            else
+                -- If the outputs are 3D, then they must be (sequence_length,
+                -- batch_size, num_labels). Otherwise, they are 2D and of shape
+                -- (batch_size, num_labels).
+                local batch_dimension = current_outputs:dim() == 3 and 2 or 1
+                outputs = torch.cat(outputs, current_outputs, batch_dimension)
+            end
+        end
+        return loss, self.model_grad_parameters
+    end
+    -- Updates self.model_parameters (and, in turn, the parameters of
+    -- self.model) in place.
+    optim.sgd(forward_backward, self.model_parameters,
+              self.optimization_config, self.optimization_state)
+    return loss, outputs, labels
+end
+
+function Trainer:evaluate_batch()
+    --[[
+    Returns:
+        loss: Output of criterion:forward on this batch.
+        outputs (Tensor): Output of model:forward on this batch. The tensor
+            size is (sequence_length, batch_size, num_labels)
+        labels (Tensor): True labels. Same size as the outputs.
+    ]]--
+    local images, labels = self:_load_batch()
+    local loss, outputs = self:_forward_backward(
+        images, labels, false --[[train_mode]])
+    self.gpu_inputs:resize(0)
+    self.gpu_labels:resize(0)
+    return loss, outputs, labels
+end
+
+function Trainer:save(directory, epoch)
+    --[[
+    Save model, optimization config, and optimization config to a directory.
+    ]]--
+    -- Clear intermediate states in the model before saving to disk to minimize
+    -- disk space usage.
+    self.model:clearState()
+    local model = self.model
+    if torch.isTypeOf(self.model, 'nn.DataParallelTable') then
+        model = model:get(1)
+    end
+    torch.save(paths.concat(directory, 'model_' .. epoch .. '.t7'), model)
+    torch.save(paths.concat(directory, 'optim_config_' .. epoch .. '.t7'),
+               self.optimization_config)
+    torch.save(paths.concat(directory, 'optim_state_' .. epoch .. '.t7'),
+               self.optimization_state)
+    collectgarbage()
+    collectgarbage()
+end
+
+function Trainer:_train_or_evaluate_epoch(epoch, num_batches, train_mode)
+    if train_mode then
+        self.model:clearState()
+        self.model:training()
+        self:update_optim_config(epoch)
+    else
+        self.model:evaluate()
+    end
+
+    local epoch_timer = torch.Timer()
+    local batch_timer = torch.Timer()
+
+    local predictions = torch.Tensor(
+        num_batches * self.batch_size, self.num_labels)
+    local groundtruth = torch.ByteTensor(
+        num_batches * self.batch_size, self.num_labels)
+
+    local process_batch = train_mode and self.train_batch or self.evaluate_batch
+    local loss_epoch = 0
+    for batch_index = 1, num_batches do
+        batch_timer:reset()
+        collectgarbage()
+        collectgarbage()
+        local loss, curr_predictions, curr_groundtruth = process_batch(self)
+        loss_epoch = loss_epoch + loss
+
+        -- We only care about the predictions and groundtruth in the last step
+        -- of the sequence.
+        if curr_predictions:dim() == 3 and curr_predictions:size(1) > 1 then
+            curr_predictions = curr_predictions[curr_predictions:size(1)]
+        end
+        if curr_groundtruth:dim() == 3 and curr_groundtruth:size(1) > 1 then
+            curr_groundtruth = curr_groundtruth[curr_groundtruth:size(1)]
+        end
+
+        -- Collect current predictions and groundtruth.
+        local epoch_index_start = (batch_index - 1) * self.batch_size + 1
+        predictions[{{epoch_index_start,
+                      epoch_index_start + self.batch_size - 1},
+                      {}}] = curr_predictions:type(predictions:type())
+        groundtruth[{{epoch_index_start,
+                      epoch_index_start + self.batch_size - 1},
+                      {}}] = curr_groundtruth
+
+        if train_mode then
+            local log_string = string.format(
+                '%s: Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f',
+                os.date('%X'), epoch, batch_index, num_batches,
+                batch_timer:time().real, loss)
+            if batch_index % 10 == 0 then
+                local current_mean_average_precision =
+                    evaluator.compute_mean_average_precision(
+                        predictions[{{1, epoch_index_start + self.batch_size - 1}}],
+                        groundtruth[{{1, epoch_index_start + self.batch_size - 1}}])
+                log_string = log_string .. string.format(
+                    ' epoch mAP %.4f', current_mean_average_precision)
+            end
+            log_string = log_string .. string.format(
+                ' LR %.0e', self.epoch_base_learning_rate)
+            print(log_string)
+        end
+    end
+
+    local mean_average_precision = evaluator.compute_mean_average_precision(
+        predictions, groundtruth)
+    predictions = nil
+    groundtruth = nil
+    collectgarbage()
+    collectgarbage()
+
+    local mode_str = train_mode and 'TRAINING' or 'EVALUATION'
+
+    print(string.format(
+        '%s: Epoch: [%d][%s SUMMARY] Total Time(s): %.2f\t' ..
+        'average loss (per batch): %.5f \t mAP: %.5f',
+        os.date('%X'), epoch, mode_str, epoch_timer:time().real, loss_epoch /
+        num_batches, mean_average_precision))
+end
+
+function Trainer:_load_batch()
+    local images_table, labels = self.data_loader:load_batch(self.batch_size)
+    -- Prefetch the next batch.
+    self.data_loader:fetch_batch_async(self.batch_size)
+
+    local num_steps = #images_table
+    local num_channels = images_table[1][1]:size(1)
+    local images = torch.Tensor(num_steps, self.batch_size, num_channels,
+                                self.crop_size, self.crop_size)
+    for step, step_images in ipairs(images_table) do
+        for sequence, img in ipairs(step_images) do
+            -- Process image after converting to the default Tensor type.
+            -- (Originally, it is a ByteTensor).
+            images[{step, sequence}] = image_util.augment_image_eval(
+                img:typeAs(images), self.crop_size, self.crop_size,
+                self.pixel_mean)
+        end
+    end
+    return images, labels
+end
+
+function Trainer:_forward_backward(images, labels, train_mode)
+    --[[
+    Run forward (and possibly backward) pass on images.
 
     Args:
         images ((sequence_length, batch_size, num_channels, width, height))
@@ -127,168 +319,15 @@ function Trainer:_train_batch_accumulate_gradients(images, labels)
     end
     local loss = self.criterion:forward(outputs, self.gpu_labels) * (
         num_images / self.batch_size)
-    local criterion_gradients = self.criterion:backward(
-        outputs, self.gpu_labels)
-    self.model:backward(
-        self.gpu_inputs, criterion_gradients, num_images / self.batch_size)
-    self.gpu_inputs:resize(0)
+
+    if train_mode then
+        local criterion_gradients = self.criterion:backward(
+            outputs, self.gpu_labels)
+        self.model:backward(
+            self.gpu_inputs, criterion_gradients, num_images / self.batch_size)
+        self.gpu_inputs:resize(0)
+    end
     return loss, outputs
-end
-
-function Trainer:train_batch()
-    --[[
-    Train on a batch of data
-
-    Returns:
-        loss: Output of criterion:forward on this batch.
-        outputs (Tensor): Output of model:forward on this batch. The tensor
-            size should be either (sequence_length, batch_size, num_labels) or
-            (batch_size, num_labels), depending on the model.
-        labels (Tensor): True labels. Same size as the outputs.
-    ]]--
-    local images_table, labels = self.data_loader:load_batch(self.batch_size)
-    -- Prefetch the next batch.
-    self.data_loader:fetch_batch_async(self.batch_size)
-
-    local num_steps = #images_table
-    local num_channels = images_table[1][1]:size(1)
-    local images = torch.Tensor(num_steps, self.batch_size, num_channels,
-                                self.crop_size, self.crop_size)
-    local sequence_states = {}
-    for step, step_images in ipairs(images_table) do
-        for sequence, img in ipairs(step_images) do
-            -- Process image after converting to the default Tensor type.
-            -- (Originally, it is a ByteTensor).
-            images[{step, sequence}], sequence_states[sequence] =
-                image_util.augment_image_train(
-                    img:typeAs(images), self.crop_size, self.crop_size,
-                    self.pixel_mean, sequence_states[sequence])
-        end
-    end
-
-    local loss = 0
-    local outputs
-    self.model:zeroGradParameters()
-    for i = 1, math.ceil(self.batch_size / self.computational_batch_size) do
-        local start_index = (i - 1) * self.computational_batch_size + 1
-        local end_index = math.min(
-            i * self.computational_batch_size, self.batch_size)
-        local current_loss, current_outputs =
-            self:_train_batch_accumulate_gradients(
-                images[{{}, {start_index, end_index}}],
-                labels[{{}, {start_index, end_index}}])
-        -- The loss is averaged by the computational batch size; we want to
-        -- average by the actual batch size.
-        loss = loss + current_loss
-        if outputs == nil then
-            outputs = current_outputs:clone()
-        else
-            -- If the outputs are 3D, then they must be (sequence_length,
-            -- batch_size, num_labels). Otherwise, they are 2D and of shape
-            -- (batch_size, num_labels).
-            local batch_dimension = current_outputs:dim() == 3 and 2 or 1
-            outputs = torch.cat(outputs, current_outputs, batch_dimension)
-        end
-    end
-
-    -- Updates self.model_parameters (and, in turn, the parameters of
-    -- self.model) in place.
-    local function loss_grad_params()
-        return loss, self.model_grad_parameters
-    end
-    optim.sgd(loss_grad_params, self.model_parameters,
-              self.optimization_config, self.optimization_state)
-    return loss, outputs, labels
-end
-
-function Trainer:train_epoch(epoch, num_batches)
-    self.model:clearState()
-    self.model:training()
-    self:update_optim_config(epoch)
-    local epoch_timer = torch.Timer()
-    local batch_timer = torch.Timer()
-
-    local predictions = torch.Tensor(
-        num_batches * self.batch_size, self.num_labels)
-    local groundtruth = torch.ByteTensor(
-        num_batches * self.batch_size, self.num_labels)
-
-    local loss_epoch = 0
-    for batch_index = 1, num_batches do
-        batch_timer:reset()
-        collectgarbage()
-        collectgarbage()
-        local loss, curr_predictions, curr_groundtruth = self:train_batch()
-        loss_epoch = loss_epoch + loss
-
-        -- We only care about the predictions and groundtruth in the last step
-        -- of the sequence.
-        if curr_predictions:dim() == 3 and curr_predictions:size(1) > 1 then
-            curr_predictions = curr_predictions[curr_predictions:size(1)]
-        end
-        if curr_groundtruth:dim() == 3 and curr_groundtruth:size(1) > 1 then
-            curr_groundtruth = curr_groundtruth[curr_groundtruth:size(1)]
-        end
-
-        -- Collect current predictions and groundtruth.
-        local epoch_index_start = (batch_index - 1) * self.batch_size + 1
-        predictions[{{epoch_index_start,
-                      epoch_index_start + self.batch_size - 1},
-                      {}}] = curr_predictions:type(predictions:type())
-        groundtruth[{{epoch_index_start,
-                      epoch_index_start + self.batch_size - 1},
-                      {}}] = curr_groundtruth
-
-        local log_string = string.format(
-            '%s: Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f',
-            os.date('%X'), epoch, batch_index, num_batches,
-            batch_timer:time().real, loss)
-        if batch_index % 10 == 0 then
-            local current_mean_average_precision =
-                evaluator.compute_mean_average_precision(
-                    predictions[{{1, epoch_index_start + self.batch_size - 1}}],
-                    groundtruth[{{1, epoch_index_start + self.batch_size - 1}}])
-            log_string = log_string .. string.format(
-                ' epoch mAP %.4f', current_mean_average_precision)
-        end
-        log_string = log_string .. string.format(
-            ' LR %.0e', self.epoch_base_learning_rate)
-        print(log_string)
-    end
-
-    local mean_average_precision = evaluator.compute_mean_average_precision(
-        predictions, groundtruth)
-    predictions = nil
-    groundtruth = nil
-    collectgarbage()
-    collectgarbage()
-
-
-    print(string.format(
-        '%s: Epoch: [%d][TRAINING SUMMARY] Total Time(s): %.2f\t' ..
-        'average loss (per batch): %.5f \t mAP: %.5f',
-        os.date('%X'), epoch, epoch_timer:time().real, loss_epoch / num_batches,
-        mean_average_precision))
-end
-
-function Trainer:save(directory, epoch)
-    --[[
-    Save model, optimization config, and optimization config to a directory.
-    ]]--
-    -- Clear intermediate states in the model before saving to disk to minimize
-    -- disk space usage.
-    self.model:clearState()
-    local model = self.model
-    if torch.isTypeOf(self.model, 'nn.DataParallelTable') then
-        model = model:get(1)
-    end
-    torch.save(paths.concat(directory, 'model_' .. epoch .. '.t7'), model)
-    torch.save(paths.concat(directory, 'optim_config_' .. epoch .. '.t7'),
-               self.optimization_config)
-    torch.save(paths.concat(directory, 'optim_state_' .. epoch .. '.t7'),
-               self.optimization_state)
-    collectgarbage()
-    collectgarbage()
 end
 
 function Trainer:_epoch_learning_rate(epoch)
