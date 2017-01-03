@@ -271,7 +271,6 @@ local function evaluate_model_sequential(options)
             crop_size
             pixel_mean
     ]]--
-    print('Using evaluate model sequential.')
     local model = options.model
     local frames_lmdb = options.frames_lmdb
     local frames_without_images_lmdb = options.frames_without_images_lmdb
@@ -422,7 +421,6 @@ local function evaluate_model(options)
     local c3d_input = options.c3d_input
 
     -- Open database.
-    -- TODO(achald): Decide if we should be using boundary frames for the sampler.
     local source = data_source.LabeledVideoFramesLmdbSource(
         frames_lmdb, frames_without_images_lmdb, num_labels)
     local sampler = data_loader.PermutedSampler(
