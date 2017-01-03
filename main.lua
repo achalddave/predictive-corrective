@@ -21,7 +21,6 @@ require 'classic'
 require 'classic.torch'
 
 local data_loader = require 'data_loader'
-local evaluator = require 'evaluator'
 local experiment_saver = require 'util/experiment_saver'
 local trainer = require 'trainer'
 require 'last_step_criterion'
@@ -245,14 +244,12 @@ if config.optim_config ~= nil and config.optim_state ~= nil then
     print('Loading optim_config, optim_state from disk.')
 end
 
-local trainer_class, evaluator_class
+local trainer_class
 if sampling_strategies[config.sampling_strategy:lower()] ==
         sampling_strategies.sequential then
     trainer_class = trainer.SequentialTrainer
-    evaluator_class = evaluator.SequentialEvaluator
 else
     trainer_class = trainer.Trainer
-    evaluator_class = evaluator.Evaluator
 end
 
 local trainer = trainer_class {
@@ -271,18 +268,8 @@ local trainer = trainer_class {
     optim_config = optim_config,
     optim_state = optim_state
 }
-local evaluator = evaluator_class {
-    model = model,
-    criterion = criterion,
-    data_loader = val_loader,
-    input_dimension_permutation = config.input_dimension_permutation,
-    pixel_mean = config.pixel_mean,
-    batch_size = config.val_batch_size,
-    crop_size = config.crop_size,
-    num_labels = config.num_labels
-}
 
-print('Initialized trainer and evaluator.')
+print('Initialized trainer.')
 if not args.debug then
     print('Config:')
     print(config)
@@ -314,7 +301,7 @@ while epoch <= config.num_epochs do
     collectgarbage()
     collectgarbage()
 
-    evaluator:evaluate_epoch(epoch, config.val_epoch_size)
+    trainer:evaluate_epoch(epoch, config.val_epoch_size)
     collectgarbage()
     collectgarbage()
     epoch = epoch + 1
