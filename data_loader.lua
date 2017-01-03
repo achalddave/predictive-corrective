@@ -117,7 +117,8 @@ function PermutedSampler.static.filter_boundary_frames(
     --[[ Filter out the last sequence_length frames in the video.
     --
     -- Args:
-    --     video_keys (array of arrays)
+    --     video_keys (array of arrays): Maps video name to array of keys for
+    --         frames in the video.
     --]]
     local keys = {}
     for video, keys_in_video in pairs(video_keys) do
