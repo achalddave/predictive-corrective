@@ -16,6 +16,7 @@ local nn = require 'nn'
 rnn = require 'rnn'
 require 'layers/init'
 
+local data_source = require 'data_source'
 local data_loader = require 'data_loader'
 
 local parser = argparse() {
@@ -30,6 +31,7 @@ parser:option('--layer_spec',
               'will select the 13th SpatialConvolution layer in the 2nd ' ..
               'ParallelTable module.')
 parser:option('--groundtruth_lmdb')
+parser:option('--groundtruth_without_images_lmdb')
 parser:option('--video_name')
 parser:option('--output_activations')
 parser:option('--sequence_length', 'Number of input frames.')
@@ -65,8 +67,7 @@ torch.setdefaulttensortype('torch.FloatTensor')
 ---
 local VideoSampler = classic.class('VideoSampler', data_loader.Sampler)
 function VideoSampler:_init(
-    frames_lmdb, _ --[[num_labels]], sequence_length, step_size,
-    use_boundary_frames, options)
+    data_source_obj, sequence_length, step_size, use_boundary_frames, options)
     --[[ Return consecutive frames from a given video.
 
     Args:
@@ -74,11 +75,14 @@ function VideoSampler:_init(
             - video_name
     ]]--
     self.video_name = options.video_name
-    self.video_keys = VideoSampler.get_video_keys(frames_lmdb, self.video_name)
+    self.data_source = data_source_obj
+    self.all_video_keys = self.data_source:video_keys()
     if not use_boundary_frames then
-        self.video_keys = data_loader.PermutedSampler.filter_boundary_frames(
-            self.video_keys, sequence_length, step_size)
+        self.all_video_keys =
+            data_loader.PermutedSampler.filter_boundary_frames(
+                self.all_video_keys, sequence_length, step_size)
     end
+    self.video_keys = self.all_video_keys[self.video_name]
     self.sequence_length = sequence_length
     self.step_size = step_size
     self.key_index = 1
@@ -98,10 +102,11 @@ function VideoSampler:sample_keys(num_sequences)
             self.key_index = 1
         end
         local sampled_key = self.video_keys[self.key_index]
+        local offset = self.key_index
         for step = 1, self.sequence_length do
             table.insert(batch_keys[step], sampled_key)
-            sampled_key = data_loader.Sampler.frame_offset_key(
-                sampled_key, self.step_size)
+            offset = offset + self.step_size
+            sampled_key = self.video_keys[offset]
         end
         self.key_index = self.key_index + 1
     end
@@ -113,10 +118,12 @@ function VideoSampler.static.get_video_keys(frames_lmdb, video_name)
     local db = lmdb.env { Path = frames_lmdb }
     db:open()
     local transaction = db:txn(true --[[readonly]])
-    local key = video_name .. '-1'
+    local offset = 1
+    local key = string.format('%s-%d', video_name, offset)
     while transaction:get(key) ~= nil do
         table.insert(video_keys, key)
-        key = data_loader.Sampler.next_frame_key(key)
+        offset = offset + 1
+        key = string.format('%s-%d', video_name, offset)
     end
     return video_keys
 end
@@ -160,15 +167,15 @@ print('Extracting from layer:', layer_to_extract)
 ---
 -- Pass frames through model
 ---
+local source = data_source.LabeledVideoFramesLmdbSource(
+    args.groundtruth_lmdb, args.groundtruth_without_images_lmdb, args.num_labels)
 local sampler = VideoSampler(
-    args.groundtruth_lmdb,
-    nil --[[num_labels]],
+    source,
     args.sequence_length,
     args.step_size,
     true --[[use boundary frames]],
     {video_name = args.video_name})
-local loader = data_loader.DataLoader(
-    args.groundtruth_lmdb, sampler, args.num_labels)
+local loader = data_loader.DataLoader(source, sampler)
 
 local gpu_inputs = torch.CudaTensor()
 local samples_complete = 0
@@ -221,8 +228,7 @@ while samples_complete ~= sampler:num_samples() do
             unpack(activation_map_size))
     end
     for i = 1, batch_size do
-        local _, frame_number = data_loader.Sampler.parse_frame_key(
-            batch_keys[i])
+        local _, frame_number = source:frame_video_offset(batch_keys[i])
         frame_activations[frame_number] = outputs[i]:float()
     end
     samples_complete = samples_complete + to_load
