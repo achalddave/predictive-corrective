@@ -237,10 +237,8 @@ else
 end
 print('Initialized samplers')
 
-local train_loader = data_loader.DataLoader(
-    train_source, train_sampler, config.num_labels)
-local val_loader = data_loader.DataLoader(
-    val_source, val_sampler, config.num_labels)
+local train_loader = data_loader.DataLoader(train_source, train_sampler)
+local val_loader = data_loader.DataLoader(val_source, val_sampler)
 print('Initialized data loaders')
 
 local optim_config, optim_state

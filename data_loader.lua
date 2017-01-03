@@ -36,7 +36,6 @@ function PermutedSampler:_init(
 
     Args:
         data_source_obj (DataSource)
-        num_labels (num)
         sequence_length (num): If provided, sample sequences of length
             sequence_length for each training sample.
         step_size (num): If provided, elements in the sequence should be
@@ -404,16 +403,14 @@ end
 
 local DataLoader = classic.class('DataLoader')
 
-function DataLoader:_init(data_source_obj, sampler, num_labels)
+function DataLoader:_init(data_source_obj, sampler)
     --[[
     Args:
         lmdb_path (str): Path to LMDB containing LabeledVideoFrames as values.
         sampler (Sampler): Sampler used for batches
-        num_labels (num): Number of total labels.
     ]]--
     self.data_source = data_source_obj
     self.sampler = sampler
-    self.num_labels = num_labels
     self._prefetched_data = {
         batch_images = nil,
         batch_labels = nil
