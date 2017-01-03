@@ -382,9 +382,9 @@ function SequentialTrainer:_init(args)
     self.model:remember('both')
 end
 
-function SequentialTrainer:train_batch()
+function SequentialTrainer:_train_or_evaluate_batch(train_mode)
     --[[
-    Train on a batch of data.
+    Train or evaluate on a batch of data.
 
     Returns:
         loss: Output of criterion:forward on this batch.
@@ -396,7 +396,9 @@ function SequentialTrainer:train_batch()
         sequence_ended (bool): If true, specifies that this batch ends the
             sequence.
     ]]--
-    self.model:zeroGradParameters()
+    if train_mode then
+        self.model:zeroGradParameters()
+    end
 
     local images_table, labels = self.data_loader:load_batch(1 --[[batch size]])
     if images_table[1][1] == END_OF_SEQUENCE then
@@ -417,59 +419,42 @@ function SequentialTrainer:train_batch()
     local images = torch.Tensor(num_steps, 1 --[[batch size]], num_channels,
                                 self.crop_size, self.crop_size)
 
-    local num_valid_steps = num_steps
-    for step, step_images in ipairs(images_table) do
-        local img = step_images[1]
-        if img == END_OF_SEQUENCE then
-            -- We're out of frames for this sequence.
-            num_valid_steps = step - 1
-            break
-        else
-            -- Process image after converting to the default Tensor type.
-            -- (Originally, it is a ByteTensor).
-            images[step] = image_util.augment_image_train(
-                img:typeAs(images), self.crop_size, self.crop_size,
-                self.pixel_mean)
-        end
-    end
-    local sequence_ended = num_valid_steps ~= num_steps
-    if sequence_ended then
-        labels = labels[{{1, num_valid_steps}}]
-        images = images[{{1, num_valid_steps}}]
-        for step = num_valid_steps + 1, #images_table do
-            -- The rest of the batch should be filled with END_OF_SEQUENCe.
-            assert(images_table[step][1] == END_OF_SEQUENCE)
-        end
-    end
-
-    self.gpu_inputs:resize(images:size()):copy(images)
-    self.gpu_labels:resize(labels:size()):copy(labels)
-
     local loss, outputs
-    local function model_forward_backward(_)
+    if train_mode then
+        local function model_forward_backward(_)
+            -- Should be of shape (sequence_length, batch_size, num_classes)
+            outputs = self.model:forward(self.gpu_inputs)
+            loss = self.criterion:forward(outputs, self.gpu_labels)
+            local criterion_gradients = self.criterion:backward(
+                outputs, self.gpu_labels)
+            self.model:backward(self.gpu_inputs, criterion_gradients)
+            return loss, self.model_grad_parameters
+        end
+
+        -- Updates self.model_parameters (and, in turn, the parameters of
+        -- self.model) in place.
+        optim.sgd(model_forward_backward, self.model_parameters,
+                self.optimization_config, self.optimization_state)
+    else
         -- Should be of shape (sequence_length, batch_size, num_classes)
         outputs = self.model:forward(self.gpu_inputs)
         loss = self.criterion:forward(outputs, self.gpu_labels)
-        local criterion_gradients = self.criterion:backward(
-            outputs, self.gpu_labels)
-        self.model:backward(self.gpu_inputs, criterion_gradients)
-        return loss, self.model_grad_parameters
     end
-
-    -- Updates self.model_parameters (and, in turn, the parameters of
-    -- self.model) in place.
-    optim.sgd(model_forward_backward, self.model_parameters,
-              self.optimization_config, self.optimization_state)
     if sequence_ended then
         self.model:forget()
     end
     return loss, outputs, labels, sequence_ended
 end
 
-function SequentialTrainer:train_epoch(epoch, num_sequences)
-    self.model:clearState()
-    self.model:training()
-    self:update_optim_config(epoch)
+function SequentialTrainer:_train_or_evaluate_epoch(
+    epoch, num_batches, train_mode)
+    if train_mode then
+        self.model:clearState()
+        self.model:training()
+        self:update_optim_config(epoch)
+    else
+        self.model:evaluate()
+    end
     local epoch_timer = torch.Timer()
     local batch_timer = torch.Timer()
 
@@ -485,7 +470,7 @@ function SequentialTrainer:train_epoch(epoch, num_sequences)
         local num_steps_in_sequence = 0
         while not sequence_ended do
             local loss, batch_predictions, batch_groundtruth, sequence_ended_ =
-                self:train_batch()
+                self:_train_or_evaluate_batch(train_mode)
             -- HACK: Assign to definition outside of while loop.
             sequence_ended = sequence_ended_
             if loss == nil then
@@ -511,15 +496,17 @@ function SequentialTrainer:train_epoch(epoch, num_sequences)
             end
         end
         epoch_loss = epoch_loss + sequence_loss
-        local sequence_mean_average_precision =
-            evaluator.compute_mean_average_precision(
-                sequence_predictions, sequence_groundtruth)
-        print(string.format(
-            '%s: Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f ' ..
-            'seq mAP %.4f LR %.0e',
-            os.date('%X'), epoch, sequence, num_sequences,
-            batch_timer:time().real, sequence_loss,
-            sequence_mean_average_precision, self.epoch_base_learning_rate))
+        if train_mode then
+            local sequence_mean_average_precision =
+                evaluator.compute_mean_average_precision(
+                    sequence_predictions, sequence_groundtruth)
+            print(string.format(
+                '%s: Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f ' ..
+                'seq mAP %.4f LR %.0e',
+                os.date('%X'), epoch, sequence, num_sequences,
+                batch_timer:time().real, sequence_loss,
+                sequence_mean_average_precision, self.epoch_base_learning_rate))
+        end
         if predictions == nil then
             predictions = sequence_predictions
             groundtruth = sequence_groundtruth
@@ -532,10 +519,11 @@ function SequentialTrainer:train_epoch(epoch, num_sequences)
     local mean_average_precision = evaluator.compute_mean_average_precision(
         predictions, groundtruth)
 
+    local mode_str = train_mode and 'TRAINING' or 'EVALUATION'
     print(string.format(
-        '%s: Epoch: [%d][TRAINING SUMMARY] Total Time(s): %.2f\t' ..
+        '%s: Epoch: [%d][%s SUMMARY] Total Time(s): %.2f\t' ..
         'average loss (per batch): %.5f \t mAP: %.5f',
-        os.date('%X'), epoch, epoch_timer:time().real,
+        os.date('%X'), epoch, mode_str, epoch_timer:time().real,
         epoch_loss / num_sequences, mean_average_precision))
 end
 
