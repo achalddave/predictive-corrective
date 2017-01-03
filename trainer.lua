@@ -301,6 +301,7 @@ function Trainer:_forward_backward(images, labels, train_mode)
     Args:
         images ((sequence_length, batch_size, num_channels, width, height))
         labels: Subset of output of data_loader:load_batch()
+        train_mode (bool): If true, perform backward pass as well.
     ]]--
     local num_images = images:size(2)
     if self.input_dimension_permutation then
