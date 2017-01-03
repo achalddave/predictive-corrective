@@ -257,7 +257,6 @@ function BalancedSampler:_permute_keys()
     end
 end
 
--- TODO(achald): Update SequentialSampler to work with new LMDB DataSource.
 -- TODO(achald): Implement sequential sampler. This will choose
 -- `batch_size` videos, and then emit consecutive sequences from these videos.
 -- So each batch will contain sequence_length frames from batch_size videos.
@@ -265,17 +264,13 @@ end
 -- with 'nil' keys.
 local SequentialSampler = classic.class('SequentialSampler', Sampler)
 function SequentialSampler:_init(
-        lmdb_without_images_path, _ --[[num_labels]],
-        sequence_length, step_size, _ --[[use_boundary_frames]], options)
+        data_source_obj, sequence_length, step_size,
+        _ --[[use_boundary_frames]], options)
     --[[
     Returns consecutives sequences of frames from videos.
 
     Args:
-        lmdb_without_images_path (str): Path to LMDB containing
-            LabeledVideoFrames as values, but without any raw image data. This
-            is easy to iterate over, and can be used to decide which images to
-            sample.
-        num_labels (num)
+        data_source_obj (DataSource)
         sequence_length (num): If provided, sample sequences of length
             sequence_length for each training sample.
         step_size (num): If provided, elements in the sequence should be
@@ -288,21 +283,23 @@ function SequentialSampler:_init(
                 Useful for evaluating.
     ]]--
     assert(options.batch_size ~= nil)
-    self.imageless_path = lmdb_without_images_path
     self.sequence_length = sequence_length == nil and 1 or sequence_length
     self.step_size = step_size == nil and 1 or step_size
     self.batch_size = options.batch_size
     self.sample_once = options.sample_once
     self.sampled_all_videos = false
-    self.keys = PermutedSampler.load_lmdb_keys(lmdb_without_images_path)
 
-    -- List of all valid keys.
-    self.keys_set = {}
-    for _, key in ipairs(self.keys) do self.keys_set[key] = true end
+    self.video_keys = data_source_obj:video_keys()
+    self.key_label_map = data_source_obj:key_label_map()
+    self.data_source = data_source_obj
 
     -- TODO(achald): Should we sort these by length of videos?
-    self.video_start_keys = Sampler.permute(
-        SequentialSampler.get_start_frames(self.keys))
+    self.video_start_keys = {}
+    for _, keys_for_video in pairs(self.video_keys) do
+        table.insert(self.video_start_keys, keys_for_video[1])
+    end
+    self.video_start_keys = Sampler.permute(self.video_start_keys)
+
     self.next_frames = {}
     for i = 1, self.batch_size do
         self.next_frames[i] = self.video_start_keys[i]
@@ -355,20 +352,23 @@ function SequentialSampler:sample_keys(num_sequences)
                          self.batch_size, num_sequences))
     for sequence = 1, num_sequences do
         local sampled_key = self.next_frames[sequence]
+        local video, offset = self.data_source:frame_video_offset(sampled_key)
         local sequence_valid = true
         -- Add steps from the sequence to batch_keys until the sequence ends.
         for step = 1, self.sequence_length do
-            sequence_valid = sequence_valid and self.keys_set[sampled_key]
+            sequence_valid =
+                self.key_label_map[sampled_key] ~= nil and sequence_valid
             if sequence_valid then
                 table.insert(batch_keys[step], sampled_key)
             else
                 table.insert(batch_keys[step], END_OF_SEQUENCE)
             end
             if sampled_key ~= nil then
-                sampled_key = Sampler.frame_offset_key(sampled_key, self.step_size)
+                offset = offset + self.step_size
+                sampled_key = self.video_keys[video][offset]
             end
         end
-        if self.keys_set[batch_keys[#batch_keys][sequence]] then
+        if self.key_label_map[batch_keys[#batch_keys][sequence]] ~= nil then
             -- The sequence filled the batch with valid keys, so we want to
             -- output the sampled_key as the next sample.
             -- Note that sampled_key may be nil if the sequence just ended, in
@@ -387,7 +387,7 @@ function SequentialSampler:sample_keys(num_sequences)
 end
 
 function SequentialSampler:num_samples()
-    return #self.keys
+    return self.data_source:num_samples()
 end
 
 function SequentialSampler.static.get_start_frames(keys)
