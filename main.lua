@@ -21,6 +21,7 @@ require 'classic'
 require 'classic.torch'
 
 local data_loader = require 'data_loader'
+local data_source = require 'data_source'
 local experiment_saver = require 'util/experiment_saver'
 local trainer = require 'trainer'
 require 'last_step_criterion'
@@ -200,14 +201,19 @@ local sampling_strategies = {
     sequential = data_loader.SequentialSampler
 }
 
+local train_source = data_source.LabeledVideoFramesLmdbSource(
+    config.train_lmdb, config.train_lmdb_without_images, config.num_labels)
+local val_source = data_source.LabeledVideoFramesLmdbSource(
+    config.val_lmdb, config.val_lmdb_without_images, config.num_labels)
+print('Loaded data sources')
+
 local train_sampler
 if config.train_sampler_init then
     print('Loading train sampler from disk.')
     train_sampler = torch.load(config.train_sampler_init)
 else
     train_sampler = sampling_strategies[config.sampling_strategy:lower()](
-        config.train_lmdb_without_images,
-        config.num_labels,
+        train_source,
         config.sequence_length,
         config.step_size,
         config.use_boundary_frames,
@@ -217,25 +223,25 @@ end
 local val_sampler
 if config.sampling_strategy:lower() == 'sequential' then
     val_sampler = data_loader.SequentialSampler(
-        config.val_lmdb_without_images,
-        config.num_labels,
+        val_source,
         config.sequence_length,
         config.step_size,
         config.use_boundary_frames,
         config.sampling_strategy_options)
 else
     val_sampler = data_loader.PermutedSampler(
-        config.val_lmdb_without_images,
-        config.num_labels,
+        val_source,
         config.sequence_length,
         config.step_size,
         config.use_boundary_frames)
 end
+print('Initialized samplers')
 
 local train_loader = data_loader.DataLoader(
-    config.train_lmdb, train_sampler, config.num_labels)
+    train_source, train_sampler, config.num_labels)
 local val_loader = data_loader.DataLoader(
-    config.val_lmdb, val_sampler, config.num_labels)
+    val_source, val_sampler, config.num_labels)
+print('Initialized data loaders')
 
 local optim_config, optim_state
 if config.optim_config ~= nil and config.optim_state ~= nil then
