@@ -291,11 +291,13 @@ function save_intermediate(epoch)
             train_sampler)
 end
 
-signal.signal(signal.SIGINT, function(signum)
-    print('Caught ctrl-c, saving model')
-    save_intermediate(epoch - 1)
-    os.exit(signum)
-end)
+if not args.debug then
+    signal.signal(signal.SIGINT, function(signum)
+        print('Caught ctrl-c, saving model')
+        save_intermediate(epoch - 1)
+        os.exit(signum)
+    end)
+end
 
 while epoch <= config.num_epochs do
     print(('Training epoch %d'):format(epoch))
