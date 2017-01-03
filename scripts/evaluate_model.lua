@@ -27,6 +27,7 @@ local nn = require 'nn'
 local torch = require 'torch'
 require 'rnn'
 
+local data_source = require 'data_source'
 local data_loader = require 'data_loader'
 local evaluator = require 'evaluator'
 local experiment_saver = require 'util/experiment_saver'
@@ -286,10 +287,12 @@ local function evaluate_model_sequential(options)
         batch_size = batch_size_sequences,
         sample_once = true
     }
+    local source = data_source.LabeledVideoFramesLmdbSource(
+        frames_lmdb, frames_without_images_lmdb, num_labels)
     local sampler = data_loader.SequentialSampler(
-        frames_without_images_lmdb, num_labels, sequence_length, step_size,
+        source, sequence_length, step_size,
         nil --[[ use boundary frames]], sampler_options)
-    local loader = data_loader.DataLoader(frames_lmdb, sampler, num_labels)
+    local loader = data_loader.DataLoader(source, sampler)
     print('Initialized sampler.')
 
     -- Pass each image in the database through the model, collect predictions
@@ -420,10 +423,11 @@ local function evaluate_model(options)
 
     -- Open database.
     -- TODO(achald): Decide if we should be using boundary frames for the sampler.
+    local source = data_source.LabeledVideoFramesLmdbSource(
+        frames_lmdb, frames_without_images_lmdb, num_labels)
     local sampler = data_loader.PermutedSampler(
-        frames_without_images_lmdb, num_labels, sequence_length, step_size,
-        true --[[use_boundary_frames]])
-    local loader = data_loader.DataLoader(frames_lmdb, sampler, num_labels)
+        source, sequence_length, step_size, true --[[use_boundary_frames]])
+    local loader = data_loader.DataLoader(source, sampler)
     print('Initialized sampler.')
 
     -- Pass each image in the database through the model, collect predictions
