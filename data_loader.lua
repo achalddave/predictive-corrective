@@ -353,13 +353,14 @@ function SequentialSampler:sample_keys(num_sequences)
                          self.batch_size, num_sequences))
     for sequence = 1, num_sequences do
         local sampled_key = self.next_frames[sequence]
-        local video, offset = self.data_source:frame_video_offset(sampled_key)
         local sequence_valid = true
+        local video, offset
         -- Add steps from the sequence to batch_keys until the sequence ends.
         for step = 1, self.sequence_length do
             sequence_valid =
                 self.key_label_map[sampled_key] ~= nil and sequence_valid
             if sequence_valid then
+                video, offset = self.data_source:frame_video_offset(sampled_key)
                 table.insert(batch_keys[step], sampled_key)
             else
                 table.insert(batch_keys[step], END_OF_SEQUENCE)
