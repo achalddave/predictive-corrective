@@ -419,12 +419,39 @@ function SequentialTrainer:_train_or_evaluate_batch(train_mode)
         return nil, nil, nil, true --[[sequence_ended]]
     end
     -- Prefetch the next batch.
-    self.data_loader:fetch_batch_async(1 --[[batch size]])
+    data_loader:fetch_batch_async(1 --[[batch size]])
 
     local num_steps = #images_table
     local num_channels = images_table[1][1]:size(1)
     local images = torch.Tensor(num_steps, 1 --[[batch size]], num_channels,
                                 self.crop_size, self.crop_size)
+    local num_valid_steps = num_steps
+    for step, step_images in ipairs(images_table) do
+        local img = step_images[1]
+        if img == END_OF_SEQUENCE then
+            -- We're out of frames for this sequence.
+            num_valid_steps = step - 1
+            break
+        else
+            -- Process image after converting to the default Tensor type.
+            -- (Originally, it is a ByteTensor).
+            images[step] = image_util.augment_image_train(
+                img:typeAs(images), self.crop_size, self.crop_size,
+                self.pixel_mean)
+        end
+    end
+    local sequence_ended = num_valid_steps ~= num_steps
+    if sequence_ended then
+        labels = labels[{{1, num_valid_steps}}]
+        images = images[{{1, num_valid_steps}}]
+        for step = num_valid_steps + 1, #images_table do
+            -- The rest of the batch should be filled with END_OF_SEQUENCe.
+            assert(images_table[step][1] == END_OF_SEQUENCE)
+        end
+    end
+
+    self.gpu_inputs:resize(images:size()):copy(images)
+    self.gpu_labels:resize(labels:size()):copy(labels)
 
     local loss, outputs
     if train_mode then
@@ -454,7 +481,7 @@ function SequentialTrainer:_train_or_evaluate_batch(train_mode)
 end
 
 function SequentialTrainer:_train_or_evaluate_epoch(
-    epoch, num_batches, train_mode)
+    epoch, num_sequences, train_mode)
     if train_mode then
         self.model:clearState()
         self.model:training()
