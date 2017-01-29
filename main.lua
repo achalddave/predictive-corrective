@@ -259,7 +259,8 @@ end
 local trainer = trainer_class {
     model = model,
     criterion = criterion,
-    data_loader = train_loader,
+    train_data_loader = train_loader,
+    val_data_loader = val_loader,
     input_dimension_permutation = config.input_dimension_permutation,
     pixel_mean = config.pixel_mean,
     batch_size = config.batch_size,

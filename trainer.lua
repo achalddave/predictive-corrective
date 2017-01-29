@@ -17,7 +17,8 @@ function Trainer:_init(args)
     Args:
         model
         criterion
-        data_loader
+        train_data_loader
+        val_data_loader
         input_dimension_permutation: Array, default nil.
             Specifies what each dimension in the input tensor corresponds to.
             By default, the input dimension order is
@@ -42,7 +43,8 @@ function Trainer:_init(args)
     ]]--
     self.model = args.model
     self.criterion = args.criterion
-    self.data_loader = args.data_loader
+    self.train_data_loader = args.train_data_loader
+    self.val_data_loader = args.val_data_loader
     -- Only use input permutation if it is not the identity.
     for i = 1, 5 do
         if args.input_dimension_permutation ~= nil
@@ -85,7 +87,8 @@ function Trainer:_init(args)
         self.model:getParameters()
 
     -- Prefetch the next batch.
-    self.data_loader:fetch_batch_async(self.batch_size)
+    self.train_data_loader:fetch_batch_async(self.batch_size)
+    self.val_data_loader:fetch_batch_async(self.batch_size)
 end
 
 function Trainer:update_optim_config(epoch)
@@ -121,7 +124,7 @@ function Trainer:train_batch()
             (batch_size, num_labels), depending on the model.
         labels (Tensor): True labels. Same size as the outputs.
     ]]--
-    local images, labels = self:_load_batch()
+    local images, labels = self:_load_batch(self.train_data_loader)
 
     local loss = 0
     local outputs
@@ -166,7 +169,7 @@ function Trainer:evaluate_batch()
             size is (sequence_length, batch_size, num_labels)
         labels (Tensor): True labels. Same size as the outputs.
     ]]--
-    local images, labels = self:_load_batch()
+    local images, labels = self:_load_batch(self.val_data_loader)
     local loss, outputs = self:_forward_backward(
         images, labels, false --[[train_mode]])
     self.gpu_inputs:resize(0)
@@ -273,10 +276,10 @@ function Trainer:_train_or_evaluate_epoch(epoch, num_batches, train_mode)
         num_batches, mean_average_precision))
 end
 
-function Trainer:_load_batch()
-    local images_table, labels = self.data_loader:load_batch(self.batch_size)
+function Trainer:_load_batch(data_loader)
+    local images_table, labels = data_loader:load_batch(self.batch_size)
     -- Prefetch the next batch.
-    self.data_loader:fetch_batch_async(self.batch_size)
+    data_loader:fetch_batch_async(self.batch_size)
 
     local num_steps = #images_table
     local num_channels = images_table[1][1]:size(1)
@@ -396,11 +399,15 @@ function SequentialTrainer:_train_or_evaluate_batch(train_mode)
         sequence_ended (bool): If true, specifies that this batch ends the
             sequence.
     ]]--
+    local data_loader
     if train_mode then
         self.model:zeroGradParameters()
+        data_loader = self.train_data_loader
+    else
+        data_loader = self.val_data_loader
     end
 
-    local images_table, labels = self.data_loader:load_batch(1 --[[batch size]])
+    local images_table, labels, keys = data_loader:load_batch(1 --[[batch size]], true)
     if images_table[1][1] == END_OF_SEQUENCE then
         -- The sequence ended at the end of the last batch; reset the model and
         -- start loading the next sequence in the next batch.
