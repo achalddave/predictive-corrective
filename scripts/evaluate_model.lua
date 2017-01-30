@@ -261,8 +261,7 @@ local function evaluate_model_sequential(options)
     --[[
         Args:
             model
-            frames_lmdb
-            frames_without_images_lmdb
+            source
             sequence_length
             step_size
             max_batch_size_images
@@ -272,8 +271,7 @@ local function evaluate_model_sequential(options)
             pixel_mean
     ]]--
     local model = options.model
-    local frames_lmdb = options.frames_lmdb
-    local frames_without_images_lmdb = options.frames_without_images_lmdb
+    local source = options.source
     local sequence_length = options.sequence_length
     local step_size = options.step_size
     local batch_size_sequences = options.max_batch_size_images
@@ -286,8 +284,6 @@ local function evaluate_model_sequential(options)
         batch_size = batch_size_sequences,
         sample_once = true
     }
-    local source = data_source.LabeledVideoFramesLmdbSource(
-        frames_lmdb, frames_without_images_lmdb, num_labels)
     local sampler = data_loader.SequentialSampler(
         source, sequence_length, step_size,
         nil --[[ use boundary frames]], sampler_options)
@@ -397,8 +393,7 @@ local function evaluate_model(options)
     --[[
         Args:
             model
-            frames_lmdb
-            frames_without_images_lmdb
+            source
             sequence_length
             step_size
             max_batch_size_images
@@ -409,8 +404,7 @@ local function evaluate_model(options)
             c3d_input
     ]]--
     local model = options.model
-    local frames_lmdb = options.frames_lmdb
-    local frames_without_images_lmdb = options.frames_without_images_lmdb
+    local source = options.source
     local sequence_length = options.sequence_length
     local step_size = options.step_size
     local max_batch_size_images = options.max_batch_size_images
@@ -421,8 +415,6 @@ local function evaluate_model(options)
     local c3d_input = options.c3d_input
 
     -- Open database.
-    local source = data_source.LabeledVideoFramesLmdbSource(
-        frames_lmdb, frames_without_images_lmdb, num_labels)
     local sampler = data_loader.PermutedSampler(
         source, sequence_length, step_size, true --[[use_boundary_frames]])
     local loader = data_loader.DataLoader(source, sampler)
@@ -533,10 +525,13 @@ local function evaluate_model(options)
     return all_predictions, all_labels, all_keys
 end
 
+local source = data_source.LabeledVideoFramesLmdbSource(
+    args.labeled_video_frames_lmdb,
+    args.labeled_video_frames_without_images_lmdb,
+    NUM_LABELS)
 local eval_options = {
     model = model,
-    frames_lmdb = args.labeled_video_frames_lmdb,
-    frames_without_images_lmdb = args.labeled_video_frames_without_images_lmdb,
+    source = source,
     sequence_length = args.sequence_length,
     step_size = args.step_size,
     max_batch_size_images = max_batch_size_images,
@@ -628,7 +623,7 @@ if args.output_hdf5 ~= nil then
         local prediction = all_predictions[i]
         -- Keys are of the form '<filename>-<frame_number>'.
         -- Find the index of the '-'
-        local filename, frame_number = data_loader.Sampler.parse_frame_key(key)
+        local filename, frame_number = source:frame_video_offset(key)
         if predictions_by_filename[filename] == nil then
             predictions_by_filename[filename] = {}
         end
