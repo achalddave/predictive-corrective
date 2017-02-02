@@ -506,6 +506,7 @@ function SequentialTrainer:_train_or_evaluate_epoch(
         local sequence_predictions, sequence_groundtruth
         local sequence_loss = 0
         local num_steps_in_sequence = 0
+        io.write(sequence)
         while not sequence_ended do
             local loss, batch_predictions, batch_groundtruth, sequence_ended_ =
                 self:_train_or_evaluate_batch(train_mode)
@@ -532,7 +533,9 @@ function SequentialTrainer:_train_or_evaluate_epoch(
                 sequence_groundtruth = torch.cat(
                     sequence_groundtruth, batch_groundtruth, 1)
             end
+            io.write('>')
         end
+        io.write('x\n')
         epoch_loss = epoch_loss + sequence_loss
         if train_mode then
             local sequence_mean_average_precision =
