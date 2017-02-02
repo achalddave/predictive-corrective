@@ -555,6 +555,8 @@ function SequentialTrainer:_train_or_evaluate_epoch(
             predictions = torch.cat(predictions, sequence_predictions, 1)
             groundtruth = torch.cat(groundtruth, sequence_groundtruth, 1)
         end
+        collectgarbage()
+        collectgarbage()
     end
 
     local mean_average_precision = evaluator.compute_mean_average_precision(
@@ -566,6 +568,8 @@ function SequentialTrainer:_train_or_evaluate_epoch(
         'average loss (per batch): %.5f \t mAP: %.5f',
         os.date('%X'), epoch, mode_str, epoch_timer:time().real,
         epoch_loss / num_sequences, mean_average_precision))
+    collectgarbage()
+    collectgarbage()
 end
 
 return {Trainer = Trainer, SequentialTrainer = SequentialTrainer}
