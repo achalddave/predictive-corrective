@@ -462,6 +462,9 @@ function SequentialTrainer:_train_or_evaluate_batch(train_mode)
             loss = self.criterion:forward(outputs, self.gpu_labels)
             local criterion_gradients = self.criterion:backward(
                 outputs, self.gpu_labels)
+            if criterion_gradients:norm() <= 1e-5 then
+                print('Criterion gradients small:', criterion_gradients:norm())
+            end
             self.model:backward(self.gpu_inputs, criterion_gradients)
             return loss, self.model_grad_parameters
         end
