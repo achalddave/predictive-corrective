@@ -91,9 +91,7 @@ if __name__ == "__main__":
         if not zero_indexed:
             ids = [original_id - 1 for original_id in ids]
         label_names = [x[1] for x in sorted(zip(ids, labels))]
-        print(label_names)
 
-    mean_aps = np.load(args.label_aps)[:20]
+    mean_aps = np.load(args.label_aps)
     label_counts = torchfile.load(args.label_counts)
-    label_counts = np.hstack((label_counts[:20], label_counts[-1]))
     plot_bars(mean_aps, label_counts, label_names)
