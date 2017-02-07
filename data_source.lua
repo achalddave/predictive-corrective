@@ -124,6 +124,9 @@ end
 
 function LabeledVideoFramesLmdbSource.static._image_proto_to_tensor(image_proto)
     local image_storage = torch.ByteStorage()
+    if image_proto.data:len() == 0 then
+        return torch.ByteTensor()
+    end
     image_storage:string(image_proto.data)
     return torch.ByteTensor(image_storage):reshape(
         image_proto.channels, image_proto.height, image_proto.width)
