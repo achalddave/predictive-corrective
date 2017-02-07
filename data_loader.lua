@@ -206,6 +206,11 @@ function BalancedSampler:_init(
 end
 
 function BalancedSampler:sample_keys(num_sequences)
+    --[[
+    Returns:
+        batch_keys (Array of array of strings): Each element contains
+            num_sequences arrays, each of which contains sequence_length keys.
+    ]]--
     local batch_keys = {}
     for _ = 1, self.sequence_length do
         table.insert(batch_keys, {})
