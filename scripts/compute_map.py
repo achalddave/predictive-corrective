@@ -1,3 +1,4 @@
+"""Compute mAP with predictions in HDF5 file and a groundtruth LMDB."""
 from __future__ import division
 import argparse
 from collections import defaultdict
