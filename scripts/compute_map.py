@@ -137,11 +137,12 @@ def main(predictions_hdf5, groundtruth_without_images_lmdb):
                     label], groundtruth_by_video[video_name][:, label]))
 
     mean_ap = 0.0
+    aps = np.zeros(len(label_names))
     for label in range(len(label_names)):
         ap = compute_average_precision(groundtruth[label], predictions[label])
-        mean_ap += ap
-    mean_ap /= len(label_names)
-    return mean_ap
+        print '{}: {}'.format(label_names[label], ap)
+        aps[label] = ap
+    return aps
 
 
 if __name__ == "__main__":
@@ -154,4 +155,5 @@ if __name__ == "__main__":
     parser.add_argument('groundtruth_without_images_lmdb')
 
     args = parser.parse_args()
-    print(main(args.predictions_hdf5, args.groundtruth_without_images_lmdb))
+    aps = main(args.predictions_hdf5, args.groundtruth_without_images_lmdb)
+    print 'mAP:', aps.mean()
