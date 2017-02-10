@@ -124,7 +124,8 @@ function Trainer:train_batch()
             (batch_size, num_labels), depending on the model.
         labels (Tensor): True labels. Same size as the outputs.
     ]]--
-    local images, labels = self:_load_batch(self.train_data_loader)
+    local images, labels = self:_load_batch(
+        self.train_data_loader, true --[[train_mode]])
 
     local loss = 0
     local outputs
@@ -169,7 +170,8 @@ function Trainer:evaluate_batch()
             size is (sequence_length, batch_size, num_labels)
         labels (Tensor): True labels. Same size as the outputs.
     ]]--
-    local images, labels = self:_load_batch(self.val_data_loader)
+    local images, labels = self:_load_batch(
+        self.val_data_loader, false --[[train_mode]])
     local loss, outputs = self:_forward_backward(
         images, labels, false --[[train_mode]])
     self.gpu_inputs:resize(0)
@@ -276,7 +278,7 @@ function Trainer:_train_or_evaluate_epoch(epoch, num_batches, train_mode)
         num_batches, mean_average_precision))
 end
 
-function Trainer:_load_batch(data_loader)
+function Trainer:_load_batch(data_loader, train_mode)
     local images_table, labels = data_loader:load_batch(self.batch_size)
     -- Prefetch the next batch.
     data_loader:fetch_batch_async(self.batch_size)
@@ -285,13 +287,16 @@ function Trainer:_load_batch(data_loader)
     local num_channels = images_table[1][1]:size(1)
     local images = torch.Tensor(num_steps, self.batch_size, num_channels,
                                 self.crop_size, self.crop_size)
+    local augment = train_mode and image_util.augment_image_train
+                               or image_util.augment_image_eval
     for step, step_images in ipairs(images_table) do
         for sequence, img in ipairs(step_images) do
             -- Process image after converting to the default Tensor type.
             -- (Originally, it is a ByteTensor).
-            images[{step, sequence}] = image_util.augment_image_eval(
-                img:typeAs(images), self.crop_size, self.crop_size,
-                self.pixel_mean)
+            images[{step, sequence}] = augment(img:typeAs(images),
+                                               self.crop_size,
+                                               self.crop_size,
+                                               self.pixel_mean)
         end
     end
     return images, labels
