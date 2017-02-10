@@ -211,7 +211,7 @@ function Trainer:_train_or_evaluate_epoch(epoch, num_batches, train_mode)
     local epoch_timer = torch.Timer()
     local batch_timer = torch.Timer()
 
-    local predictions = torch.Tensor(
+    local predictions = torch.CudaTensor(
         num_batches * self.batch_size, self.num_labels)
     local groundtruth = torch.ByteTensor(
         num_batches * self.batch_size, self.num_labels)
@@ -238,7 +238,7 @@ function Trainer:_train_or_evaluate_epoch(epoch, num_batches, train_mode)
         local epoch_index_start = (batch_index - 1) * self.batch_size + 1
         predictions[{{epoch_index_start,
                       epoch_index_start + self.batch_size - 1},
-                      {}}] = curr_predictions:type(predictions:type())
+                      {}}] = curr_predictions
         groundtruth[{{epoch_index_start,
                       epoch_index_start + self.batch_size - 1},
                       {}}] = curr_groundtruth
