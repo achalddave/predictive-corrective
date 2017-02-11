@@ -156,6 +156,17 @@ if config.criterion_wrapper == nil then
     end
 end
 
+-- -- Increase dropout probability.
+if config.dropout_p ~= nil then
+   local dropout_layers = single_model:findModules('nn.Dropout')
+   for _, layer in ipairs(dropout_layers) do
+       local previous_p = layer.p
+       layer.p = config.dropout_p
+       print(string.format('Increasing dropout probability from %.2f to %.2f',
+                           previous_p, layer.p))
+   end
+end
+
 if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
     print('Getting first of DataParallelTable.')
     single_model = single_model:get(1)
