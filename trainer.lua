@@ -5,6 +5,7 @@ local cutorch = require 'cutorch'
 local optim = require 'optim'
 local paths = require 'paths'
 local torch = require 'torch'
+require 'nnlr'
 
 local evaluator = require 'evaluator'
 local image_util = require 'util/image_util'
@@ -39,6 +40,9 @@ function Trainer:_init(args)
         num_labels
         momentum
         weight_decay
+        use_nnlr (bool): If true, use nnlr to train with layer
+            wise learning rates. Otherwise, use the same learning rate for all
+            layers. (Default: False)
         optim_config: Optional
         optim_state: Optional
     ]]--
@@ -61,6 +65,7 @@ function Trainer:_init(args)
     self.num_labels = args.num_labels
     self.weight_decay = args.weight_decay
     self.learning_rates = args.learning_rates
+    self.use_nnlr = args.use_nnlr == nil and false or args.use_nnlr
 
     -- Preallocate GPU inputs.
     self.gpu_inputs = torch.CudaTensor()
@@ -95,9 +100,27 @@ end
 function Trainer:update_optim_config(epoch)
     local learning_rate, regime_was_updated = self:_epoch_learning_rate(epoch)
     self.epoch_base_learning_rate = learning_rate
+    -- For whatever reason, optim.sgd will use
+    -- (decay_fn(learningRate) * learningRates) as the vector of learning rates,
+    -- but will use weightDecays (ignoring weightDecay the scalar) as the vector
+    -- of weight decays. So we need to supply a learning rate, a vector of
+    -- learning rate multipliers and a vector of weight decays.
     if regime_was_updated then
-        self.optimization_config.learningRate = learning_rate
-        self.optimization_config.weightDecay = self.weight_decay
+        if self.use_nnlr then
+            log.info('Using layerwise learning rates')
+            -- Layerwise learning rates
+            local layer_learning_rate_multipliers, layer_weight_decays =
+                self.model:getOptimConfig(
+                    1 --[[base lr multiplier]],
+                    self.weight_decay --[[base weight decay]])
+            self.optimization_config.learningRates =
+                layer_learning_rate_multipliers
+            self.optimization_config.weightDecays =
+                layer_weight_decays
+        else
+            self.optimization_config.learningRate = learning_rate
+            self.optimization_config.weightDecay = self.weight_decay
+        end
         self.optimization_state = nil
         collectgarbage()
         collectgarbage()

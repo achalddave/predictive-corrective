@@ -55,6 +55,9 @@ learning_rates: [
     { start_epoch: 31, learning_rate: 1.e-5 },
     { start_epoch: 41, learning_rate: 1.e-6 }
 ]
+learning_rate_multipliers: [
+    { name: 'nn.Linear', index: 3, weight: 10, bias: 10 }
+]
 dropout_p: 0.9  # If specified, update dropout p to this for dropout layers.
 
 ###

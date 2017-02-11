@@ -94,6 +94,9 @@ function normalize_config(config)
             'or both left empty')
     end
 
+    if config.learning_rate_multipliers == nil then
+        config.learning_rate_multipliers = {}
+    end
     return config
 end
 
@@ -155,6 +158,20 @@ if config.criterion_wrapper == nil then
     else
         config.criterion_wrapper = ''
     end
+end
+
+-- Increase learning rate of last nn.Linear layer.
+for _, multiplier_spec in ipairs(config.learning_rate_multipliers) do
+    local layers = single_model:findModules(multiplier_spec.name)
+    log.info(#layers)
+    layers[multiplier_spec.index]:learningRate('weight', multiplier_spec.weight)
+                                 :learningRate('bias', multiplier_spec.bias)
+    log.info(string.format(
+        'Multiplier for %s layer, index %d. Weight: %d, Bias: %d',
+        multiplier_spec.name,
+        multiplier_spec.index,
+        multiplier_spec.weight,
+        multiplier_spec.bias))
 end
 
 -- -- Increase dropout probability.
@@ -284,7 +301,8 @@ local trainer = trainer_class {
     momentum = config.momentum,
     weight_decay = config.weight_decay,
     optim_config = optim_config,
-    optim_state = optim_state
+    optim_state = optim_state,
+    use_nnlr = (#config.learning_rate_multipliers ~= 0)
 }
 
 log.info('Initialized trainer.')
