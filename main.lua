@@ -163,7 +163,6 @@ end
 -- Increase learning rate of last nn.Linear layer.
 for _, multiplier_spec in ipairs(config.learning_rate_multipliers) do
     local layers = single_model:findModules(multiplier_spec.name)
-    log.info(#layers)
     layers[multiplier_spec.index]:learningRate('weight', multiplier_spec.weight)
                                  :learningRate('bias', multiplier_spec.bias)
     log.info(string.format(
