@@ -48,11 +48,6 @@ parser:flag('--debug', "Indicates that we are only debugging; " ..
 local args = parser:parse()
 local config = lyaml.load(io.open(args.config, 'r'):read('*a'))
 
-local function print_(...)
-    io.write(string.format('%s: ', os.date('%X')))
-    print(...)
-end
-
 function normalize_config(config)
     if config.data_paths_config ~= nil then
         local data_paths = lyaml.load(
@@ -106,16 +101,17 @@ config = normalize_config(config)
 
 -- Create cache_base
 if not paths.dirp(args.cache_base) and not paths.mkdir(args.cache_base) then
-    print_('Error creating cache base dir:', args.cache_base)
+    log.error('Error creating cache base dir:', args.cache_base)
     os.exit()
 end
 local cache_dir = paths.concat(args.cache_base, os.date('%m-%d-%y-%H-%M-%S'))
 if not paths.mkdir(cache_dir) then
-    print_('Error making cache dir:', cache_dir)
+    log.error('Error making cache dir:', cache_dir)
     os.exit()
 end
+log.outfile = paths.concat(cache_dir, 'training.log')
 experiment_saver.save_git_info(cache_dir)
-print_('Saving run information to', cache_dir)
+log.info('Saving run information to', cache_dir)
 
 -- Save config to cache_dir
 experiment_saver.copy_file(args.config, paths.concat(cache_dir, 'config.yaml'))
@@ -131,9 +127,9 @@ local experiment_id_output = io.open(
     paths.concat(cache_dir, 'experiment-id.txt'), 'w')
 experiment_id_output:write(experiment_id)
 experiment_id_output:close()
-print_('===')
-print_('Experiment id:', experiment_id)
-print_('===')
+log.info('===')
+log.info('Experiment id:', experiment_id)
+log.info('===')
 
 cutorch.setDevice(config.gpus[1])
 math.randomseed(config.seed)
@@ -148,12 +144,12 @@ if not args.debug then
     experiment_saver.copy_file(config.model_init,
                                paths.concat(cache_dir, 'model_init.t7'))
 end
-print_('Loading model from ' .. config.model_init)
+log.info('Loading model from ' .. config.model_init)
 single_model = torch.load(config.model_init)
 single_model:clearState()
 if config.criterion_wrapper == nil then
     if torch.isTypeOf(single_model, 'nn.Sequencer') then
-        print_('nn.Sequencer models are wrapped by LastStepCriterion if ' ..
+        log.info('nn.Sequencer models are wrapped by LastStepCriterion if ' ..
                'config.criterion_wrapper is not set.')
         config.criterion_wrapper = 'last_step_criterion'
     else
@@ -167,19 +163,19 @@ if config.dropout_p ~= nil then
    for _, layer in ipairs(dropout_layers) do
        local previous_p = layer.p
        layer.p = config.dropout_p
-       print_(string.format('Increasing dropout probability from %.2f to %.2f',
+       log.info(string.format('Increasing dropout probability from %.2f to %.2f',
                             previous_p, layer.p))
    end
 end
 
 if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
-    print_('Getting first of DataParallelTable.')
+    log.info('Getting first of DataParallelTable.')
     single_model = single_model:get(1)
 end
 if args.decorate_sequencer then
     if torch.isTypeOf(single_model, 'nn.Sequencer') then
-        print_('WARNING: --decorate_sequencer on model that is already ' ..
-              'nn.Sequencer!')
+        log.info('WARNING: --decorate_sequencer on model that is already ' ..
+                 'nn.Sequencer!')
     end
     single_model = nn.Sequencer(single_model)
 end
@@ -209,7 +205,7 @@ elseif config.criterion_wrapper:lower() == 'sequencer_criterion' then
 elseif config.criterion_wrapper ~= '' then
     error('Unknown criterion wrapper', config.criterion_wraper)
 end
-print_('Loaded model')
+log.info('Loaded model')
 
 local sampling_strategies = {
     permuted = data_loader.PermutedSampler,
@@ -221,12 +217,12 @@ local train_source = data_source.LabeledVideoFramesLmdbSource(
     config.train_lmdb, config.train_lmdb_without_images, config.num_labels)
 local val_source = data_source.LabeledVideoFramesLmdbSource(
     config.val_lmdb, config.val_lmdb_without_images, config.num_labels)
-print_('Loaded data sources')
+log.info('Loaded data sources')
 
 local train_sampler
 if config.train_sampler_init then
     train_sampler = torch.load(config.train_sampler_init)
-    print_('Loaded train sampler from disk.')
+    log.info('Loaded train sampler from disk.')
 else
     train_sampler = sampling_strategies[config.sampling_strategy:lower()](
         train_source,
@@ -234,7 +230,7 @@ else
         config.step_size,
         config.use_boundary_frames,
         config.sampling_strategy_options)
-    print_('Initialized train sampler')
+    log.info('Initialized train sampler')
 end
 
 local val_sampler
@@ -252,17 +248,17 @@ else
         config.step_size,
         config.use_boundary_frames)
 end
-print_('Initialized val sampler')
+log.info('Initialized val sampler')
 
 local train_loader = data_loader.DataLoader(train_source, train_sampler)
 local val_loader = data_loader.DataLoader(val_source, val_sampler)
-print_('Initialized data loaders')
+log.info('Initialized data loaders')
 
 local optim_config, optim_state
 if config.optim_config ~= nil and config.optim_state ~= nil then
     optim_config = torch.load(config.optim_config)
     optim_state = torch.load(config.optim_state)
-    print_('Loading optim_config, optim_state from disk.')
+    log.info('Loading optim_config, optim_state from disk.')
 end
 
 local trainer_class
@@ -291,10 +287,10 @@ local trainer = trainer_class {
     optim_state = optim_state
 }
 
-print_('Initialized trainer.')
+log.info('Initialized trainer.')
 if not args.debug then
-    print_('Config:')
-    print_(config)
+    log.info('Config:')
+    log.info(config)
     trainer:save(cache_dir, 0)
 end
 collectgarbage()
@@ -309,14 +305,14 @@ end
 
 if not args.debug then
     signal.signal(signal.SIGINT, function(signum)
-        print_('Caught ctrl-c, saving model')
+        log.info('Caught ctrl-c, saving model')
         save_intermediate(epoch - 1)
         os.exit(signum)
     end)
 end
 
 while epoch <= config.num_epochs do
-    print_(('Training epoch %d'):format(epoch))
+    log.info(('Training epoch %d'):format(epoch))
     trainer:train_epoch(epoch, config.epoch_size)
     if not args.debug and (epoch % 5 == 0 or epoch == config.init_epoch) then
         -- TODO: Add a signal handler that saves the model on SIGINT/ctrl-c.

@@ -32,6 +32,7 @@ local data_loader = require 'data_loader'
 local evaluator = require 'evaluator'
 local experiment_saver = require 'util/experiment_saver'
 local image_util = require 'util/image_util'
+local log = require 'util/log'
 local string_util = require 'util/strings'
 require 'layers/init'
 
@@ -43,6 +44,7 @@ parser:argument('labeled_video_frames_lmdb',
                 'LMDB containing LabeledVideoFrames to evaluate.')
 parser:argument('labeled_video_frames_without_images_lmdb',
                 'LMDB containing LabeledVideoFrames without images.')
+parser:argument('output_log', 'File to log output to')
 parser:option('--output_hdf5', 'HDF5 to output predictions to'):count('?')
 parser:option('--num_labels', 'Number of labels')
     :count('?'):default(65):convert(tonumber)
@@ -108,33 +110,34 @@ cutorch.setDevice(GPUS[1])
 torch.setdefaulttensortype('torch.FloatTensor')
 torch.setheaptracking(true)
 
-print('Git status information:')
-print('===')
+log.outfile = args.output_log
+log.info('Git status information:')
+log.info('===')
 
-print('Executing command: git --no-pager diff scripts/evaluate_model.lua')
+log.info('Executing command: git --no-pager diff scripts/evaluate_model.lua')
 os.execute('git --no-pager diff scripts/evaluate_model.lua')
 
-print('Executing command: git --no-pager diff layers/')
+log.info('Executing command: git --no-pager diff layers/')
 os.execute('git --no-pager diff layers/')
 
-print('Executing command: git --no-pager rev-parse HEAD')
+log.info('Executing command: git --no-pager rev-parse HEAD')
 os.execute('git --no-pager rev-parse HEAD')
 
-print('===')
+log.info('===')
 
-print('Evaluating model. Args:')
-print(args)
-print('FRAME_TO_PREDICT: ', FRAME_TO_PREDICT)
-print('CROPS: ', CROPS)
+log.info('Evaluating model. Args:')
+log.info(args)
+log.info('FRAME_TO_PREDICT: ', FRAME_TO_PREDICT)
+log.info('CROPS: ', CROPS)
 
 local experiment_id = experiment_saver.read_and_increment_experiment_id(
     args.experiment_id_file)
-print('===')
-print('Experiment id:', experiment_id)
-print('===')
+log.info('===')
+log.info('Experiment id:', experiment_id)
+log.info('===')
 
 -- Load model.
-print('Loading model.')
+log.info('Loading model.')
 nn.DataParallelTable.deserializeNGPUs = #GPUS
 local single_model = torch.load(args.model)
 if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
@@ -143,15 +146,16 @@ end
 single_model:clearState()
 
 if args.decorate_sequencer then
+    log.info('Decorating sequencer')
     if torch.isTypeOf(single_model, 'nn.Sequencer') then
-        print('WARNING: --decorate_sequencer on model that is already ' ..
-              'nn.Sequencer!')
+        log.warn('--decorate_sequencer on model that is already ' ..
+                 'nn.Sequencer!')
     end
     single_model = nn.Sequencer(single_model)
 end
 
 if args.reinit_rate ~= -1 then
-    print('Resetting reinit rate to', args.reinit_rate)
+    log.info('Resetting reinit rate to', args.reinit_rate)
     local reinit_types = {
         'nn.CRollingDiffTable', 'nn.PeriodicResidualTable', 'nn.CCumSumTable'}
     for _, reinit_type in ipairs(reinit_types) do
@@ -193,7 +197,7 @@ collectgarbage()
 
 cutorch.setDevice(GPUS[1])
 model:evaluate()
-print('Loaded model.')
+log.info('Loaded model.')
 
 local function crop_and_zero_center_images(
     images_table, crops, crop_size, image_mean)
@@ -288,7 +292,7 @@ local function evaluate_model_sequential(options)
         source, sequence_length, step_size,
         nil --[[ use boundary frames]], sampler_options)
     local loader = data_loader.DataLoader(source, sampler)
-    print('Initialized sampler.')
+    log.info('Initialized sampler.')
 
     -- Pass each image in the database through the model, collect predictions
     -- and groundtruth.
@@ -371,7 +375,7 @@ local function evaluate_model_sequential(options)
             log_string = log_string ..
                 string.format(' mAP: %.5f, THUMOS mAP: %.5f',
                                 map_so_far, thumos_map_so_far)
-            print(log_string)
+            log.info(log_string)
         end
 
         images_table = nil
@@ -418,7 +422,7 @@ local function evaluate_model(options)
     local sampler = data_loader.PermutedSampler(
         source, sequence_length, step_size, true --[[use_boundary_frames]])
     local loader = data_loader.DataLoader(source, sampler)
-    print('Initialized sampler.')
+    log.info('Initialized sampler.')
 
     -- Pass each image in the database through the model, collect predictions
     -- and groundtruth.
@@ -439,8 +443,8 @@ local function evaluate_model(options)
         local images_table, labels, batch_keys = loader:load_batch(
             to_load, true --[[return_keys]])
         if loader.sampler.key_index ~= samples_complete + to_load + 1 then
-            print('Data loader key index does not match samples_complete')
-            print(loader.sampler.key_index, samples_complete + to_load + 1)
+            log.info('Data loader key index does not match samples_complete')
+            log.info(loader.sampler.key_index, samples_complete + to_load + 1)
             os.exit(1)
         end
         -- Prefetch the next batch.
@@ -544,7 +548,7 @@ local all_predictions = nil
 local all_labels = nil
 local all_keys = nil
 if args.recurrent then
-    print('NOTE: --recurrent specified; evaluating recurrently.')
+    log.info('NOTE: --recurrent specified; evaluating recurrently.')
     all_predictions, all_labels, all_keys = evaluate_model_sequential(
         eval_options)
 else
@@ -559,12 +563,12 @@ for i = 1, all_predictions:size(2) do
     local ap = evaluator.compute_mean_average_precision(
         all_predictions[{{}, {i}}], all_labels[{{}, {i}}])
     aps[i] = ap
-    print(string.format('Class %d\t AP: %.5f', i, ap))
+    log.info(string.format('Class %d\t AP: %.5f', i, ap))
 end
 
 assert(torch.all(torch.ne(aps, -1)))
 
-print('MultiTHUMOS mAP:', torch.mean(aps))
+log.info('mAP:', torch.mean(aps))
 
 local group_mAPs
 if args.val_groups ~= '' then -- Compute accuracy across validation groups.
@@ -611,10 +615,10 @@ if args.val_groups ~= '' then -- Compute accuracy across validation groups.
                 group_predictions[group_index],
                 group_labels[group_index])
         end
-        print(string.format('Group %d mAP:', group_index),
-              group_mAPs[group_index])
+        log.info(string.format(
+            'Group %d mAP:', group_index), group_mAPs[group_index])
     end
-    print('Group mAPs STD:', group_mAPs:std())
+    log.info('Group mAPs STD:', group_mAPs:std())
 end
 
 if args.output_hdf5 ~= nil then

@@ -9,6 +9,7 @@ local torch = require 'torch'
 require 'classic.torch'
 
 local data_source = require 'data_source'
+local log = require 'util/log'
 
 local END_OF_SEQUENCE = data_source.VideoDataSource.END_OF_SEQUENCE
 
@@ -82,8 +83,8 @@ function PermutedSampler:sample_keys(num_sequences)
     end
     for _ = 1, num_sequences do
         if self.key_index > self:num_samples() then
-            print(string.format('%s: Finished pass through data, repermuting!',
-                                os.date('%X')))
+            log.info(string.format(
+                '%s: Finished pass through data, repermuting!', os.date('%X')))
             self.permuted_keys = Sampler.permute(self.keys)
             self.key_index = 1
         end
@@ -321,9 +322,9 @@ function SequentialSampler:advance_video_index(offset)
     if self.video_index > #self.video_start_keys then
         self.sampled_all_videos = true
         if not self.sample_once then
-            print(string.format(
-                    '%s: Finished pass through videos, repermuting!',
-                    os.date('%X')))
+            log.info(string.format(
+                '%s: Finished pass through videos, repermuting!',
+                os.date('%X')))
             self.video_start_keys = Sampler.permute(
                 self.video_start_keys)
             self.video_index = 1

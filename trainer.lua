@@ -8,6 +8,7 @@ local torch = require 'torch'
 
 local evaluator = require 'evaluator'
 local image_util = require 'util/image_util'
+local log = require 'util/log'
 local END_OF_SEQUENCE = require('data_loader').END_OF_SEQUENCE
 
 local Trainer = classic.class('Trainer')
@@ -258,7 +259,7 @@ function Trainer:_train_or_evaluate_epoch(epoch, num_batches, train_mode)
             end
             log_string = log_string .. string.format(
                 ' LR %.0e', self.epoch_base_learning_rate)
-            print(log_string)
+            log.info(log_string)
         end
     end
 
@@ -271,7 +272,7 @@ function Trainer:_train_or_evaluate_epoch(epoch, num_batches, train_mode)
 
     local mode_str = train_mode and 'TRAINING' or 'EVALUATION'
 
-    print(string.format(
+    log.info(string.format(
         '%s: Epoch: [%d][%s SUMMARY] Total Time(s): %.2f\t' ..
         'average loss (per batch): %.5f \t mAP: %.5f',
         os.date('%X'), epoch, mode_str, epoch_timer:time().real, loss_epoch /
@@ -468,7 +469,9 @@ function SequentialTrainer:_train_or_evaluate_batch(train_mode)
             local criterion_gradients = self.criterion:backward(
                 outputs, self.gpu_labels)
             if criterion_gradients:norm() <= 1e-5 then
-                print('Criterion gradients small:', criterion_gradients:norm())
+                log.info(string.format(
+                    'Criterion gradients small: %.2f; Loss: %.2f',
+                    criterion_gradients:norm(), loss))
             end
             self.model:backward(self.gpu_inputs, criterion_gradients)
             return loss, self.model_grad_parameters
@@ -546,7 +549,7 @@ function SequentialTrainer:_train_or_evaluate_epoch(
             local sequence_mean_average_precision =
                 evaluator.compute_mean_average_precision(
                     sequence_predictions, sequence_groundtruth)
-            print(string.format(
+            log.info(string.format(
                 '%s: Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f ' ..
                 'seq mAP %.4f LR %.0e',
                 os.date('%X'), epoch, sequence, num_sequences,
@@ -568,7 +571,7 @@ function SequentialTrainer:_train_or_evaluate_epoch(
         predictions, groundtruth)
 
     local mode_str = train_mode and 'TRAINING' or 'EVALUATION'
-    print(string.format(
+    log.info(string.format(
         '%s: Epoch: [%d][%s SUMMARY] Total Time(s): %.2f\t' ..
         'average loss (per batch): %.5f \t mAP: %.5f',
         os.date('%X'), epoch, mode_str, epoch_timer:time().real,

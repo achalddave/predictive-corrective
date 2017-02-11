@@ -5,6 +5,7 @@ local cutorch = require 'cutorch'
 local torch = require 'torch'
 
 local image_util = require 'util/image_util'
+local log = require 'util/log'
 local END_OF_SEQUENCE = require('data_loader').END_OF_SEQUENCE
 
 -- TODO(achald): Move this to a separate util file.
@@ -55,7 +56,7 @@ function compute_mean_average_precision(predictions, groundtruth)
     -- in the provided data.
     average_precisions = average_precisions[torch.eq(label_has_sample, 1)]
     if average_precisions:nElement() == 0 then
-        print('No positive labels! Returning -1.')
+        log.warn('No positive labels! Returning -1.')
         return -1
     end
     return torch.mean(average_precisions)
