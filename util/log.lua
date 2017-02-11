@@ -47,25 +47,25 @@ for i, x in ipairs(modes) do
         end
 
         local msg = tostring(...)
-        local info = debug.getinfo(2, "Sl")
-        local lineinfo = info.short_src .. ":" .. info.currentline
+        -- In case you want to include line info.
+        -- local info = debug.getinfo(2, "Sl")
+        -- local lineinfo = info.short_src .. ":" .. info.currentline
 
-        -- Output to console
-        print(string.format("%s[%-6s%s]%s %s: %s",
+        -- Output to console. The console version is colored.
+        print(string.format("%s[%-6s%s]%s: %s",
                             log.usecolor and x.color or "",
                             nameupper,
-                            os.date("%H:%M:%S"),
+                            os.date('%X'),
                             log.usecolor and "\27[0m" or "",
-                            lineinfo,
                             msg))
 
         -- Output to log file
         if log.outfile then
-        local fp = io.open(log.outfile, "a")
-        local str = string.format("[%-6s%s] %s: %s\n",
-                                  nameupper, os.date(), lineinfo, msg)
-        fp:write(str)
-        fp:close()
+            local fp = io.open(log.outfile, "a")
+            local str = string.format("[%-6s%s]: %s\n",
+                                      nameupper, os.date('%X'), msg)
+            fp:write(str)
+            fp:close()
         end
     end
 end
