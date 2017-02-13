@@ -38,6 +38,7 @@ local tostring = function(...)
     return table.concat(t, " ")
 end
 
+local torch_mode = print_new ~= nil and print == print_new
 for i, x in ipairs(modes) do
     local nameupper = x.name:upper()
     log[x.name] = function(...)
@@ -52,19 +53,32 @@ for i, x in ipairs(modes) do
         -- local lineinfo = info.short_src .. ":" .. info.currentline
 
         -- Output to console. The console version is colored.
-        print(string.format("%s[%-6s%s]%s: %s",
+        io.write(string.format("%s[%-6s%s]%s: ",
                             log.usecolor and x.color or "",
                             nameupper,
                             os.date('%X'),
-                            log.usecolor and "\27[0m" or "",
-                            msg))
+                            log.usecolor and "\27[0m" or ""))
+        -- If in torch mode, we can use print for both stdout and for file,
+        -- since it uses io.write under the hood, which can be redericted to a
+        -- file. Otherwise, use io.write to ensure consistency between stdout
+        -- and file, since we can't redirect the usual print.
+        if torch_mode then
+            print(...)
+        else
+            io.write(msg, '\n')
+        end
 
         -- Output to log file
         if log.outfile then
             local fp = io.open(log.outfile, "a")
-            local str = string.format("[%-6s%s]: %s\n",
-                                      nameupper, os.date('%X'), msg)
-            fp:write(str)
+            fp:write(string.format("[%-6s%s]: ", nameupper, os.date('%X')))
+            if torch_mode then
+                io.output(fp)
+                print(...)
+                io.output(io.stdout)
+            else
+                fp:write(msg .. '\n')
+            end
             fp:close()
         end
     end
