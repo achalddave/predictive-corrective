@@ -365,8 +365,7 @@ local function evaluate_model_sequential(options)
         end
 
         local log_string = string.format(
-            '%s: Finished %d/%d.', os.date('%X'),#all_keys,
-            loader:num_samples())
+            'Finished %d/%d.', #all_keys, loader:num_samples())
         if num_iter % 10 == 0 then
             local map_so_far = evaluator.compute_mean_average_precision(
                 all_predictions, all_labels)
@@ -518,9 +517,9 @@ local function evaluate_model(options)
                 all_predictions, all_labels)
             local thumos_map_so_far = evaluator.compute_mean_average_precision(
                 all_predictions[{{}, {1, 20}}], all_labels[{{}, {1, 20}}])
-            print(string.format(
-                '%s: Finished %d/%d mAP: %.5f, THUMOS mAP: %.5f',
-                os.date('%X'), samples_complete, loader:num_samples(),
+            log.info(string.format(
+                'Finished %d/%d mAP: %.5f, THUMOS mAP: %.5f',
+                samples_complete, loader:num_samples(),
                 map_so_far, thumos_map_so_far))
         end
         collectgarbage()
