@@ -38,6 +38,56 @@ local tostring = function(...)
     return table.concat(t, " ")
 end
 
+-- Taken from Torch REPL's init.lua.
+local ndepth = 4
+function print_no_color(...)
+   local function rawprint(o)
+      io.write(tostring(o or '') .. '\n')
+      io.flush()
+   end
+   local objs = {...}
+   local function printrecursive(obj,depth)
+      local depth = depth or 0
+      local tab = depth*4
+      local line = function(s) for i=1,tab do io.write(' ') end rawprint(s) end
+      if next(obj) then
+         line('{')
+         tab = tab+2
+         for k,v in pairs(obj) do
+            if type(v) == 'table' then
+               if depth >= (ndepth-1) or next(v) == nil then
+                  line(tostring(k) .. ' : {...}')
+               else
+                  line(tostring(k) .. ' : ') printrecursive(v,depth+1)
+               end
+            else
+               line(tostring(k) .. ' : ' .. v)
+            end
+         end
+         tab = tab-2
+         line('}')
+      else
+         line('{}')
+      end
+   end
+   for i = 1,select('#',...) do
+      local obj = select(i,...)
+      if type(obj) ~= 'table' then
+         if type(obj) == 'userdata' or type(obj) == 'cdata' then
+            rawprint(obj)
+         else
+            io.write(obj .. '\t')
+            if i == select('#',...) then
+               rawprint()
+            end
+         end
+      elseif getmetatable(obj) and getmetatable(obj).__tostring then
+         rawprint(obj)
+      else
+         printrecursive(obj)
+      end
+   end
+end
 local torch_mode = print_new ~= nil and print == print_new
 for i, x in ipairs(modes) do
     local nameupper = x.name:upper()
@@ -74,7 +124,7 @@ for i, x in ipairs(modes) do
             fp:write(string.format("[%-6s%s]: ", nameupper, os.date('%X')))
             if torch_mode then
                 io.output(fp)
-                print(...)
+                print_no_color(...)
                 io.output(io.stdout)
             else
                 fp:write(msg .. '\n')
