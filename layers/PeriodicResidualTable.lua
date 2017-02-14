@@ -48,7 +48,8 @@ function PeriodicResidualTable:read(file, versionNumber)
     parent.read(self, file, versionNumber)
     if #self.modules == 0 or self.modules[1]:get(2) ~= self.init then
         -- Model was created with old code that didn't set the first and second
-        -- modules to be equivalently self.init. Reset the self.modules array.
+        -- modules to be self.init and self.residual. Reset the self.modules
+        -- array.
         print('PeriodicResidualTable: Repopulating self.modules for old ' ..
               'model; this is for backwards compatibility and can be ignored.')
         self.modules = {}
@@ -63,7 +64,8 @@ function PeriodicResidualTable:__tostring__()
 end
 
 function PeriodicResidualTable:clearState()
-   for i = 1, #self.modules do
+   -- Keep all but one init and residual clone in self.modules
+   for i = 3, #self.modules do
       self.modules[i] = nil
    end
    self.init:clearState()
