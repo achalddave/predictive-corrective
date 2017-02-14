@@ -11,7 +11,7 @@ local parser = argparse() {
 }
 parser:argument('groundtruth_without_images_lmdb')
 parser:option('--num_labels'):default(65)
-parser:option('--num_samples'):default(100)
+parser:option('--num_samples'):default(100):convert(tonumber)
 parser:option('--background_weight'):default(20)
 parser:option('--output_counts')
 
