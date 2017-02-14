@@ -1,3 +1,5 @@
+local log = require 'util/log'
+
 local function save_git_info(output_dir)
     os.execute('./dump_git_info.sh ' .. output_dir)
 end
@@ -5,7 +7,7 @@ end
 local function copy_file(in_path, out_path)
     -- TODO(achald): See if there is a portable way to copy a file in lua.
     local cmd = string.format('cp %s %s', in_path, out_path)
-    print('Executing command:', cmd)
+    log.info('Executing command:', cmd)
     os.execute(cmd)
 end
 
