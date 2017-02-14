@@ -309,8 +309,7 @@ local trainer = trainer_class {
 
 log.info('Initialized trainer.')
 if not args.debug then
-    log.info('Config:')
-    log.info(config)
+    log.info('Config:', config)
     trainer:save(cache_dir, 0)
 end
 collectgarbage()
@@ -335,7 +334,6 @@ while epoch <= config.num_epochs do
     log.info(('Training epoch %d'):format(epoch))
     trainer:train_epoch(epoch, config.epoch_size)
     if not args.debug and (epoch % 5 == 0 or epoch == config.init_epoch) then
-        -- TODO: Add a signal handler that saves the model on SIGINT/ctrl-c.
         save_intermediate(epoch)
     end
     collectgarbage()
