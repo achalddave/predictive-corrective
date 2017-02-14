@@ -127,14 +127,13 @@ def read_groundtruth_lmdb(groundtruth_without_images_lmdb):
     return groundtruth_onehot, label_names
 
 
-def main(predictions_hdf5, groundtruth_without_images_lmdb):
+def main(predictions_hdf5, groundtruth_without_images_lmdb, sequence_length):
     groundtruth_by_video, label_names = read_groundtruth_lmdb(
         groundtruth_without_images_lmdb)
 
     with h5py.File(predictions_hdf5, 'r') as f:
         predictions_by_video = {key: np.array(f[key]) for key in f.keys()}
 
-    sequence_length = 4
     predictions = [{} for _ in range(sequence_length)]
     groundtruth = [{} for _ in range(sequence_length)]
     mean_ap = 0
@@ -172,6 +171,7 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('predictions_hdf5')
     parser.add_argument('groundtruth_without_images_lmdb')
+    parser.add_argument('--sequence_length', default=4, type=int)
 
     args = parser.parse_args()
-    print(main(args.predictions_hdf5, args.groundtruth_without_images_lmdb))
+    print(main(args.predictions_hdf5, args.groundtruth_without_images_lmdb, args.sequence_length))
