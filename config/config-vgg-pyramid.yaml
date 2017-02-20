@@ -44,9 +44,9 @@ val_epoch_size: 800
 criterion_wrapper: 'sequencer_criterion'
 
 # One of 'permuted', 'balanced' (case-insensitive)
-sampling_strategy: 'balanced'
+sampling_strategy: 'permuted'
 sampling_strategy_options: {
-    background_weight: 20
+    replace: False
 }
 sequence_length: 4
 use_boundary_frames: False
