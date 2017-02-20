@@ -28,11 +28,10 @@ function LabeledVideoFramesLmdbSource:_init(
     self.lmdb_without_images_path = lmdb_without_images_path
     self.num_labels_ = num_labels
 
-    self.key_labels = self:load_key_label_map()
-
     self.num_keys = 0
     self.video_keys_ = {}
-    for key, _ in pairs(self.key_labels) do
+    local key_labels = self:key_label_map()
+    for key, _ in pairs(key_labels) do
         local video, frame = LabeledVideoFramesLmdbSource.parse_frame_key(key)
         if self.video_keys_[video] == nil then
             self.video_keys_[video] = {}
@@ -43,8 +42,6 @@ function LabeledVideoFramesLmdbSource:_init(
 end
 
 function LabeledVideoFramesLmdbSource:num_samples() return self.num_keys end
-
-function LabeledVideoFramesLmdbSource:key_label_map() return self.key_labels end
 
 function LabeledVideoFramesLmdbSource:video_keys() return self.video_keys_ end
 
@@ -154,9 +151,13 @@ function LabeledVideoFramesLmdbSource.static._load_image_labels_from_proto(
     return img, labels
 end
 
-function LabeledVideoFramesLmdbSource:load_key_label_map()
+function LabeledVideoFramesLmdbSource:key_label_map()
     --[[
     Load mapping from frame keys to labels array.
+
+    Note: This is a giant array, and should be destroyed as soon as it is no
+    longer needed. If this array is stored permanently (e.g. globally or as an
+    object attribute), it will slow down *all* future calls to collectgarbage().
 
     Returns:
         key_labels: Table mapping frame keys to array of label indices.
