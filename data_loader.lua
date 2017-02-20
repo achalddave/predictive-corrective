@@ -140,11 +140,19 @@ function PermutedSampler.static.filter_boundary_frames(
     --         frames in the video.
     --]]
     local keys = {}
-    for video, keys_in_video in pairs(video_keys) do
-        -- Remove the last ((sequence_length - 1) * step_size) keys.
-        for i = 1, #keys_in_video - (sequence_length - 1) * step_size do
-            local key = keys_in_video[i]
-            table.insert(keys, key)
+    for _, keys_in_video in pairs(video_keys) do
+        if step_size > 0 then
+            -- Remove the last ((sequence_length - 1) * step_size) keys.
+            for i = 1, #keys_in_video - (sequence_length - 1) * step_size do
+                local key = keys_in_video[i]
+                table.insert(keys, key)
+            end
+        elseif step_size < 0 then
+            -- Remove the first ((sequence_length - 1) * step_size) keys.
+            for i = 1 - (sequence_length - 1) * step_size, #keys_in_video do
+                local key = keys_in_video[i]
+                table.insert(keys, key)
+            end
         end
     end
     return keys
