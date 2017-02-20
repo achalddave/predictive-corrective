@@ -200,7 +200,6 @@ function BalancedSampler:_init(
 
     assert(options.include_bg == nil,
            'include_bg is deprecated; use background_weight instead.')
-    self.key_label_map = self.data_source:key_label_map()
 
     -- List of all valid keys.
     self.video_keys = self.data_source:video_keys()
@@ -209,16 +208,19 @@ function BalancedSampler:_init(
         valid_keys = PermutedSampler.filter_boundary_frames(
             self.video_keys, sequence_length, -step_size)
     else
-        for key, _ in pairs(self.key_label_map) do
-            table.insert(valid_keys, key)
+        for _, keys in pairs(self.video_keys) do
+            for _, key in ipairs(keys) do
+                table.insert(valid_keys, key)
+            end
         end
     end
 
     -- Map labels to list of keys containing that label.
+    local key_label_map = self.data_source:key_label_map()
     self.label_key_map = {}
     for i = 1, self.num_labels+1 do self.label_key_map[i] = {} end
     for _, key in ipairs(valid_keys) do
-        for _, label in ipairs(self.key_label_map[key]) do
+        for _, label in ipairs(key_label_map[key]) do
             table.insert(self.label_key_map[label], key)
         end
     end
@@ -254,7 +256,7 @@ function BalancedSampler:sample_keys(num_sequences)
         local last_valid_key
         for step = self.sequence_length, 1, -1 do
             -- If the key exists, use it. Otherwise, use the last frame we have.
-            if self.key_label_map[sampled_key] ~= nil then
+            if self.video_keys[video][offset] ~= nil then
                 last_valid_key = sampled_key
             elseif not self.use_boundary_frames then
                 -- If we aren't using boundary frames, we shouldn't run into
@@ -323,7 +325,6 @@ function SequentialSampler:_init(
     self.sampled_all_videos = false
 
     self.video_keys = data_source_obj:video_keys()
-    self.key_label_map = data_source_obj:key_label_map()
     self.data_source = data_source_obj
 
     -- TODO(achald): Should we sort these by length of videos?
@@ -389,10 +390,14 @@ function SequentialSampler:sample_keys(num_sequences)
         local video, offset
         -- Add steps from the sequence to batch_keys until the sequence ends.
         for step = 1, self.sequence_length do
-            sequence_valid =
-                self.key_label_map[sampled_key] ~= nil and sequence_valid
-            if sequence_valid then
+            if sampled_key ~= nil then
                 video, offset = self.data_source:frame_video_offset(sampled_key)
+                sequence_valid = self.video_keys[video][offset] ~= nil and
+                                 sequence_valid
+            else
+                sequence_valid = false
+            end
+            if sequence_valid then
                 table.insert(batch_keys[step], sampled_key)
             else
                 table.insert(batch_keys[step], END_OF_SEQUENCE)
@@ -402,7 +407,9 @@ function SequentialSampler:sample_keys(num_sequences)
                 sampled_key = self.video_keys[video][offset]
             end
         end
-        if self.key_label_map[batch_keys[#batch_keys][sequence]] ~= nil then
+        local last_video, last_offset = self.data_source:frame_video_offset(
+            batch_keys[#batch_keys][sequence])
+        if sequence_valid then
             -- The sequence filled the batch with valid keys, so we want to
             -- output the sampled_key as the next sample.
             -- Note that sampled_key may be nil if the sequence just ended, in
