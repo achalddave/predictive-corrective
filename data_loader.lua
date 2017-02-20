@@ -128,7 +128,7 @@ function PermutedSampler:sample_keys(num_sequences)
 end
 
 function PermutedSampler:num_samples()
-    return self.data_source:num_samples()
+    return #self.keys
 end
 
 function PermutedSampler.static.filter_boundary_frames(
