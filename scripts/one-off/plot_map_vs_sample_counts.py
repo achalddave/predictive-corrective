@@ -42,7 +42,7 @@ def plot_bars(mean_aps, label_counts, label_names=None):
                     color='r',
                     label='AP')
 
-    ax2 = ax.twinx()
+    ax2 = ax.twinx()  # Creates a y-axis on the right with a different scale
     counts_bar = ax2.bar(indices + bar_width,
                          label_counts[sorted_labels],
                          bar_width,
