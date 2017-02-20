@@ -57,13 +57,15 @@ function PermutedSampler:_init(
                                false or use_boundary_frames
 
     self.video_keys = data_source_obj:video_keys()
-    self.key_label_map = data_source_obj:key_label_map()
     self.data_source = data_source_obj
     self.replace = options.replace == nil and false or options.replace
 
+    -- TODO: Don't store two copies of keys.
     self.keys = {}
-    for key, _ in pairs(self.key_label_map) do
-        table.insert(self.keys, key)
+    for _, keys in pairs(self.video_keys) do
+        for _, key in ipairs(keys) do
+            table.insert(self.keys, key)
+        end
     end
 
     if not self.use_boundary_frames then
@@ -109,7 +111,7 @@ function PermutedSampler:sample_keys(num_sequences)
         local last_valid_key
         for step = 1, self.sequence_length do
             -- If the key exists, use it. Otherwise, use the last frame we have.
-            if self.key_label_map[sampled_key] ~= nil then
+            if self.video_keys[video][offset] ~= nil then
                 last_valid_key = sampled_key
             elseif not self.use_boundary_frames then
                 -- If we aren't using boundary frames, we shouldn't run into
