@@ -329,6 +329,8 @@ function Trainer:_forward_backward(images, labels, train_mode)
             self.gpu_labels:size(1) ~= 1 then
         self.gpu_labels = self.gpu_labels[self.gpu_labels:size(1)]
     end
+    -- The loss is averaged by the computational batch size; we want to
+    -- average by the actual batch size.
     local loss = self.criterion:forward(outputs, self.gpu_labels) * (
         num_images / self.batch_size)
 
