@@ -58,7 +58,6 @@ learning_rates: [
 learning_rate_multipliers: [
     { name: 'nn.Linear', index: 3, weight: 10, bias: 10 }
 ]
-dropout_p: 0.9  # If specified, update dropout p to this for dropout layers.
 
 ###
 # Model options
