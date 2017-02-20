@@ -36,10 +36,10 @@ epoch_size: 500
 init_epoch: 1
 # Number of examples in batch.
 batch_size: 64
-# One of 'permuted', 'balanced' (case-insensitive)
-sampling_strategy: 'balanced'
+# One of 'permuted', 'balanced', 'sequential' (case-insensitive)
+sampling_strategy: 'permuted'
 sampling_strategy_options: {
-    include_bg: True
+    replace: False
 }
 sequence_length: 1
 
