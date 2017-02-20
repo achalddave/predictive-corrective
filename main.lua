@@ -305,12 +305,6 @@ local trainer = trainer_class {
 }
 
 log.info('Initialized trainer.')
-if not args.debug then
-    log.info('Config:', config)
-    trainer:save(cache_dir, 0)
-end
-collectgarbage()
-collectgarbage()
 
 local epoch = config.init_epoch
 function save_intermediate(epoch)
@@ -320,6 +314,11 @@ function save_intermediate(epoch)
 end
 
 if not args.debug then
+    log.info('Config:', config)
+    save_intermediate(0)
+    collectgarbage()
+    collectgarbage()
+
     signal.signal(signal.SIGINT, function(signum)
         log.info('Caught ctrl-c, saving model')
         save_intermediate(epoch - 1)
