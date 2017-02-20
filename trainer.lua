@@ -339,7 +339,6 @@ function Trainer:_forward_backward(images, labels, train_mode)
             outputs, self.gpu_labels)
         self.model:backward(
             self.gpu_inputs, criterion_gradients, num_images / self.batch_size)
-        self.gpu_inputs:resize(0)
     end
     return loss, outputs
 end
