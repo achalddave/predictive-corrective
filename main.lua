@@ -345,6 +345,8 @@ function train_eval_loop()
     end
 end
 
+collectgarbage()
+collectgarbage()
 -- TODO(achald): Wrap in pcall, save model on error.
 train_eval_loop()
 -- Proof of concept of pcall below. The issue is that I can't figure out how to
