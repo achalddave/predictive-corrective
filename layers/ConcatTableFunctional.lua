@@ -16,6 +16,7 @@ end
 function ConcatTableFunctional:_update(num_input)
     if num_input < #self.modules then
         for i = num_input + 1, #self.modules do
+            self.modules[i]:clearState()
             self.modules[i] = nil
         end
     elseif num_input > #self.modules then

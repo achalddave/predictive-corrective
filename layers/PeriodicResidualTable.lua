@@ -66,6 +66,7 @@ end
 function PeriodicResidualTable:clearState()
    -- Keep all but one init and residual clone in self.modules
    for i = 3, #self.modules do
+      self.modules[i]:clearState()
       self.modules[i] = nil
    end
    self.init:clearState()
