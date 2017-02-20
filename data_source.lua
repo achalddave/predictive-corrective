@@ -190,9 +190,9 @@ function LabeledVideoFramesLmdbSource:key_label_map()
             key_label_map[key] = {self.num_labels_ + 1}
         else
             local labels = {}
-            for _, label in ipairs(video_frame.label) do
+            for i, label in ipairs(video_frame.label) do
                 -- Label ids start at 0.
-                table.insert(labels, label.id + 1)
+                labels[i] = label.id + 1
             end
             key_label_map[key] = labels
         end
