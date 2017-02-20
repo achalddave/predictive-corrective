@@ -55,7 +55,7 @@ function LabeledVideoFramesLmdbSource:frame_video_offset(key)
     return LabeledVideoFramesLmdbSource.static.parse_frame_key(key)
 end
 
-function LabeledVideoFramesLmdbSource:load_data(keys)
+function LabeledVideoFramesLmdbSource:load_data(keys, load_images)
     --[[
     Load images and labels for a set of keys from the LMDB.
 
@@ -63,12 +63,16 @@ function LabeledVideoFramesLmdbSource:load_data(keys)
         keys (array): Array of array of string keys. Each element must be
             an array of the same length as every element, and contains keys for
             one step of the image sequence.
+        load_images (bool): Defaults to true. If false, load only labels,
+            not images. The ByteTensors in batch_images will simply be empty.
 
     Returns:
         batch_images: Array of array of ByteTensors
-        batch_labels: ByteTensor
+        batch_labels: ByteTensor of shape (num_steps, batch_size, num_labels)
     ]]--
-    local db = lmdb.env { Path = self.lmdb_path }
+    load_images = load_images == nil and true or load_images
+    local db = lmdb.env {
+        Path = load_images and self.lmdb_path or self.lmdb_without_images_path}
     db:open()
     local transaction = db:txn(true --[[readonly]])
 
