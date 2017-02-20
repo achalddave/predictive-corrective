@@ -5,6 +5,7 @@ local torch = require 'torch'
 
 local data_source = require 'data_source'
 local data_loader = require 'data_loader'
+local log = require 'util/log'
 
 local parser = argparse() {
     description = 'Compute distribution of labels from samples.'
@@ -29,7 +30,9 @@ local sampler = data_loader.BalancedSampler(
     {background_weight = args.background_weight})
 
 local sampled_keys = sampler:sample_keys(args.num_samples)
+log.info('Sampled keys')
 local _, sampled_labels = source:load_data(sampled_keys)
+log.info('Loaded labels')
 sampled_labels = sampled_labels[1 --[[first step]]]
 
 local counts = torch.zeros(args.num_labels + 1)
