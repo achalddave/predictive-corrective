@@ -29,9 +29,9 @@ end
 local PermutedSampler = classic.class('PermutedSampler', Sampler)
 function PermutedSampler:_init(
         data_source_obj, sequence_length, step_size, use_boundary_frames,
-        _ --[[options]])
+        options)
     --[[
-    Returns consecutive batches from a permuted list of keys.
+    Sample frames randomly.
 
     Once the list has been exhausted, we generate a new permutation.
 
@@ -45,7 +45,12 @@ function PermutedSampler:_init(
         use_boundary_frames (bool): Default false. If false, avoid sequences
             that go outside the video temporally. Otherwise, for sequences at
             the boundary, we replicate the first or last frame of the video.
+        options:
+            replace (bool): If true, sample each frame i.i.d. with replacement.
+                If false, do not re-sample a frame until all other frames have
+                been sampled.
     ]]--
+    options = options == nil and {} or options
     self.sequence_length = sequence_length == nil and 1 or sequence_length
     self.step_size = step_size == nil and 1 or step_size
     self.use_boundary_frames = use_boundary_frames == nil and
@@ -54,6 +59,7 @@ function PermutedSampler:_init(
     self.video_keys = data_source_obj:video_keys()
     self.key_label_map = data_source_obj:key_label_map()
     self.data_source = data_source_obj
+    self.replace = options.replace == nil and false or options.replace
 
     self.keys = {}
     for key, _ in pairs(self.key_label_map) do
@@ -65,7 +71,18 @@ function PermutedSampler:_init(
             self.video_keys, self.sequence_length, self.step_size)
     end
 
-    self.permuted_keys = Sampler.permute(self.keys)
+    self:_refresh_keys()
+end
+
+function PermutedSampler:_refresh_keys()
+    if self.replace then
+        self.key_order = torch.multinomial(
+            torch.ones(#self.keys), #self.keys, true --[[replace]])
+    else
+        -- Using torch.multinomial here with replace set to false is incredibly
+        -- slow, for some reason.
+        self.key_order = torch.randperm(#self.keys)
+    end
     self.key_index = 1
 end
 
@@ -85,10 +102,9 @@ function PermutedSampler:sample_keys(num_sequences)
         if self.key_index > self:num_samples() then
             log.info(string.format(
                 '%s: Finished pass through data, repermuting!', os.date('%X')))
-            self.permuted_keys = Sampler.permute(self.keys)
-            self.key_index = 1
+            self:_refresh_keys()
         end
-        local sampled_key = self.permuted_keys[self.key_index]
+        local sampled_key = self.keys[self.key_order[self.key_index]]
         local video, offset = self.data_source:frame_video_offset(sampled_key)
         local last_valid_key
         for step = 1, self.sequence_length do
