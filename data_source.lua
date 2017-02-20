@@ -41,9 +41,13 @@ function LabeledVideoFramesLmdbSource:_init(
     end
 end
 
-function LabeledVideoFramesLmdbSource:num_samples() return self.num_keys end
+function LabeledVideoFramesLmdbSource:num_samples()
+    return self.num_keys
+end
 
-function LabeledVideoFramesLmdbSource:video_keys() return self.video_keys_ end
+function LabeledVideoFramesLmdbSource:video_keys()
+    return self.video_keys_
+end
 
 function LabeledVideoFramesLmdbSource:num_labels() return self.num_labels_ end
 
