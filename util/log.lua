@@ -27,15 +27,44 @@ for i, v in ipairs(modes) do
     levels[v.name] = i
 end
 
-local _tostring = tostring
-
-local tostring = function(...)
-    local t = {}
-    for i = 1, select('#', ...) do
-        local x = select(i, ...)
-        t[#t + 1] = _tostring(x)
-    end
-    return table.concat(t, " ")
+-- Taken from Torch REPL's init.lua; this is the colorize function without
+-- color.
+local function tostring_(object,nested)
+   -- Apply:
+   -- Type?
+   if object == nil then
+      return 'nil'
+   elseif type(object) == 'number' then
+      return tostring(object)
+   elseif type(object) == 'boolean' then
+      return tostring(object)
+   elseif type(object) == 'string' then
+      if nested then
+         return '"'..object..'"'
+      else
+         return object
+      end
+   elseif type(object) == 'function' then
+      return tostring(object)
+   elseif type(object) == 'userdata' or type(object) == 'cdata' then
+      local tp = torch.typename(object) or ''
+      if tp:find('torch.*Tensor') then
+         tp = sizestr(object)
+      elseif tp:find('torch.*Storage') then
+         tp = sizestr(object)
+      else
+         tp = tostring(object)
+      end
+      if tp ~= '' then
+         return tp
+      else
+         return tostring(object)
+      end
+   elseif type(object) == 'table' then
+      return tostring(object)
+   else
+      return tostring(object)
+   end
 end
 
 -- Taken from Torch REPL's init.lua.
@@ -61,7 +90,7 @@ function print_no_color(...)
                   line(tostring(k) .. ' : ') printrecursive(v,depth+1)
                end
             else
-               line(tostring(k) .. ' : ' .. v)
+               line(tostring(k) .. ' : ' .. tostring_(v))
             end
          end
          tab = tab-2
@@ -76,7 +105,7 @@ function print_no_color(...)
          if type(obj) == 'userdata' or type(obj) == 'cdata' then
             rawprint(obj)
          else
-            io.write(obj .. '\t')
+            io.write(tostring_(obj) .. '\t')
             if i == select('#',...) then
                rawprint()
             end
