@@ -262,7 +262,8 @@ else
         val_source,
         config.sequence_length,
         config.step_size,
-        config.use_boundary_frames)
+        config.use_boundary_frames,
+        {replace = false})
 end
 log.info('Initialized val sampler')
 
