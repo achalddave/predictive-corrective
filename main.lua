@@ -330,17 +330,36 @@ if not args.debug then
     end)
 end
 
-while epoch <= config.num_epochs do
-    log.info(('Training epoch %d'):format(epoch))
-    trainer:train_epoch(epoch, config.epoch_size)
-    if not args.debug and (epoch % 5 == 0 or epoch == config.init_epoch) then
-        save_intermediate(epoch)
-    end
-    collectgarbage()
-    collectgarbage()
+function train_eval_loop()
+    while epoch <= config.num_epochs do
+        log.info(('Training epoch %d'):format(epoch))
+        trainer:train_epoch(epoch, config.epoch_size)
+        if not args.debug and (epoch % 5 == 0 or epoch == config.init_epoch) then
+            save_intermediate(epoch)
+        end
+        collectgarbage()
+        collectgarbage()
 
-    trainer:evaluate_epoch(epoch, config.val_epoch_size)
-    collectgarbage()
-    collectgarbage()
-    epoch = epoch + 1
+        trainer:evaluate_epoch(epoch, config.val_epoch_size)
+        collectgarbage()
+        collectgarbage()
+        epoch = epoch + 1
+    end
 end
+
+-- TODO(achald): Wrap in pcall, save model on error.
+train_eval_loop()
+-- Proof of concept of pcall below. The issue is that I can't figure out how to
+-- raise the exact same error that would have been raised in train_eval_loop.
+-- local successful, err = pcall(train_eval_loop)
+-- if successful then
+--     log.info('Model successfuly trained.')
+-- else
+--     log.info('Saving model before exiting due to error:')
+--     log.error(err)
+--     log.error(type(err))
+--     if not args.debug then
+--         save_intermediate(epoch - 1)
+--     end
+--     os.exit(1)
+-- end
