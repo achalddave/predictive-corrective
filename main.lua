@@ -334,6 +334,9 @@ function train_eval_loop()
     while epoch <= config.num_epochs do
         log.info(('Training epoch %d'):format(epoch))
         trainer:train_epoch(epoch, config.epoch_size)
+        collectgarbage()
+        collectgarbage()
+
         if not args.debug and (epoch % 5 == 0 or epoch == config.init_epoch) then
             save_intermediate(epoch)
         end
