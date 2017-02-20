@@ -303,14 +303,13 @@ local trainer = trainer_class {
     optim_state = optim_state,
     use_nnlr = (#config.learning_rate_multipliers ~= 0)
 }
-
 log.info('Initialized trainer.')
 
 local epoch = config.init_epoch
 function save_intermediate(epoch)
     trainer:save(cache_dir, epoch)
     torch.save(paths.concat(cache_dir, 'sampler_' .. epoch .. '.t7'),
-            train_sampler)
+               train_sampler)
 end
 
 if not args.debug then
