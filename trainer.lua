@@ -137,72 +137,6 @@ function Trainer:evaluate_epoch(epoch, num_batches)
     self:_train_or_evaluate_epoch(epoch, num_batches, false --[[train_mode]])
 end
 
-function Trainer:train_batch()
-    --[[
-    Train on a batch of data
-
-    Returns:
-        loss: Output of criterion:forward on this batch.
-        outputs (Tensor): Output of model:forward on this batch. The tensor
-            size should be either (sequence_length, batch_size, num_labels) or
-            (batch_size, num_labels), depending on the model.
-        labels (Tensor): True labels. Same size as the outputs.
-    ]]--
-    local images, labels = self:_load_batch(
-        self.train_data_loader, true --[[train_mode]])
-
-    local loss = 0
-    local outputs
-    local function forward_backward()
-        self.model:zeroGradParameters()
-        for i = 1, math.ceil(self.batch_size / self.computational_batch_size) do
-            local start_index = (i - 1) * self.computational_batch_size + 1
-            local end_index = math.min(
-                i * self.computational_batch_size, self.batch_size)
-            local current_loss, current_outputs =
-                self:_forward_backward(
-                    images[{{}, {start_index, end_index}}],
-                    labels[{{}, {start_index, end_index}}],
-                    true --[[train_mode]])
-            -- The loss is averaged by the computational batch size; we want to
-            -- average by the actual batch size.
-            loss = loss + current_loss
-            if outputs == nil then
-                outputs = current_outputs:clone()
-            else
-                -- If the outputs are 3D, then they must be (sequence_length,
-                -- batch_size, num_labels). Otherwise, they are 2D and of shape
-                -- (batch_size, num_labels).
-                local batch_dimension = current_outputs:dim() == 3 and 2 or 1
-                outputs = torch.cat(outputs, current_outputs, batch_dimension)
-            end
-        end
-        return loss, self.model_grad_parameters
-    end
-    -- Updates self.model_parameters (and, in turn, the parameters of
-    -- self.model) in place.
-    optim.sgd(forward_backward, self.model_parameters,
-              self.optimization_config, self.optimization_state)
-    return loss, outputs, labels
-end
-
-function Trainer:evaluate_batch()
-    --[[
-    Returns:
-        loss: Output of criterion:forward on this batch.
-        outputs (Tensor): Output of model:forward on this batch. The tensor
-            size is (sequence_length, batch_size, num_labels)
-        labels (Tensor): True labels. Same size as the outputs.
-    ]]--
-    local images, labels = self:_load_batch(
-        self.val_data_loader, false --[[train_mode]])
-    local loss, outputs = self:_forward_backward(
-        images, labels, false --[[train_mode]])
-    self.gpu_inputs:resize(0)
-    self.gpu_labels:resize(0)
-    return loss, outputs, labels
-end
-
 function Trainer:save(directory, epoch)
     --[[
     Save model, optimization config, and optimization config to a directory.
@@ -223,6 +157,50 @@ function Trainer:save(directory, epoch)
     collectgarbage()
 end
 
+function Trainer:_train_or_evaluate_batch(train_mode)
+    local data = train_mode and self.train_data_loader or self.val_data_loader
+    local images, labels = self:_load_batch(data, train_mode)
+    local loss = 0
+    local outputs
+    local function forward_backward()
+        if train_mode then
+            self.model:zeroGradParameters()
+        end
+        for i = 1, math.ceil(self.batch_size / self.computational_batch_size) do
+            local start_index = (i - 1) * self.computational_batch_size + 1
+            local end_index = math.min(
+                i * self.computational_batch_size, self.batch_size)
+            local current_loss, current_outputs =
+                self:_forward_backward(
+                    images[{{}, {start_index, end_index}}],
+                    labels[{{}, {start_index, end_index}}],
+                    train_mode)
+            loss = loss + current_loss
+            if outputs == nil then
+                outputs = current_outputs:clone()
+            else
+                -- If the outputs are 3D, then they must be (sequence_length,
+                -- batch_size, num_labels). Otherwise, they are 2D and of shape
+                -- (batch_size, num_labels).
+                local batch_dimension = current_outputs:dim() == 3 and 2 or 1
+                outputs = torch.cat(outputs, current_outputs, batch_dimension)
+            end
+        end
+        return loss, self.model_grad_parameters
+    end
+
+    if train_mode then
+        -- Updates self.model_parameters (and, in turn, the parameters of
+        -- self.model) in place.
+        optim.sgd(forward_backward, self.model_parameters,
+                  self.optimization_config, self.optimization_state)
+        return loss, outputs, labels
+    else
+        forward_backward()
+        return loss, outputs, labels
+    end
+end
+
 function Trainer:_train_or_evaluate_epoch(epoch, num_batches, train_mode)
     if train_mode then
         self.model:clearState()
@@ -240,13 +218,14 @@ function Trainer:_train_or_evaluate_epoch(epoch, num_batches, train_mode)
     local groundtruth = torch.ByteTensor(
         num_batches * self.batch_size, self.num_labels)
 
-    local process_batch = train_mode and self.train_batch or self.evaluate_batch
     local loss_epoch = 0
     for batch_index = 1, num_batches do
         batch_timer:reset()
         collectgarbage()
         collectgarbage()
-        local loss, curr_predictions, curr_groundtruth = process_batch(self)
+
+        local loss, curr_predictions, curr_groundtruth =
+            self:_train_or_evaluate_batch(train_mode)
         loss_epoch = loss_epoch + loss
 
         -- We only care about the predictions and groundtruth in the last step
