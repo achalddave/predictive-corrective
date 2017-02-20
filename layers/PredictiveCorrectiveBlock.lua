@@ -101,6 +101,10 @@ function PredictiveCorrectiveBlock:_reset_modules()
     self.cumulative_sum_blocks.modules = {}
 
     self:_add_init(1)
+    -- TODO(achald): Make sure this is the correct thing to do. I added this
+    -- because we want one init and update clone to be in the self.modules
+    -- array, but I'm not sure if it has any unwanted side effects.
+    self:_add_update(2)
 end
 
 function PredictiveCorrectiveBlock:_get_init_clone()
