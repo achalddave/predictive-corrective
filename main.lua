@@ -190,7 +190,7 @@ if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
 end
 if args.decorate_sequencer then
     if torch.isTypeOf(single_model, 'nn.Sequencer') then
-        log.info('WARNING: --decorate_sequencer on model that is already ' ..
+        log.warn('WARNING: --decorate_sequencer on model that is already ' ..
                  'nn.Sequencer!')
     end
     single_model = nn.Sequencer(single_model)
