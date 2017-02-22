@@ -100,23 +100,28 @@ end
 function Trainer:update_optim_config(epoch)
     local learning_rate, regime_was_updated = self:_epoch_learning_rate(epoch)
     self.epoch_base_learning_rate = learning_rate
-    -- For whatever reason, optim.sgd will use
-    -- (decay_fn(learningRate) * learningRates) as the vector of learning rates,
-    -- but will use weightDecays (ignoring weightDecay the scalar) as the vector
-    -- of weight decays. So we need to supply a learning rate, a vector of
-    -- learning rate multipliers and a vector of weight decays.
+
+    if self.use_nnlr and self.optimization_config.learningRates == nil then
+        -- For whatever reason, optim.sgd will use (decay_fn(learningRate) *
+        -- learningRates) as the vector of learning rates, but will use
+        -- weightDecays (ignoring weightDecay the scalar) as the vector of
+        -- weight decays. So we need to supply a vector of learning rate
+        -- multipliers and a vector of weight decays here, and supply a
+        -- base `learningRate` below when the regime is updated.
+        log.info('Using layerwise learning rates')
+        local layer_learning_rate_multipliers, layer_weight_decays =
+            self.model:getOptimConfig(
+                1 --[[base lr multiplier]],
+                self.weight_decay --[[base weight decay]])
+        self.optimization_config.learningRates =
+            layer_learning_rate_multipliers
+        self.optimization_config.weightDecays =
+            layer_weight_decays
+    end
+
     if regime_was_updated then
         if self.use_nnlr then
-            log.info('Using layerwise learning rates')
-            -- Layerwise learning rates
-            local layer_learning_rate_multipliers, layer_weight_decays =
-                self.model:getOptimConfig(
-                    1 --[[base lr multiplier]],
-                    self.weight_decay --[[base weight decay]])
-            self.optimization_config.learningRates =
-                layer_learning_rate_multipliers
-            self.optimization_config.weightDecays =
-                layer_weight_decays
+            self.optimization_config.learningRate = learning_rate
         else
             self.optimization_config.learningRate = learning_rate
             self.optimization_config.weightDecay = self.weight_decay
