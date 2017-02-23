@@ -31,9 +31,7 @@ function PermutedSampler:_init(
         data_source_obj, sequence_length, step_size, use_boundary_frames,
         options)
     --[[
-    Sample frames randomly.
-
-    Once the list has been exhausted, we generate a new permutation.
+    Sample frames randomly, with or without replacement.
 
     Args:
         data_source_obj (DataSource)
