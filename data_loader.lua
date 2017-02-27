@@ -16,6 +16,7 @@ local END_OF_SEQUENCE = data_source.VideoDataSource.END_OF_SEQUENCE
 local Sampler = classic.class('Sampler')
 Sampler:mustHave('sample_keys')
 Sampler:mustHave('num_samples')
+Sampler:mustHave('num_labels')
 
 function Sampler.static.permute(list)
     local permuted_list = {}
@@ -125,6 +126,10 @@ function PermutedSampler:sample_keys(num_sequences)
     return batch_keys
 end
 
+function PermutedSampler:num_labels()
+    return self.data_source:num_labels()
+end
+
 function PermutedSampler:num_samples()
     return #self.keys
 end
@@ -189,7 +194,7 @@ function BalancedSampler:_init(
                 1; if false, background_weight is set to 0.
     ]]--
     self.data_source = data_source_obj
-    self.num_labels = data_source_obj:num_labels()
+    self.num_labels_ = data_source_obj:num_labels()
     options = options == nil and {} or options
     self.sequence_length = sequence_length
     self.step_size = step_size
@@ -216,15 +221,15 @@ function BalancedSampler:_init(
     -- Map labels to list of keys containing that label.
     local key_label_map = self.data_source:key_label_map()
     self.label_key_map = {}
-    for i = 1, self.num_labels+1 do self.label_key_map[i] = {} end
+    for i = 1, self.num_labels_+1 do self.label_key_map[i] = {} end
     for _, key in ipairs(valid_keys) do
         for _, label in ipairs(key_label_map[key]) do
             table.insert(self.label_key_map[label], key)
         end
     end
 
-    self.label_weights = torch.ones(self.num_labels + 1)
-    self.label_weights[self.num_labels + 1] =
+    self.label_weights = torch.ones(self.num_labels_ + 1)
+    self.label_weights[self.num_labels_ + 1] =
         options.background_weight == nil and 0 or options.background_weight
 
     -- For each label, maintain an index of the next data point to output.
@@ -270,6 +275,10 @@ function BalancedSampler:sample_keys(num_sequences)
     return batch_keys
 end
 
+function BalancedSampler:num_labels()
+    return self.data_source:num_labels()
+end
+
 function BalancedSampler:num_samples()
     return self.data_source:num_samples()
 end
@@ -284,7 +293,7 @@ function BalancedSampler:_advance_label_index(label)
 end
 
 function BalancedSampler:_permute_keys()
-    for i = 1, self.num_labels + 1 do
+    for i = 1, self.num_labels_ + 1 do
         self.label_key_map[i] = Sampler.permute(self.label_key_map[i])
         self.label_indices[i] = 1
     end
@@ -425,6 +434,11 @@ function SequentialSampler:sample_keys(num_sequences)
     return batch_keys
 end
 
+function SequentialSampler:num_labels()
+    return self.data_source:num_labels()
+end
+
+
 function SequentialSampler:num_samples()
     return self.data_source:num_samples()
 end
@@ -455,6 +469,10 @@ function DataLoader:_init(data_source_obj, sampler)
         batch_labels = nil
     }
     self._prefetching_thread = threads.Threads(1)
+end
+
+function DataLoader:num_labels()
+    return self.sampler:num_labels()
 end
 
 function DataLoader:num_samples()

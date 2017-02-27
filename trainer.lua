@@ -37,7 +37,6 @@ function Trainer:_init(args)
                  {start_epoch: 6, learning_rate: 1e-3}]
             will use a learning rate of 1e-2 for the first 5 epochs, then switch
             to a learning rate of 1e-3.
-        num_labels
         momentum
         weight_decay
         use_nnlr (bool): If true, use nnlr to train with layer
@@ -62,7 +61,6 @@ function Trainer:_init(args)
     self.batch_size = args.batch_size
     self.computational_batch_size = args.computational_batch_size
     self.crop_size = args.crop_size
-    self.num_labels = args.num_labels
     self.weight_decay = args.weight_decay
     self.learning_rates = args.learning_rates
     self.use_nnlr = args.use_nnlr == nil and false or args.use_nnlr
@@ -95,6 +93,7 @@ function Trainer:_init(args)
     -- Prefetch the next batch.
     self.train_data_loader:fetch_batch_async(self.batch_size)
     self.val_data_loader:fetch_batch_async(self.batch_size)
+    self.num_labels = self.train_data_loader:num_labels()
 end
 
 function Trainer:update_optim_config(epoch)
