@@ -157,8 +157,8 @@ single_model = torch.load(config.model_init)
 single_model:clearState()
 if config.criterion_wrapper == nil then
     if torch.isTypeOf(single_model, 'nn.Sequencer') then
-        log.info('nn.Sequencer models are wrapped by LastStepCriterion if ' ..
-               'config.criterion_wrapper is not set.')
+        log.info('Adding LastStepCriterion wrapper for ' ..
+                 'nn.Sequencer model since config.criterion_wrapper is unset.')
         config.criterion_wrapper = 'last_step_criterion'
     else
         config.criterion_wrapper = ''
@@ -184,8 +184,8 @@ if config.dropout_p ~= nil then
    for _, layer in ipairs(dropout_layers) do
        local previous_p = layer.p
        layer.p = config.dropout_p
-       log.info(string.format('Increasing dropout probability from %.2f to %.2f',
-                            previous_p, layer.p))
+       log.info(string.format('Updating dropout probability from %.2f to %.2f',
+                              previous_p, layer.p))
    end
 end
 
