@@ -312,14 +312,17 @@ function Trainer:_load_batch(data_loader, train_mode)
                                 self.crop_size, self.crop_size)
     local augment = train_mode and image_util.augment_image_train
                                or image_util.augment_image_eval
+    local sequence_states = {}
     for step, step_images in ipairs(images_table) do
         for sequence, img in ipairs(step_images) do
             -- Process image after converting to the default Tensor type.
             -- (Originally, it is a ByteTensor).
-            images[{step, sequence}] = augment(img:typeAs(images),
-                                               self.crop_size,
-                                               self.crop_size,
-                                               self.pixel_mean)
+            images[{step, sequence}], sequence_states[sequence] = augment(
+                img:typeAs(images),
+                self.crop_size,
+                self.crop_size,
+                self.pixel_mean,
+                sequence_states[sequence])
         end
     end
     return images, labels
@@ -458,6 +461,7 @@ function SequentialTrainer:_train_or_evaluate_batch(train_mode)
     local num_valid_steps = num_steps
     local augment = train_mode and image_util.augment_image_train
                                or image_util.augment_image_eval
+    local augment_state = nil
     for step, step_images in ipairs(images_table) do
         local img = step_images[1]
         if img == END_OF_SEQUENCE then
@@ -467,9 +471,9 @@ function SequentialTrainer:_train_or_evaluate_batch(train_mode)
         else
             -- Process image after converting to the default Tensor type.
             -- (Originally, it is a ByteTensor).
-            images[step] = augment(
+            images[step], augment_state = augment(
                 img:typeAs(images), self.crop_size, self.crop_size,
-                self.pixel_mean)
+                self.pixel_mean, augment_state)
         end
     end
     local sequence_ended = num_valid_steps ~= num_steps
