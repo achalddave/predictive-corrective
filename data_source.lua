@@ -23,7 +23,7 @@ VideoDataSource.END_OF_SEQUENCE = -1
 local LabeledVideoFramesLmdbSource = classic.class(
     'LabeledVideoFramesLmdbSource', 'VideoDataSource')
 function LabeledVideoFramesLmdbSource:_init(
-        lmdb_path, lmdb_without_images_path, num_labels)
+        lmdb_path, lmdb_without_images_path, num_labels, _ --[[options]])
     --[[
     Data source for LabeledVideoFrame protobufs in LMDBs.
 
