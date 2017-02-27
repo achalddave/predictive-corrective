@@ -243,8 +243,109 @@ function LabeledVideoFramesLmdbSource.static.parse_frame_key(frame_key)
     return filename, frame_number
 end
 
+local PositiveVideosLmdbSource, super = classic.class(
+    'PositiveVideosLmdbSource', 'LabeledVideoFramesLmdbSource')
+function PositiveVideosLmdbSource:_init(
+        lmdb_path, lmdb_without_images_path, num_labels, options)
+    --[[
+    Like LabeledVideoFramesLmdbSource, but only use 'positive' videos.
+
+    A 'positive' video is a video containing at least one frame that has one of
+    the options.labels labels assigned to it.
+
+    Args:
+       lmdb_path (str): Path to LMDB containing LabeledVideoFrames as values,
+           and keys of the form "<video>-<frame_number>".
+       lmdb_without_images_path (str): Path to LMDB of the same form as
+           lmdb_path, but where the images have been stripped from the
+           protobufs.
+        num_labels (int): Total number of labels in the dataset.
+        options:
+            labels (table of strings): List of labels to consider as positive.
+            output_all_labels (bool): If true, still output the groundtruth
+                for all labels in the dataset - just limit the frames to be
+                from positive videos. By default, this is false, and we only
+                output the groundtruth for labels in options.labels.
+    ]]--
+    self.lmdb_path = lmdb_path
+    self.lmdb_without_images_path = lmdb_without_images_path
+    self.positive_label_names = options.labels
+    self.output_all_labels =
+        options.output_all_labels == nil and false or options.output_all_labels
+    self.num_labels_ = num_labels
+
+    self.num_keys = 0
+    self.video_keys_ = {}
+    local key_labels, label_map = self:_unfiltered_key_label_map()
+    self.label_map = label_map -- Maps label names to ids
+
+    for key, _ in pairs(key_labels) do
+        local video, frame = LabeledVideoFramesLmdbSource.parse_frame_key(key)
+        if self.video_keys_[video] == nil then
+            self.video_keys_[video] = {}
+        end
+        self.video_keys_[video][frame] = key
+        self.num_keys = self.num_keys + 1
+    end
+
+    self.positive_label_ids  = {}
+    local positive_label_ids_set = {}
+    for i, label in ipairs(self.positive_label_names) do
+        positive_label_ids_set[self.label_map[label]] = true
+        self.positive_label_ids[i] = self.label_map[label]
+    end
+    table.sort(self.positive_label_ids)
+
+    for video, keys in pairs(self.video_keys_) do
+        local positive_video = false
+        for _, key in ipairs(keys) do
+            for _, label_id in ipairs(key_labels[key]) do
+                if positive_label_ids_set[label_id] then
+                    positive_video = true
+                    break
+                end
+            end
+            if positive_video then break end
+        end
+        if not positive_video then self.video_keys_[video] = nil end
+    end
+end
+
+function PositiveVideosLmdbSource:num_labels()
+    if self.output_all_labels then
+        return self.num_labels_
+    else
+        return #self.positive_label_ids
+    end
+end
+
+function PositiveVideosLmdbSource:_unfiltered_key_label_map()
+    return super.key_label_map(self, true --[[return_label_map]])
+end
+
+function PositiveVideosLmdbSource:key_label_map(return_label_map)
+    -- Remove keys that are not in positive videos.
+    local key_label_map = super.key_label_map(self, return_label_map)
+    for key, _ in pairs(key_label_map) do
+        local video, _ = self:parse_frame_key(key)
+        if self.video_keys_[video] == nil then
+            key_label_map[key] = nil
+        end
+    end
+end
+
+function PositiveVideosLmdbSource:load_data(keys, load_images)
+    local batch_images, batch_labels = super.load_data(
+        self, keys, load_images)
+    if not self.output_all_labels then
+        batch_labels = batch_labels[{{}, {}, self.positive_label_ids}]
+    end
+    return batch_images, batch_labels
+end
+
 return {
     DataSource = DataSource,
     VideoDataSource = VideoDataSource,
-    LabeledVideoFramesLmdbSource = LabeledVideoFramesLmdbSource
+    LabeledVideoFramesLmdbSource = LabeledVideoFramesLmdbSource,
+    PositiveVideosLmdbSource = PositiveVideosLmdbSource
 }
