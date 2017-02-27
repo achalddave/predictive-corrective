@@ -96,6 +96,12 @@ function normalize_config(config)
     if config.learning_rate_multipliers == nil then
         config.learning_rate_multipliers = {}
     end
+
+    if config.data_source_class == nil then
+        config.data_source_class = 'LabeledVideoFramesLmdbSource'
+        config.data_source_options = {}
+    end
+
     return config
 end
 
@@ -228,10 +234,16 @@ local sampling_strategies = {
     sequential = data_loader.SequentialSampler
 }
 
-local train_source = data_source.LabeledVideoFramesLmdbSource(
-    config.train_lmdb, config.train_lmdb_without_images, config.num_labels)
-local val_source = data_source.LabeledVideoFramesLmdbSource(
-    config.val_lmdb, config.val_lmdb_without_images, config.num_labels)
+local train_source = data_source[config.data_source_class](
+    config.train_lmdb,
+    config.train_lmdb_without_images,
+    config.num_labels,
+    config.data_source_options)
+local val_source = data_source[config.data_source_class](
+    config.val_lmdb,
+    config.val_lmdb_without_images,
+    config.num_labels,
+    config.data_source_options)
 log.info('Loaded data sources')
 
 local train_sampler

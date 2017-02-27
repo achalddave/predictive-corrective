@@ -15,6 +15,9 @@ data_paths_config: 'config/local_data_paths.yaml'
 train_split: 'train_val_split'
 val_split: 'test_split'
 
+data_source_class: 'LabeledVideoFramesLmdbSource',
+data_source_options: {}
+
 # Number of labels
 num_labels: 65
 
