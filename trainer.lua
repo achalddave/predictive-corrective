@@ -456,6 +456,8 @@ function SequentialTrainer:_train_or_evaluate_batch(train_mode)
     local images = torch.Tensor(num_steps, 1 --[[batch size]], num_channels,
                                 self.crop_size, self.crop_size)
     local num_valid_steps = num_steps
+    local augment = train_mode and image_util.augment_image_train
+                               or image_util.augment_image_eval
     for step, step_images in ipairs(images_table) do
         local img = step_images[1]
         if img == END_OF_SEQUENCE then
@@ -465,7 +467,7 @@ function SequentialTrainer:_train_or_evaluate_batch(train_mode)
         else
             -- Process image after converting to the default Tensor type.
             -- (Originally, it is a ByteTensor).
-            images[step] = image_util.augment_image_train(
+            images[step] = augment(
                 img:typeAs(images), self.crop_size, self.crop_size,
                 self.pixel_mean)
         end
