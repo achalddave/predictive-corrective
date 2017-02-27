@@ -217,6 +217,7 @@ function BalancedSampler:_init(
             end
         end
     end
+    self.num_keys = #valid_keys
 
     -- Map labels to list of keys containing that label.
     local key_label_map = self.data_source:key_label_map()
@@ -280,7 +281,7 @@ function BalancedSampler:num_labels()
 end
 
 function BalancedSampler:num_samples()
-    return self.data_source:num_samples()
+    return self.num_keys
 end
 
 function BalancedSampler:_advance_label_index(label)
