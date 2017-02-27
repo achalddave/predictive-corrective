@@ -170,7 +170,7 @@ function LabeledVideoFramesLmdbSource.static._load_image_labels_from_proto(
     return img, labels
 end
 
-function LabeledVideoFramesLmdbSource:key_label_map()
+function LabeledVideoFramesLmdbSource:key_label_map(return_label_map)
     --[[
     Load mapping from frame keys to labels array.
 
@@ -178,9 +178,17 @@ function LabeledVideoFramesLmdbSource:key_label_map()
     longer needed. If this array is stored permanently (e.g. globally or as an
     object attribute), it will slow down *all* future calls to collectgarbage().
 
+    Args:
+        return_label_map (bool): If true, return a map from label names to label
+            id.
+
     Returns:
         key_labels: Table mapping frame keys to array of label indices.
+        (optional) label_map: See doc for return_label_map arg.
+
     ]]--
+    return_label_map = return_label_map == nil and false or return_label_map
+
     -- Get LMDB cursor.
     local db = lmdb.env { Path = self.lmdb_without_images_path }
     db:open()
@@ -190,6 +198,7 @@ function LabeledVideoFramesLmdbSource:key_label_map()
     -- Create mapping from keys to labels.
     local key_label_map = {}
 
+    local label_map = {}
     local num_keys = db:stat().entries
     for i = 1, num_keys do
         local key, value = cursor:get('MDB_GET_CURRENT')
@@ -204,6 +213,9 @@ function LabeledVideoFramesLmdbSource:key_label_map()
             for i, label in ipairs(video_frame.label) do
                 -- Label ids start at 0.
                 labels[i] = label.id + 1
+                if label_map[label.name] == nil then
+                    label_map[label.name] = label.id + 1
+                end
             end
             key_label_map[key] = labels
         end
@@ -215,7 +227,11 @@ function LabeledVideoFramesLmdbSource:key_label_map()
     transaction:abort()
     db:close()
 
-    return key_label_map
+    if return_label_map then
+        return key_label_map, label_map
+    else
+        return key_label_map
+    end
 end
 
 function LabeledVideoFramesLmdbSource.static.parse_frame_key(frame_key)
