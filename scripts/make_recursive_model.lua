@@ -40,6 +40,8 @@ parser:option('--model', 'Torch model'):count(1)
 parser:option('--output', 'Output model'):count(1)
 
 local args = parser:parse()
+print('Args:')
+print(args)
 
 -- conv12: 3
 -- conv22: 8
