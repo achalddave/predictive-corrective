@@ -4,8 +4,7 @@
 -- Example usage:
 --    th main.lua \
 --      config/config-vgg.yaml \
---      model_output_dir/ \
---      | tee model_output_dir/training.log
+--      model_output_dir/
 --]]
 
 local argparse = require 'argparse'
