@@ -24,6 +24,17 @@ local LabeledVideoFramesLmdbSource = classic.class(
     'LabeledVideoFramesLmdbSource', 'VideoDataSource')
 function LabeledVideoFramesLmdbSource:_init(
         lmdb_path, lmdb_without_images_path, num_labels)
+    --[[
+    Data source for LabeledVideoFrame protobufs in LMDBs.
+
+    Args:
+       lmdb_path (str): Path to LMDB containing LabeledVideoFrames as values,
+           and keys of the form "<video>-<frame_number>".
+       lmdb_without_images_path (str): Path to LMDB of the same form as
+           lmdb_path, but where the images have been stripped from the
+           protobufs.
+        num_labels (int)
+    ]]--
     self.lmdb_path = lmdb_path
     self.lmdb_without_images_path = lmdb_without_images_path
     self.num_labels_ = num_labels
