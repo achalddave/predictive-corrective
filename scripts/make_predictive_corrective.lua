@@ -50,9 +50,9 @@ print(args)
 -- conv53: 29
 -- fc7: 36
 -- fc8: 39
-local MERGE_LAYER_INDICES = {29} -- 22 --[[conv43]], 29 --[[conv53]]}
+local MERGE_LAYER_INDICES = {22, 36} -- 22 --[[conv43]], 29 --[[conv53]]}
 -- How many consecutive inputs to merge at each merging step.
-local REINITIALIZE_RATES = {4} -- , 2}
+local REINITIALIZE_RATES = {1, 4} -- , 2}
 assert(#REINITIALIZE_RATES == #MERGE_LAYER_INDICES)
 print('Merge layer indices:', MERGE_LAYER_INDICES)
 print('Reinitialize rates:', REINITIALIZE_RATES)
