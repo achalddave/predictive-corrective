@@ -2,7 +2,7 @@ local nn = require 'nn'
 local rnn = require 'rnn'
 local torch = require 'torch'
 
-local RecursorSpecialInit = require 'layers/RecursorSpecialInit'
+local InitUpdateRecurrent = require 'layers/InitUpdateRecurrent'
 
 local PredictiveCorrectiveRecurrent, parent = torch.class(
     'nn.PredictiveCorrectiveRecurrent', 'nn.Sequential')
@@ -34,7 +34,7 @@ function PredictiveCorrectiveRecurrent:__init(
 
     self.modules = {
         differencer,
-        nn.RecursorSpecialInit(init, update, rho),
+        nn.InitUpdateRecurrent(init, update, rho),
         nn.Recurrence(nn.CAddTable(),
                       output_size --[[outputSize]],
                       num_input_dim --[[nInputDim]],
