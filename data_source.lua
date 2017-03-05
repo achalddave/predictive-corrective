@@ -132,8 +132,7 @@ function LabeledVideoFramesLmdbSource.static._labels_to_tensor(
     ]]--
     local labels_tensor = torch.ByteTensor(num_labels):zero()
     for _, label in ipairs(labels) do
-        -- Label ids start at 0.
-        labels_tensor[label + 1] = 1
+        labels_tensor[label + 1] = 1 -- Label ids start at 0.
     end
     return labels_tensor
 end

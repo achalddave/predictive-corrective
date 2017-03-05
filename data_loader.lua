@@ -141,6 +141,9 @@ function PermutedSampler.static.filter_boundary_frames(
     -- Args:
     --     video_keys (array of arrays): Maps video name to array of keys for
     --         frames in the video.
+    --
+    --  Returns:
+    --      keys (array): Valid keys after filtering.
     --]]
     local keys = {}
     for _, keys_in_video in pairs(video_keys) do
