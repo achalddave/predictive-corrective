@@ -7,8 +7,7 @@ require 'layers/PredictiveCorrectiveRecurrent'
 local function test_no_reinit()
     local init = nn.MulConstant(1)
     local update = nn.MulConstant(2)
-    local model = nn.PredictiveCorrectiveRecurrent(
-        init, update, torch.LongStorage({5, 5}), torch.LongStorage({5, 5}), 2, math.huge)
+    local model = nn.PredictiveCorrectiveRecurrent(init, update, math.huge)
     model = nn.Sequencer(model)
 
     local inputs = {}
@@ -25,8 +24,7 @@ end
 local function test_reinit_every_time()
     local init = nn.MulConstant(1)
     local update = nn.MulConstant(2)
-    local model = nn.PredictiveCorrectiveRecurrent(
-        init, update, torch.LongStorage({5, 5}), torch.LongStorage({5, 5}), 2, math.huge)
+    local model = nn.PredictiveCorrectiveRecurrent(init, update, math.huge)
 
     local inputs = {}
     for i = 1, 4 do inputs[i] = torch.rand(5, 5) end
@@ -46,8 +44,7 @@ end
 local function test_clearState()
     local init = nn.MulConstant(1)
     local update = nn.MulConstant(2)
-    local model = nn.PredictiveCorrectiveRecurrent(
-        init, update, torch.LongStorage({5, 5}), torch.LongStorage({5, 5}), 2, math.huge)
+    local model = nn.PredictiveCorrectiveRecurrent(init, update, math.huge)
     model = nn.Sequencer(model)
 
     local inputs = {}
