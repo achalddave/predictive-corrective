@@ -6,6 +6,7 @@ as values.
 local classic = require 'classic'
 local threads = require 'threads'
 local torch = require 'torch'
+local __ = require 'moses'
 require 'classic.torch'
 
 local data_source = require 'data_source'
@@ -60,12 +61,7 @@ function PermutedSampler:_init(
     self.replace = options.replace == nil and false or options.replace
 
     -- TODO: Don't store two copies of keys.
-    self.keys = {}
-    for _, keys in pairs(self.video_keys) do
-        for _, key in ipairs(keys) do
-            table.insert(self.keys, key)
-        end
-    end
+    self.keys = __.flatten(self.video_keys)
 
     if not self.use_boundary_frames then
         self.keys = PermutedSampler.filter_boundary_frames(
@@ -146,6 +142,8 @@ function PermutedSampler.static.filter_boundary_frames(
     --      keys (array): Valid keys after filtering.
     --]]
     local keys = {}
+    -- TODO(achald): Use __.initial and __.last to clean up this code. Be sure
+    -- to test this thoroughly!
     for _, keys_in_video in pairs(video_keys) do
         if step_size > 0 then
             -- Remove the last ((sequence_length - 1) * step_size) keys.
@@ -214,11 +212,7 @@ function BalancedSampler:_init(
         valid_keys = PermutedSampler.filter_boundary_frames(
             self.video_keys, sequence_length, -step_size)
     else
-        for _, keys in pairs(self.video_keys) do
-            for _, key in ipairs(keys) do
-                table.insert(valid_keys, key)
-            end
-        end
+        local valid_keys = __.flatten(self.video_keys)
     end
     self.num_keys = #valid_keys
 
@@ -339,16 +333,9 @@ function SequentialSampler:_init(
     self.data_source = data_source_obj
 
     -- TODO(achald): Should we sort these by length of videos?
-    self.video_start_keys = {}
-    for _, keys_for_video in pairs(self.video_keys) do
-        table.insert(self.video_start_keys, keys_for_video[1])
-    end
-    self.video_start_keys = Sampler.permute(self.video_start_keys)
+    self.video_start_keys = Sampler.permute(__.pluck(self.video_keys, 1))
 
-    self.next_frames = {}
-    for i = 1, self.batch_size do
-        self.next_frames[i] = self.video_start_keys[i]
-    end
+    self.next_frames = __.first(self.video_start_keys, self.batch_size)
     -- Set to the last video that we are currently outputting; when a video
     -- ends, this will be advanced by 1 and a new video will be output.
     self.video_index = self.batch_size

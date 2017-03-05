@@ -1,6 +1,7 @@
 local classic = require 'classic'
 local lmdb = require 'lmdb'
 local torch = require 'torch'
+local __ = require 'moses'
 require 'classic.torch'
 
 local video_frame_proto = require 'video_util.video_frames_pb'
@@ -161,11 +162,7 @@ function LabeledVideoFramesLmdbSource.static._load_image_labels_from_proto(
         frame_proto.frame.image)
 
     -- Load labels in an array.
-    local labels = {}
-    for _, label in ipairs(frame_proto.label) do
-        table.insert(labels, label.id)
-    end
-
+    local labels = __.pluck(frame_proto.label, 'id')
     return img, labels
 end
 
