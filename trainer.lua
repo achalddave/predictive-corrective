@@ -141,23 +141,6 @@ function Trainer:evaluate_epoch(epoch, num_batches)
     self:_train_or_evaluate_epoch(epoch, num_batches, false --[[train_mode]])
 end
 
-function Trainer.static.deep_copy(tbl)
-    -- Copied from fb.resnet.torch repo.
-    -- Creates a copy of a network with new modules and the same tensors.
-    local copy = {}
-    for k, v in pairs(tbl) do
-        if type(v) == 'table' then
-            copy[k] = Trainer.deep_copy(v)
-        else
-            copy[k] = v
-        end
-    end
-    if torch.typename(tbl) then
-        torch.setmetatable(copy, torch.typename(tbl))
-    end
-    return copy
-end
-
 function Trainer:save(directory, epoch)
     --[[
     Save model, optimization config, and optimization config to a directory.
@@ -168,7 +151,8 @@ function Trainer:save(directory, epoch)
     if torch.isTypeOf(model, 'nn.DataParallelTable') then
         model = model:get(1)
     end
-    local cpu_model = Trainer.deep_copy(model):float():clearState()
+    local cpu_model = model:float():clearState()
+    model:cuda()
     torch.save(paths.concat(directory, 'model_' .. epoch .. '.t7'), cpu_model)
     torch.save(paths.concat(directory, 'optim_config_' .. epoch .. '.t7'),
                self.optimization_config)
