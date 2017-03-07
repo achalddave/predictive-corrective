@@ -155,7 +155,7 @@ local function test_reset_faster_reinit()
     assert(test_util.equals(b[3], a[3]))
     assert(test_util.equals(b[4], a[4] + a[3]))
 end
-test_util.run_test(test_single_diff, 'Single summerence')
+test_util.run_test(test_single_diff, 'Single summer')
 test_util.run_test(test_reinit, 'Reinit')
 test_util.run_test(test_small_input_after_larger_input,
                    'Small input after larger input')
