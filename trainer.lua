@@ -423,8 +423,7 @@ function SequentialTrainer:_train_or_evaluate_batch(train_mode)
         data_loader = self.val_data_loader
     end
 
-    local images_table, labels = data_loader:load_batch(
-        1 --[[batch size]])
+    local images_table, labels = data_loader:load_batch(1 --[[batch size]])
     if images_table[1][1] == END_OF_SEQUENCE then
         -- The sequence ended at the end of the last batch; reset the model and
         -- start loading the next sequence in the next batch.
