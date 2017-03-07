@@ -64,11 +64,11 @@ local function test_backward_one_step()
     assert(test_util.equals(computed_gradients[1], computed_gradients_block[1]))
 end
 
-local function test_backward_two_steps()
+local function test_backward_multiple_steps()
     local init = nn.MulConstant(1)
     local update = nn.MulConstant(2)
-    local reinit = 2
-    local rho = 2
+    local reinit = 4
+    local rho = 4
 
     local function clone(table_of_tensors)
         return __.invoke(table_of_tensors, function(x) return x:clone() end)
@@ -167,6 +167,76 @@ local function test_backward_two_steps()
     end
 end
 
+local function test_sequencer_highjack_rho()
+    local init = nn.MulConstant(1)
+    local update = nn.MulConstant(2)
+    local reinit = 4
+    local rho = 2 -- Should be overridden by nn.Sequencer
+
+    local model = nn.PredictiveCorrectiveRecurrent(init, update, reinit, rho)
+    model = nn.Sequencer(model)
+
+    local model_block = nn.Sequential()
+        :add(nn.CRollingDiffTable(reinit))
+        :add(nn.PeriodicResidualTable(reinit, init:clone(), update:clone()))
+        :add(nn.CCumSumTable(reinit))
+
+    local inputs = {}
+    for i = 1, 4 do inputs[i] = torch.rand(5, 5) end
+
+    local outputs_block = model_block:forward(inputs)
+    local outputs = model:forward(inputs)
+
+    assert(test_util.equals(outputs_block[1], outputs[1]))
+
+    local gradients = outputs
+
+    local computed_gradients = model:backward(inputs, gradients)
+    local computed_gradients_block = model_block:backward(inputs, gradients)
+    assert(test_util.equals(computed_gradients[1], computed_gradients_block[1]))
+    assert(test_util.equals(computed_gradients[2], computed_gradients_block[2]))
+    assert(test_util.equals(computed_gradients[3], computed_gradients_block[3]))
+    assert(test_util.equals(computed_gradients[4], computed_gradients_block[4]))
+end
+
+
+local function test_backward_small_rho()
+    local init = nn.MulConstant(1)
+    local update = nn.MulConstant(2)
+    local reinit = 4
+    local rho = 1
+
+    local model = nn.PredictiveCorrectiveRecurrent(init, update, reinit, rho)
+
+    local model_block = nn.Sequential()
+        :add(nn.CRollingDiffTable(reinit))
+        :add(nn.PeriodicResidualTable(reinit, init:clone(), update:clone()))
+        :add(nn.CCumSumTable(reinit))
+
+    local inputs = {}
+    for i = 1, 4 do inputs[i] = torch.rand(5, 5) end
+
+    local outputs_block = model_block:forward(inputs)
+    local outputs = {}
+    for i = 1, 4 do outputs[i] = model:forward(inputs[i]):clone() end
+
+    assert(test_util.equals(outputs_block[1], outputs[1]))
+    assert(test_util.equals(outputs_block[2], outputs[2]))
+    assert(test_util.equals(outputs_block[3], outputs[3]))
+    assert(test_util.equals(outputs_block[4], outputs[4]))
+
+    local gradients = outputs
+
+    local computed_gradients = {}
+    for i = 4, 3, -1 do
+        computed_gradients[i] = model:backward(inputs[i], gradients[i]):clone()
+    end
+
+    local computed_gradients_block = model_block:backward(inputs, gradients)
+    assert(test_util.equals(computed_gradients[3], computed_gradients_block[3]))
+    assert(test_util.equals(computed_gradients[4], computed_gradients_block[4]))
+end
+
 local function test_reinit_every_time()
     local init = nn.MulConstant(1)
     local update = nn.MulConstant(2)
@@ -211,9 +281,11 @@ local function test_clearState()
     assert(test_util.equals(outputs[4], 2*(inputs[4] - inputs[3]) + outputs[3]))
 end
 
-test_util.run_test(test_no_reinit, 'No reinit test')
+test_util.run_test(test_no_reinit, 'Forward without reinit')
+test_util.run_test(test_no_reinit_backward, 'Backward without reinit')
+test_util.run_test(test_reinit_every_time, 'Forward reinit every time')
 test_util.run_test(test_backward_one_step, 'Test backward one step')
-test_util.run_test(test_backward_two_steps, 'Test backward two steps')
-test_util.run_test(test_no_reinit_backward, 'Backward')
-test_util.run_test(test_reinit_every_time, 'Reinit every time')
+test_util.run_test(test_backward_multiple_steps, 'Backward multiple steps')
+test_util.run_test(test_backward_small_rho, 'Test backward with small rho')
+test_util.run_test(test_sequencer_highjack_rho, 'Highjack rho')
 test_util.run_test(test_clearState, 'clearState')

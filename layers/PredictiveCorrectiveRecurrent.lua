@@ -81,6 +81,9 @@ function InputCouplerRecurrent:_updateGradInput(input, gradOutput)
     --     input
     --     gradOutput: Table containing two elements of same size as input.
     --]]
+    assert(self.updateGradInputStep >= self.step - self.rho,
+           string.format('Called backward more than rho+1=%d times',
+                         self.rho+1))
     assert(self.step > 1, "expecting at least one updateOutput")
     local step = self.updateGradInputStep - 1
     assert(step >= 1)
@@ -197,6 +200,6 @@ function PredictiveCorrectiveRecurrent:__init(
     self.modules = {
         nn.CRollingDiffRecurrent(reinitialize_rate, rho),
         nn.InitUpdateRecurrent(init, update, reinitialize_rate, rho),
-        nn.CCumSumRecurrent(rho)
+        nn.CCumSumRecurrent(reinitialize_rate, rho)
     }
 end
