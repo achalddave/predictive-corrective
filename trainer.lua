@@ -377,8 +377,7 @@ function Trainer:_epoch_learning_rate(epoch)
     return regime.learning_rate, is_new_regime
 end
 
-local SequentialTrainer, SequentialTrainerSuper = classic.class(
-    'SequentialTrainer', Trainer)
+local SequentialTrainer, parent = classic.class('SequentialTrainer', Trainer)
 function SequentialTrainer:_init(args)
     if args.input_dimension_permutation ~= nil then
         for i = 1, #args do
@@ -388,7 +387,7 @@ function SequentialTrainer:_init(args)
             end
         end
     end
-    SequentialTrainerSuper._init(self, args)
+    parent._init(self, args)
     assert(self.batch_size == 1,
           'Currently, SequentialTrainer only supports batch size = 1. ' ..
           'See the "recurrent_batched_training" branch for some WIP on ' ..
