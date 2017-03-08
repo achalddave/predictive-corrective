@@ -197,6 +197,22 @@ cutorch.setDevice(GPUS[1])
 model:evaluate()
 log.info('Loaded model.')
 
+-- Ensure that dropout is properly turned off. Sometimes with modules such as
+-- nn.MapTable and nn.PeriodicResidualTable, we have issues where dropout is not
+-- properly turned off even when :evaluate() is called.
+local test_input = torch.rand(
+    args.sequence_length, 1, 3, CROP_SIZE, CROP_SIZE):cuda()
+local output1 = model:forward(test_input):clone()
+model:forget()
+local output2 = model:forward(test_input):clone()
+model:forget()
+assert(torch.all(torch.eq(output1, output2)),
+       'Model produced two different outputs for the same input!')
+output1 = nil
+output2 = nil
+test_input = nil
+collectgarbage(); collectgarbage()
+
 local function crop_and_zero_center_images(
     images_table, crops, crop_size, image_mean)
     --[[
