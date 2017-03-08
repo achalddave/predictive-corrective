@@ -187,10 +187,8 @@ end
 -- dimension is a step in the sequence.
 local batch_dimension = args.c3d_input and 1 or 2
 local model = nn.DataParallelTable(batch_dimension --[[dimension]])
-for _, gpu in ipairs(GPUS) do
-    cutorch.setDevice(gpu)
-    model:add(single_model:clone():cuda(), gpu)
-end
+model:add(single_model, GPUS)
+model:cuda()
 single_model = nil
 collectgarbage()
 collectgarbage()
