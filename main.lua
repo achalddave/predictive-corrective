@@ -15,6 +15,7 @@ local nn = require 'nn'
 local paths = require 'paths'
 local torch = require 'torch'
 local signal = require 'posix.signal'
+local __ = require 'moses'
 
 require 'nnlr'
 require 'rnn'
@@ -105,8 +106,6 @@ function normalize_config(config)
     return config
 end
 
-config = normalize_config(config)
-
 -- Create cache_base
 if not paths.dirp(args.cache_base) and not paths.mkdir(args.cache_base) then
     log.error('Error creating cache base dir:', args.cache_base)
@@ -122,11 +121,24 @@ experiment_saver.save_git_info(cache_dir)
 log.info('Saving run information to', cache_dir)
 
 -- Save config to cache_dir
-experiment_saver.copy_file(args.config, paths.concat(cache_dir, 'config.yaml'))
+do
+    experiment_saver.copy_file(
+        args.config, paths.concat(cache_dir, 'config.yaml'))
+    local new_config = lyaml.load(io.open(args.config, 'r'):read('*a'))
+    assert(__.isEqual(config, new_config),
+           'Config updated before it could be copied!')
+end
 if config.data_paths_config ~= nil then
     experiment_saver.copy_file(
         config.data_paths_config,
         paths.concat(cache_dir, paths.basename(config.data_paths_config)))
+end
+
+config = normalize_config(config)
+do -- Write normalized config to file
+    local normalized_config_out = io.open(
+        paths.concat(cache_dir, 'normalized-config.yaml'), 'w')
+    normalized_config_out:write(lyaml.dump(config))
 end
 
 local experiment_id = experiment_saver.read_and_increment_experiment_id(
