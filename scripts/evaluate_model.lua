@@ -194,6 +194,18 @@ collectgarbage()
 collectgarbage()
 
 cutorch.setDevice(GPUS[1])
+layers, _ = model:findModules('nn.MapTable')
+for j, layer in ipairs(layers) do
+    if layer.modules[1] ~= layer.module then
+        -- This shouldn't happen! It happened for a few models trained using
+        -- commits between c6b93fe and 12f5b4b. See the commit message for
+        -- 12f5b4b for details.
+        log.warn('MapTable module not in modules! Adding it.')
+        layer.module = layer.modules[1]
+    end
+end
+collectgarbage()
+collectgarbage()
 model:evaluate()
 log.info('Loaded model.')
 
