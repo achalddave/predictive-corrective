@@ -184,11 +184,11 @@ function Trainer:_train_or_evaluate_batch(train_mode)
             if outputs == nil then
                 outputs = current_outputs:clone()
             else
-                -- If the outputs are 3D, then they must be (sequence_length,
-                -- batch_size, num_labels). Otherwise, they are 2D and of shape
-                -- (batch_size, num_labels).
-                local batch_dimension = current_outputs:dim() == 3 and 2 or 1
-                outputs = torch.cat(outputs, current_outputs, batch_dimension)
+                assert(current_outputs:dim() == 3,
+                       'Unknown output size: ' .. current_outputs:size())
+                -- Outputs should be of size (sequence_length, batch_size,
+                -- num_labels). Concatenate across the second dimension.
+                outputs = torch.cat(outputs, current_outputs, 2 --[[batch dim]])
             end
         end
         return loss, self.model_grad_parameters
@@ -332,8 +332,10 @@ function Trainer:_forward_backward(images, labels, train_mode)
     local outputs = self.model:forward(self.gpu_inputs)
     -- If the output of the network is a single prediction for the sequence,
     -- compare it to the label of the last frame.
-    if (outputs:size(1) == 1 or outputs:dim() == 2) and
-            self.gpu_labels:size(1) ~= 1 then
+    if outputs:dim() == 2 then
+        outputs = nn.utils.addSingletonDimension(outputs, 1)
+    end
+    if outputs:size(1) == 1 and self.gpu_labels:size(1) ~= 1 then
         self.gpu_labels = self.gpu_labels[self.gpu_labels:size(1)]
     end
     -- The loss is averaged by the computational batch size; we want to
