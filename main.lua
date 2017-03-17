@@ -49,6 +49,8 @@
 --     sampler. See sampler documentation in data_loader.lua.
 -- sequence_length (int): Number of steps in a sequence. See Trainer
 --     for details. (Default: 1)
+-- backprop_rho (int): Number of steps for truncated backprop through time. See
+--     Trainer for details. (Default: sequence_length)
 -- step_size (int): Step size for sequence. This is equal to 1 + the
 --     number of frames between consecutive steps in the sequence.
 --     (Default: 1)
@@ -82,6 +84,10 @@
 --     re-starting training.
 -- decorate_sequencer (bool): If specified, decorate model with
 --     nn.Sequencer.
+-- sequencer_remember (string): One of {None, 'eval', 'train', 'neither',
+--     'both'}. If not empty or nil, call `:remember(sequencer_remember)` on the
+--     model, which is assumed to implement the method (mainly for
+--     nn.Sequencer). (Default '')
 --]]
 
 local argparse = require 'argparse'
@@ -287,6 +293,10 @@ if config.decorate_sequencer then
     end
     single_model = nn.Sequencer(single_model)
 end
+if config.sequencer_remember ~= nil then
+    single_model:remember(config.sequencer_remember)
+    log.info('Calling :remember with "' .. config.sequencer_remember .. '"')
+end
 local batch_dimension = 2 -- by default
 for i = 1, 5 do
     if config.input_dimension_permutation[i] == batch_dimension then
@@ -393,6 +403,7 @@ local trainer = trainer_class {
     pixel_mean = config.pixel_mean,
     batch_size = config.batch_size,
     computational_batch_size = config.computational_batch_size,
+    backprop_rho = config.backprop_rho,
     crop_size = config.crop_size,
     learning_rates = config.learning_rates,
     momentum = config.momentum,

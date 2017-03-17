@@ -28,6 +28,10 @@ function Trainer:_init(args)
     dimensions can be changed by specifying input_dimension_permutation (see
     below).
 
+    By default, the model will be passed the entire input tensor above, but this
+    can be changed with computational_batch_size and backprop_rho (which can
+    be used for truncated backprop). See doc for these parameters below.
+
     Args:
         model
         criterion
@@ -42,6 +46,11 @@ function Trainer:_init(args)
         pixel_mean
         batch_size
         computational_batch_size
+        backprop_rho (int): Optional. If specified, sequences will be fed to the
+            model in chunks of backprop_rho steps, and after all the chunks
+            have been processed, `model:forget()` will be called. This can be
+            used for truncated back-propagation with a model that maintains
+            state across forward/backward calls.
         crop_size
         learning_rates: Array of tables containing keys 'start_epoch',
             'learning_rate'. E.g.
@@ -78,6 +87,7 @@ function Trainer:_init(args)
     self.batch_size = args.batch_size
     self.computational_batch_size = args.computational_batch_size or
                                     args.batch_size
+    self.backprop_rho = args.backprop_rho
     self.crop_size = args.crop_size
     self.weight_decay = args.weight_decay
     self.learning_rates = args.learning_rates
@@ -338,33 +348,77 @@ function Trainer:_forward_backward(images, labels, train_mode)
         train_mode (bool): If true, perform backward pass as well.
     ]]--
     local num_images = images:size(2)
-    if self.input_dimension_permutation then
-        images = images:permute(unpack(self.input_dimension_permutation))
-    end
+    local sequence_length = images:size(1)
+    local sequence_chunk = self.backprop_rho or sequence_length
 
-    self.gpu_inputs:resize(images:size()):copy(images)
-    self.gpu_labels:resize(labels:size()):copy(labels)
+    -- This sequence chunking code is similar to what we do for
+    -- computational_batch_size in _train_or_evaluate_batch, but there isn't an
+    -- easy way to share the code.
+    local loss = 0
+    local outputs
+    for i = 1, math.ceil(sequence_length / sequence_chunk) do
+        local start_index = (i - 1) * sequence_chunk + 1
+        local end_index = math.min(i * sequence_chunk, sequence_length)
+        local chunk_images = images[{{start_index, end_index}, {}}]
+        local chunk_labels = labels[{{start_index, end_index}, {}}]
+        if self.input_dimension_permutation then
+            chunk_images = chunk_images:permute(
+                unpack(self.input_dimension_permutation))
+        end
+        self.gpu_inputs:resize(chunk_images:size()):copy(chunk_images)
+        self.gpu_labels:resize(chunk_labels:size()):copy(chunk_labels)
+        local current_outputs = self.model:forward(self.gpu_inputs)
+        if current_outputs:dim() == 2 then
+            current_outputs = nn.utils.addSingletonDimension(current_outputs, 1)
+        end
 
-    local outputs = self.model:forward(self.gpu_inputs)
-    -- If the output of the network is a single prediction for the sequence,
-    -- compare it to the label of the last frame.
-    if outputs:dim() == 2 then
-        outputs = nn.utils.addSingletonDimension(outputs, 1)
+        if outputs == nil then
+            outputs = current_outputs:clone()
+        else
+            outputs = torch.cat(outputs, current_outputs, 1 --[[sequence]])
+        end
+
+        -- If the output of the network is a single prediction for the sequence,
+        -- compare it to the label of the last frame.
+        if current_outputs:size(1) == 1 and self.gpu_labels:size(1) ~= 1 then
+            log.info('Only one output from network, but multiple GT labels.')
+            self.gpu_labels = self.gpu_labels[self.gpu_labels:size(1)]
+        end
+        loss = loss + self.criterion:forward(current_outputs, self.gpu_labels)
+
+        if train_mode then
+            local criterion_gradients = self.criterion:backward(
+                current_outputs, self.gpu_labels)
+            if criterion_gradients:norm() <= 1e-10 and loss >= 1e-10 then
+                log.info(string.format(
+                    'Criterion gradients small: %.2f; Loss: %.2f',
+                    criterion_gradients:norm(), loss))
+            end
+            self.model:backward(self.gpu_inputs,
+                                criterion_gradients,
+                                num_images / self.batch_size)
+            -- torch.abs makes a copy which takes too much memory
+            local max_grad = math.max(torch.max(self.model_grad_parameters), -torch.min(self.model_grad_parameters))
+            if max_grad > 9.2 then
+                log.warn('Large gradients! Max magnitude:', max_grad, i)
+            end
+        end
     end
-    if outputs:size(1) == 1 and self.gpu_labels:size(1) ~= 1 then
-        self.gpu_labels = self.gpu_labels[self.gpu_labels:size(1)]
+    -- Forget state for next set of sequences. This is necessary since we use
+    -- truncated backpropagation above to compute gradients over long sequences
+    -- from small chunks (of length self.backprop_rho).
+    if torch.isTypeOf(self.model, 'nn.DataParallelTable') then
+        self.model.impl:exec(function(m) m:forget() end)
+    else
+        self.model:forget()
     end
+    collectgarbage()
+    collectgarbage()
+
     -- The loss is averaged by the computational batch size; we want to
     -- average by the actual batch size.
-    local loss = self.criterion:forward(outputs, self.gpu_labels) * (
-        num_images / self.batch_size)
+    loss = loss * (num_images / self.batch_size)
 
-    if train_mode then
-        local criterion_gradients = self.criterion:backward(
-            outputs, self.gpu_labels)
-        self.model:backward(
-            self.gpu_inputs, criterion_gradients, num_images / self.batch_size)
-    end
     return loss, outputs
 end
 
