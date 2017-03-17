@@ -126,6 +126,34 @@ parser:flag('--debug', "Indicates that we are only debugging; " ..
 local args = parser:parse()
 local config = lyaml.load(io.open(args.config, 'r'):read('*a'))
 
+-- Create cache_base
+if not paths.dirp(args.cache_base) and not paths.mkdir(args.cache_base) then
+    log.error('Error creating cache base dir:', args.cache_base)
+    os.exit()
+end
+local cache_dir = paths.concat(args.cache_base, os.date('%m-%d-%y-%H-%M-%S'))
+if not paths.mkdir(cache_dir) then
+    log.error('Error making cache dir:', cache_dir)
+    os.exit()
+end
+log.outfile = paths.concat(cache_dir, 'training.log')
+experiment_saver.save_git_info(cache_dir)
+log.info('Saving run information to', cache_dir)
+
+-- Save config to cache_dir
+do
+    experiment_saver.copy_file(
+        args.config, paths.concat(cache_dir, 'config.yaml'))
+    local new_config = lyaml.load(io.open(args.config, 'r'):read('*a'))
+    assert(__.isEqual(config, new_config),
+           'Config updated before it could be copied!')
+end
+if config.data_paths_config ~= nil then
+    experiment_saver.copy_file(
+        config.data_paths_config,
+        paths.concat(cache_dir, paths.basename(config.data_paths_config)))
+end
+
 function normalize_config(config)
     if config.data_paths_config ~= nil then
         local data_paths = lyaml.load(
@@ -181,35 +209,8 @@ function normalize_config(config)
     return config
 end
 
--- Create cache_base
-if not paths.dirp(args.cache_base) and not paths.mkdir(args.cache_base) then
-    log.error('Error creating cache base dir:', args.cache_base)
-    os.exit()
-end
-local cache_dir = paths.concat(args.cache_base, os.date('%m-%d-%y-%H-%M-%S'))
-if not paths.mkdir(cache_dir) then
-    log.error('Error making cache dir:', cache_dir)
-    os.exit()
-end
-log.outfile = paths.concat(cache_dir, 'training.log')
-experiment_saver.save_git_info(cache_dir)
-log.info('Saving run information to', cache_dir)
-
--- Save config to cache_dir
-do
-    experiment_saver.copy_file(
-        args.config, paths.concat(cache_dir, 'config.yaml'))
-    local new_config = lyaml.load(io.open(args.config, 'r'):read('*a'))
-    assert(__.isEqual(config, new_config),
-           'Config updated before it could be copied!')
-end
-if config.data_paths_config ~= nil then
-    experiment_saver.copy_file(
-        config.data_paths_config,
-        paths.concat(cache_dir, paths.basename(config.data_paths_config)))
-end
-
 config = normalize_config(config)
+
 do -- Write normalized config to file
     local normalized_config_out = io.open(
         paths.concat(cache_dir, 'normalized-config.yaml'), 'w')
