@@ -216,11 +216,10 @@ function Trainer:_train_or_evaluate_batch(train_mode)
         -- self.model) in place.
         optim.sgd(forward_backward, self.model_parameters,
                   self.optimization_config, self.optimization_state)
-        return loss, outputs, labels
     else
         forward_backward()
-        return loss, outputs, labels
     end
+    return loss, outputs, labels
 end
 
 function Trainer:_train_or_evaluate_epoch(epoch, num_batches, train_mode)
