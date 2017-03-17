@@ -63,6 +63,7 @@
 -- # Optimization options
 -- momentum (float)
 -- weight_decay (float)
+-- gradient_clip (float)
 -- learning_rates (list of objects): List containing objects of the
 --     form { start_epoch: (int), learning_rate: (float) }.
 -- learning_rate_multipliers (list of objects): List specifiying learning rate
@@ -406,6 +407,7 @@ local trainer = trainer_class {
     backprop_rho = config.backprop_rho,
     crop_size = config.crop_size,
     learning_rates = config.learning_rates,
+    gradient_clip = config.gradient_clip,
     momentum = config.momentum,
     weight_decay = config.weight_decay,
     optim_config = optim_config,

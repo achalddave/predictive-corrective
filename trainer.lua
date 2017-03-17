@@ -58,6 +58,7 @@ function Trainer:_init(args)
                  {start_epoch: 6, learning_rate: 1e-3}]
             will use a learning rate of 1e-2 for the first 5 epochs, then switch
             to a learning rate of 1e-3.
+        gradient_clip (float)
         momentum (float)
         weight_decay (float)
         use_nnlr (bool): If true, use nnlr to train with layer
@@ -72,6 +73,8 @@ function Trainer:_init(args)
         self.cleared_model = self.cleared_model:get(1)
     end
     self.cleared_model = self.cleared_model:sharedClone():clearState()
+
+    self.gradient_clip = args.gradient_clip
     self.criterion = args.criterion
     self.train_data_loader = args.train_data_loader
     self.val_data_loader = args.val_data_loader
@@ -217,6 +220,10 @@ function Trainer:_train_or_evaluate_batch(train_mode)
                 -- Concatenate across the second dimension.
                 outputs = torch.cat(outputs, chunk_outputs, 2 --[[batch dim]])
             end
+        end
+        if self.gradient_clip ~= nil then
+            self.model_grad_parameters:clamp(
+                -self.gradient_clip, self.gradient_clip)
         end
         return loss, self.model_grad_parameters
     end
@@ -397,11 +404,6 @@ function Trainer:_forward_backward(images, labels, train_mode)
             self.model:backward(self.gpu_inputs,
                                 criterion_gradients,
                                 num_images / self.batch_size)
-            -- torch.abs makes a copy which takes too much memory
-            local max_grad = math.max(torch.max(self.model_grad_parameters), -torch.min(self.model_grad_parameters))
-            if max_grad > 9.2 then
-                log.warn('Large gradients! Max magnitude:', max_grad, i)
-            end
         end
     end
     -- Forget state for next set of sequences. This is necessary since we use
@@ -557,6 +559,10 @@ function SequentialTrainer:_train_or_evaluate_batch(train_mode)
                     criterion_gradients:norm(), loss))
             end
             self.model:backward(self.gpu_inputs, criterion_gradients)
+            if self.gradient_clip ~= nil then
+                self.model_grad_parameters:clamp(
+                    -self.gradient_clip, self.gradient_clip)
+            end
             return loss, self.model_grad_parameters
         end
 
