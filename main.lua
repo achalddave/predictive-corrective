@@ -1,10 +1,85 @@
 --[[
--- Fine-tunes an ImageNet-pretrained VGG-16 network on MultiTHUMOS data.
+-- Train a model on image data.
 --
 -- Example usage:
 --    th main.lua \
 --      config/config-vgg.yaml \
 --      model_output_dir/
+--
+-- Config options:
+--
+-- Note that the types listed are YAML types (e.g. list instead of table).
+--
+-- # General
+-- seed (int): Random seed
+-- gpus (list): List of GPUs to use
+--
+-- # Data options
+-- data_paths_config (str): Yaml file configuring datasets/splits.
+--     Maps keys of dataset/split names to an object containing
+--     keys 'with_images' and 'without_images' (whose values are the
+--     LMDBs with and without images)
+-- train_split (str): Name of dataset/split to use for training. Must
+--     be a key in data_paths_config.
+-- val_split (str): Name of dataset/split to use for evaluation. Must
+--     be a key in data_paths_config.
+-- num_labels (int): Number of labels.
+-- crop_size (int): Size to crop image to before passing ot network.
+-- pixel_mean (list of floats): Mean pixel to subtract from images.
+-- data_source_class (str): Data source class to use. See data_source.lua for
+--     possible classes. (Default: 'LabeledVideoFramesLmdbSource')
+-- data_source_options (object): Options to pass to data source. (Default: {})
+--
+-- # Training options
+-- num_epochs (int): Number of epochs to train.
+-- epoch_size (int): Number of batches in one epoch.
+-- val_epoch_size (int): Number of batches in one evaluation epoch.
+--     (Default: epoch_size)
+-- batch_size (int): Mini batch size for mini-batch SGD.
+-- computational_batch_size (int): The *computational* batch size:
+--     how many examples should we pass at once to the network and
+--     compute gradients. See Trainer documentation for details.
+--     (Default: batch_size)
+-- criterion_wrapper (string): Either 'sequencer_criterion' or
+--     'last_step_criterion', which will wrap the criterion with
+--     nn.SequencerCriterion or nn.LastStepCriterion.
+-- sampling_strategy (string): Which sampling strategy to use. One of
+--     'permuted', 'balanced', or 'sequential'. (Default: {})
+-- sampling_strategy_options (list): Options to be passed to the
+--     sampler. See sampler documentation in data_loader.lua.
+-- sequence_length (int): Number of steps in a sequence. See Trainer
+--     for details. (Default: 1)
+-- step_size (int): Step size for sequence. This is equal to 1 + the
+--     number of frames between consecutive steps in the sequence.
+--     (Default: 1)
+-- input_dimension_permutation (list): See Trainer for details.
+--     (Default: {1, 2, 3, 4, 5})
+-- use_boundary_frames (bool): Whether to use sequences
+--     that go beyond video boundaries. See data_loader.lua for
+--     details. (Default: false)
+--
+-- # Optimization options
+-- momentum (float)
+-- weight_decay (float)
+-- learning_rates (list of objects): List containing objects of the
+--     form { start_epoch: (int), learning_rate: (float) }.
+-- learning_rate_multipliers (list of objects): List specifiying learning rate
+--     multipliers to use for some layers. Contains objects of the form
+--     { name: (type of layer), index: (int), weight: (float), bias: (float) }.
+--     e.g. {name: 'nn.Linear', index: 3, weight: 10, bias: 10} specifies a
+--     10x multiplier on the weight and bias of the 3rd nn.Linear layer in the
+--     model. (Default: {})
+-- dropout_p (float): If specified, update all dropout probabilities
+--     for model to this value.
+-- optim_config (str): If specified, load optim_config from disk. Note that
+--     if this is specified, optim_state must also be specified (and vice
+--     versa). (Default: None)
+-- optim_state (str): If specified, load optim_state from disk. (Default: None)
+--
+-- # Model options
+-- model_init (str): Path to initial model
+-- init_epoch (int): Initial epoch to start training with. Useful for
+--     re-starting training.
 --]]
 
 local argparse = require 'argparse'
