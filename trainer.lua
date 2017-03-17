@@ -76,7 +76,8 @@ function Trainer:_init(args)
     end
     self.pixel_mean = torch.Tensor(args.pixel_mean)
     self.batch_size = args.batch_size
-    self.computational_batch_size = args.computational_batch_size
+    self.computational_batch_size = args.computational_batch_size or
+                                    args.batch_size
     self.crop_size = args.crop_size
     self.weight_decay = args.weight_decay
     self.learning_rates = args.learning_rates
