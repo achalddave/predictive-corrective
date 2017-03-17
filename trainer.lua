@@ -58,6 +58,11 @@ function Trainer:_init(args)
         optim_state: Optional
     ]]--
     self.model = args.model
+    self.cleared_model = self.model
+    if torch.isTypeOf(self.cleared_model, 'nn.DataParallelTable') then
+        self.cleared_model = self.cleared_model:get(1)
+    end
+    self.cleared_model = self.cleared_model:sharedClone():clearState()
     self.criterion = args.criterion
     self.train_data_loader = args.train_data_loader
     self.val_data_loader = args.val_data_loader
@@ -159,13 +164,8 @@ function Trainer:save(directory, epoch)
     ]]--
     -- Clear intermediate states in the model before saving to disk to minimize
     -- disk space usage.
-    local model = self.model
-    if torch.isTypeOf(model, 'nn.DataParallelTable') then
-        model = model:get(1)
-    end
-    local cpu_model = model:float():clearState()
-    model:cuda()
-    torch.save(paths.concat(directory, 'model_' .. epoch .. '.t7'), cpu_model)
+    torch.save(
+        paths.concat(directory, 'model_' .. epoch .. '.t7'), self.cleared_model)
     torch.save(paths.concat(directory, 'optim_config_' .. epoch .. '.t7'),
                self.optimization_config)
     torch.save(paths.concat(directory, 'optim_state_' .. epoch .. '.t7'),
