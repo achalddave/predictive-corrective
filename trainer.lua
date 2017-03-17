@@ -410,6 +410,7 @@ function Trainer:_forward_backward(images, labels, train_mode)
     -- truncated backpropagation above to compute gradients over long sequences
     -- from small chunks (of length self.backprop_rho).
     if torch.isTypeOf(self.model, 'nn.DataParallelTable') then
+        -- https://github.com/Element-Research/rnn/issues/404
         self.model.impl:exec(function(m) m:forget() end)
     else
         self.model:forget()
