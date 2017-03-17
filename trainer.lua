@@ -49,8 +49,8 @@ function Trainer:_init(args)
                  {start_epoch: 6, learning_rate: 1e-3}]
             will use a learning rate of 1e-2 for the first 5 epochs, then switch
             to a learning rate of 1e-3.
-        momentum
-        weight_decay
+        momentum (float)
+        weight_decay (float)
         use_nnlr (bool): If true, use nnlr to train with layer
             wise learning rates. Otherwise, use the same learning rate for all
             layers. (Default: False)
