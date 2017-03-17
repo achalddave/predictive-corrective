@@ -103,10 +103,12 @@ function Trainer:_init(args)
     else
         self.optimization_state = {}
     end
+    log.info('Getting model parameters')
     -- These variables view into the model's parameters, so that changes to the
     -- model's parameters are automatically reflected in them, and vice versa.
     self.model_parameters, self.model_grad_parameters =
         self.model:getParameters()
+    log.info('Got model parameters')
 
     -- Prefetch the next batch.
     self.train_data_loader:fetch_batch_async(self.batch_size)
