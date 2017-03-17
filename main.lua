@@ -266,7 +266,7 @@ for _, multiplier_spec in ipairs(config.learning_rate_multipliers) do
         multiplier_spec.bias))
 end
 
--- -- Increase dropout probability.
+-- Increase dropout probability.
 if config.dropout_p ~= nil then
    local dropout_layers = single_model:findModules('nn.Dropout')
    for _, layer in ipairs(dropout_layers) do
