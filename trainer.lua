@@ -190,20 +190,22 @@ function Trainer:_train_or_evaluate_batch(train_mode)
             local start_index = (i - 1) * self.computational_batch_size + 1
             local end_index = math.min(
                 i * self.computational_batch_size, self.batch_size)
-            local current_loss, current_outputs =
+            local chunk_loss, chunk_outputs =
                 self:_forward_backward(
                     images[{{}, {start_index, end_index}}],
                     labels[{{}, {start_index, end_index}}],
                     train_mode)
-            loss = loss + current_loss
+            loss = loss + chunk_loss
             if outputs == nil then
-                outputs = current_outputs:clone()
+                outputs = chunk_outputs:clone()
             else
-                assert(current_outputs:dim() == 3,
-                       'Unknown output size: ' .. current_outputs:size())
-                -- Outputs should be of size (sequence_length, batch_size,
-                -- num_labels). Concatenate across the second dimension.
-                outputs = torch.cat(outputs, current_outputs, 2 --[[batch dim]])
+                assert(chunk_outputs:dim() == 3,
+                       'Unknown output size:\n' ..
+                       tostring(chunk_outputs:size()))
+                -- Outputs should be of size
+                -- (sequence_length, batch_size, num_labels).
+                -- Concatenate across the second dimension.
+                outputs = torch.cat(outputs, chunk_outputs, 2 --[[batch dim]])
             end
         end
         return loss, self.model_grad_parameters
