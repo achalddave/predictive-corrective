@@ -16,6 +16,18 @@ local Trainer = classic.class('Trainer')
 
 function Trainer:_init(args)
     --[[
+    Trains a model on images.
+
+    This is by no means a general purpose trainer class. It assumes a number of
+    things about the model and inputs, as described below.
+
+    By default, the model is assumed to take in inputs of size
+        (sequence_length, batch_size, num_channels, crop_size, crop_size)
+    The sequence_length and num_channels can be arbitrary (they depend on the
+    data loaders), but batch_size must be specified. The exact order of the
+    dimensions can be changed by specifying input_dimension_permutation (see
+    below).
+
     Args:
         model
         criterion
