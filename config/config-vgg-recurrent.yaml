@@ -60,3 +60,4 @@ learning_rates: [
 ###
 # Torch model to start training with.
 model_init: '/data/achald/MultiTHUMOS/models/pretrained/vgg_pretrained_rnn/vgg_pretrained_rnn.t7'
+decorate_sequencer: True

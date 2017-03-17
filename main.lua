@@ -80,6 +80,8 @@
 -- model_init (str): Path to initial model
 -- init_epoch (int): Initial epoch to start training with. Useful for
 --     re-starting training.
+-- decorate_sequencer (bool): If specified, decorate model with
+--     nn.Sequencer.
 --]]
 
 local argparse = require 'argparse'
@@ -116,10 +118,6 @@ parser:option('--experiment_id_file',
               'The id in this file will be incremented by this program.')
               :count(1)
               :default('/data/achald/MultiTHUMOS/models/next_experiment_id.txt')
-parser:flag('--decorate_sequencer',
-            'If specified, decorate model with nn.Sequencer.' ..
-            'This is necessary if the model does not expect a table as ' ..
-            'input.')
 parser:flag('--debug', "Indicates that we are only debugging; " ..
             "Speeds up some things, such as not saving models to disk.")
 
@@ -155,6 +153,7 @@ if config.data_paths_config ~= nil then
 end
 
 function normalize_config(config)
+    -- Normalize config files.
     if config.data_paths_config ~= nil then
         local data_paths = lyaml.load(
             io.open(config.data_paths_config, 'r'):read('*a'))
@@ -281,9 +280,9 @@ if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
     log.info('Getting first of DataParallelTable.')
     single_model = single_model:get(1)
 end
-if args.decorate_sequencer then
+if config.decorate_sequencer then
     if torch.isTypeOf(single_model, 'nn.Sequencer') then
-        log.warn('WARNING: --decorate_sequencer on model that is already ' ..
+        log.warn('WARNING: decorating sequencer on model that is already ' ..
                  'nn.Sequencer!')
     end
     single_model = nn.Sequencer(single_model)

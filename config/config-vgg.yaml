@@ -67,3 +67,4 @@ learning_rate_multipliers: [
 ###
 # Torch model to start training with.
 model_init: '/data/achald/MultiTHUMOS/models/pretrained/vgg_pretrained_last_layer_updated/vgg16_ilsvrc_2014_pretrained_updated_for_multithumos.t7'
+decorate_sequencer: True
