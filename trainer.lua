@@ -268,8 +268,8 @@ function Trainer:_train_or_evaluate_epoch(epoch, num_batches, train_mode)
 
         if train_mode then
             local log_string = string.format(
-                '%s: Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f',
-                os.date('%X'), epoch, batch_index, num_batches,
+                'Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f',
+                epoch, batch_index, num_batches,
                 batch_timer:time().real, loss)
             if batch_index % 10 == 0 then
                 local current_mean_average_precision =
@@ -295,9 +295,9 @@ function Trainer:_train_or_evaluate_epoch(epoch, num_batches, train_mode)
     local mode_str = train_mode and 'TRAINING' or 'EVALUATION'
 
     log.info(string.format(
-        '%s: Epoch: [%d][%s SUMMARY] Total Time(s): %.2f\t' ..
+        'Epoch: [%d][%s SUMMARY] Total Time(s): %.2f\t' ..
         'average loss (per batch): %.5f \t mAP: %.5f',
-        os.date('%X'), epoch, mode_str, epoch_timer:time().real, loss_epoch /
+        epoch, mode_str, epoch_timer:time().real, loss_epoch /
         num_batches, mean_average_precision))
 end
 
@@ -578,9 +578,9 @@ function SequentialTrainer:_train_or_evaluate_epoch(
                 evaluator.compute_mean_average_precision(
                     sequence_predictions, sequence_groundtruth)
             log.info(string.format(
-                '%s: Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f ' ..
+                'Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f ' ..
                 'seq mAP %.4f LR %.0e',
-                os.date('%X'), epoch, sequence, num_sequences,
+                epoch, sequence, num_sequences,
                 batch_timer:time().real, sequence_loss,
                 sequence_mean_average_precision, self.epoch_base_learning_rate))
         end
@@ -600,9 +600,9 @@ function SequentialTrainer:_train_or_evaluate_epoch(
 
     local mode_str = train_mode and 'TRAINING' or 'EVALUATION'
     log.info(string.format(
-        '%s: Epoch: [%d][%s SUMMARY] Total Time(s): %.2f\t' ..
+        'Epoch: [%d][%s SUMMARY] Total Time(s): %.2f\t' ..
         'average loss (per batch): %.5f \t mAP: %.5f',
-        os.date('%X'), epoch, mode_str, epoch_timer:time().real,
+        epoch, mode_str, epoch_timer:time().real,
         epoch_loss / num_sequences, mean_average_precision))
     collectgarbage()
     collectgarbage()
