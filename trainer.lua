@@ -347,7 +347,7 @@ end
 
 function Trainer:_forward_backward(images, labels, train_mode)
     --[[
-    Run forward (and possibly backward) pass on images.
+    Run forward (and optionally backward) pass on images.
 
     Args:
         images ((sequence_length, batch_size, num_channels, width, height))
