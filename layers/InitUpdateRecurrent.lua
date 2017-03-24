@@ -4,8 +4,6 @@ local torch = require 'torch'
 local __ = require 'moses'
 require 'dpnn'
 
-require 'util/strict'
-
 local InitUpdateRecurrent, parent = torch.class(
     'nn.InitUpdateRecurrent', 'nn.Recurrent')
 
