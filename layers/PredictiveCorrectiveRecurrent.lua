@@ -9,9 +9,9 @@
 --     - nn.CCumSumRecurrent
 --]]
 local nn = require 'nn'
-local rnn = require 'rnn'
 local torch = require 'torch'
 local __ = require 'moses'
+require 'rnn'
 
 local InitUpdateRecurrent = require 'layers/InitUpdateRecurrent'
 
