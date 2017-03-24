@@ -481,9 +481,8 @@ function DataLoader:load_batch(batch_size, return_keys)
 
     Returns:
         images (Array of array of ByteTensors): Contains image sequences for
-            the batch. Each element is a step in the sequence, so that images is
-            an array of length sequence_length, whose elements are arrays of
-            length batch_size.
+            the batch. Each element is a step in the sequence, so that
+            #images = sequence_length, #images[1] = batch_size.
         labels (ByteTensor): Contains label ids. Size is
             (sequence_length, batch_size, num_labels)
         keys (Array of array of strings): Only returned if return_keys is
