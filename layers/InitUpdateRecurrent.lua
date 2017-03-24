@@ -79,9 +79,9 @@ function InitUpdateRecurrent:getStepModule(step)
 end
 
 function InitUpdateRecurrent:_updateGradInput(input, gradOutput)
-    assert(self.updateGradInputStep >= self.step - self.rho,
-           string.format('Called backward more than rho+1=%d times',
-                         self.rho+1))
+    assert(self.step - self.updateGradInputStep + 1 <= self.rho,
+           string.format('Called backward more than rho=%d times',
+                         self.rho))
     nn.Recurrent._updateGradInput(self, input, gradOutput)
 end
 
