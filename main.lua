@@ -113,6 +113,7 @@ local log = require 'util/log'
 local trainer = require 'trainer'
 require 'last_step_criterion'
 require 'layers/init'
+require 'util/strict'
 
 local parser = argparse() {
     description = 'Fine tune ImageNet-pretrained VGG-16 network on MultiTHUMOS.'
