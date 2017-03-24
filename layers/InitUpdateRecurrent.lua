@@ -202,10 +202,6 @@ end
 
 function InitUpdateRecurrent:_accGradParameters(input, gradOutput, scale)
     local step = self.accGradParametersStep - 1
-
-    local gradOutput = (step == self.step-1) and gradOutput
-                                             or self._gradOutputs[step]
-
     local module = self:getStepModule(step)
     module:accGradParameters(input, gradOutput, scale)
 end
