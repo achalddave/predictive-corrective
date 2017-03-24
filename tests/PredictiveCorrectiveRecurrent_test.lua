@@ -127,7 +127,6 @@ local function test_backward_multiple_steps()
         assert(test_util.equals(gradients1[8], gradients2[8]))
     end
 
-
     -- Test CRollingDiffRecurrent
     do
         local differ = nn.Sequencer(nn.CRollingDiffRecurrent(reinit))
@@ -165,6 +164,106 @@ local function test_backward_multiple_steps()
         compare_modules_4(model, model_block)
         compare_modules_8(model, model_block)
     end
+end
+
+local function test_compare_gradients_different_rhos(module)
+    -- Ensure that the setting of rho does not affect the last few
+    -- gradients.
+    local init = nn.MulConstant(1)
+    local update = nn.MulConstant(2)
+    local reinit = 8
+    local rho1 = 4
+    local rho2 = 8
+
+    local model1 = nn.PredictiveCorrectiveRecurrent(
+        init, update, reinit, rho1)
+    local model2 = nn.PredictiveCorrectiveRecurrent(
+        init:clone(), update:clone(), reinit, rho2)
+
+    local inputs = {}
+    for i = 1, 8 do inputs[i] = torch.rand(5, 5) end
+
+    local outputs1 = torch.Tensor(8, 5, 5)
+    local outputs2 = torch.Tensor(8, 5, 5)
+    for i = 1, 8 do
+        outputs1[i] = model1:forward(inputs[i]):clone()
+        outputs2[i] = model2:forward(inputs[i]):clone()
+    end
+
+    assert(test_util.equals(outputs1, outputs2))
+
+    -- Compute gradients for both models. model1 will only get 4 backprop steps,
+    -- but they should be equivalent to the last (or first, depending on how you
+    -- look at it) 4 backprop steps of model2.
+    local gradients1 = torch.Tensor(8, 5, 5)
+    local gradients2 = torch.Tensor(8, 5, 5)
+    for i = 8, 5, -1 do
+        gradients1[i] = model1:backward(outputs1[i], inputs[i]):clone()
+    end
+    for i = 8, 1, -1 do
+        gradients2[i] = model2:backward(outputs2[i], inputs[i]):clone()
+    end
+
+    assert(test_util.equals(gradients1[{{5, 8}}], gradients2[{{5, 8}}]))
+end
+
+local function test_compare_gradients_different_rhos_sequencer(module)
+    -- Ensure that the setting of rho does not affect the last few
+    -- gradients, even with nn.Sequencer wrapper.
+    local init = nn.MulConstant(1)
+    local update = nn.MulConstant(2)
+    local reinit = 8
+    local rho1 = 4
+    local rho2 = 8
+
+    local model1 = nn.Sequencer(nn.PredictiveCorrectiveRecurrent(
+        init, update, reinit, rho1))
+    model1:remember('both')
+    model1:training()
+    local model2 = nn.Sequencer(nn.PredictiveCorrectiveRecurrent(
+        init:clone(), update:clone(), reinit, rho2))
+    model2:remember('both')
+    model2:training()
+
+    local inputs = torch.rand(8, 5, 5)
+
+    local outputs1 = torch.Tensor(8, 5, 5)
+    outputs1[{{1, 4}}] = model1:forward(inputs[{{1, 4}}]):clone()
+    outputs1[{{5, 8}}] = model1:forward(inputs[{{5, 8}}]):clone()
+    local outputs2 = model2:forward(inputs):clone()
+    assert(test_util.equals(outputs1, outputs2))
+
+    -- Compute gradients for both models. model1 will only get 4 backprop steps,
+    -- but they should be equivalent to the last (or first, depending on how you
+    -- look at it) 4 backprop steps of model2.
+    local gradients1 = model1:backward(outputs1[{{5, 8}}], inputs[{{5, 8}}]):clone()
+    local gradients2 = model2:backward(outputs2, inputs):clone()
+
+    assert(test_util.equals(gradients1, gradients2[{{5, 8}}]))
+end
+
+local function test_sequencer_remember()
+    local init = nn.MulConstant(1)
+    local update = nn.MulConstant(2)
+    local model1 = nn.PredictiveCorrectiveRecurrent(
+        init, update, 2 --[[reinit]], 2 --[[rho]])
+    model1 = nn.Sequencer(model1)
+    model1:remember('both')
+
+    local model2 = nn.PredictiveCorrectiveRecurrent(
+        init:clone(), update:clone(), 2 --[[reinit]], 2 --[[rho]])
+    model2 = nn.Sequencer(model2)
+
+    local inputs = torch.Tensor(4, 5, 5)
+    for i = 1, 4 do inputs[i] = torch.rand(5, 5) end
+
+    local outputs1 = torch.Tensor(4, 5, 5)
+    outputs1[{{1, 2}}] = model1:forward(inputs[{{1, 2}}]):clone()
+    outputs1[{{3, 4}}] = model1:forward(inputs[{{3, 4}}]):clone()
+
+    local outputs2 = model2:forward(inputs)
+
+    assert(test_util.equals(outputs1, outputs2))
 end
 
 local function test_sequencer_highjack_rho()
@@ -228,12 +327,9 @@ local function test_backward_small_rho()
     local gradients = outputs
 
     local computed_gradients = {}
-    for i = 4, 3, -1 do
-        computed_gradients[i] = model:backward(inputs[i], gradients[i]):clone()
-    end
+    computed_gradients[4] = model:backward(inputs[4], gradients[4]):clone()
 
     local computed_gradients_block = model_block:backward(inputs, gradients)
-    assert(test_util.equals(computed_gradients[3], computed_gradients_block[3]))
     assert(test_util.equals(computed_gradients[4], computed_gradients_block[4]))
 end
 
@@ -286,6 +382,11 @@ test_util.run_test(test_no_reinit_backward, 'Backward without reinit')
 test_util.run_test(test_reinit_every_time, 'Forward reinit every time')
 test_util.run_test(test_backward_one_step, 'Test backward one step')
 test_util.run_test(test_backward_multiple_steps, 'Backward multiple steps')
+test_util.run_test(test_compare_gradients_different_rhos,
+                   'Compare different rhos')
+test_util.run_test(test_compare_gradients_different_rhos_sequencer,
+                   'Compare different rhos with Sequencer')
 test_util.run_test(test_backward_small_rho, 'Test backward with small rho')
 test_util.run_test(test_sequencer_highjack_rho, 'Highjack rho')
+test_util.run_test(test_sequencer_remember, 'Test sequencer remember')
 test_util.run_test(test_clearState, 'clearState')
