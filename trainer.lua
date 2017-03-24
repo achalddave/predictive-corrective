@@ -376,11 +376,12 @@ function Trainer:_forward_backward(images, labels, train_mode)
         end
         self.gpu_inputs:resize(chunk_images:size()):copy(chunk_images)
         self.gpu_labels:resize(chunk_labels:size()):copy(chunk_labels)
+
         local current_outputs = self.model:forward(self.gpu_inputs)
+
         if current_outputs:dim() == 2 then
             current_outputs = nn.utils.addSingletonDimension(current_outputs, 1)
         end
-
         if outputs == nil then
             outputs = current_outputs:clone()
         else
