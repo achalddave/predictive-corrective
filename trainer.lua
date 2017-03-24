@@ -68,12 +68,6 @@ function Trainer:_init(args)
         optim_state: Optional
     ]]--
     self.model = args.model
-    self.cleared_model = self.model
-    if torch.isTypeOf(self.cleared_model, 'nn.DataParallelTable') then
-        self.cleared_model = self.cleared_model:get(1)
-    end
-    self.cleared_model = self.cleared_model:sharedClone()
-    self.cleared_model:clearState()
 
     self.gradient_clip = args.gradient_clip
     self.criterion = args.criterion
@@ -128,6 +122,13 @@ function Trainer:_init(args)
     self.train_data_loader:fetch_batch_async(self.batch_size)
     self.val_data_loader:fetch_batch_async(self.batch_size)
     self.num_labels = self.train_data_loader:num_labels()
+
+    self.cleared_model = self.model
+    if torch.isTypeOf(self.cleared_model, 'nn.DataParallelTable') then
+        self.cleared_model = self.cleared_model:get(1)
+    end
+    self.cleared_model = self.cleared_model:sharedClone()
+    self.cleared_model:clearState()
 end
 
 function Trainer:update_optim_config(epoch)
