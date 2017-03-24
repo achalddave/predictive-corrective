@@ -75,16 +75,49 @@ function InputCouplerRecurrent:getHiddenState(step, input)
     return {prevOutput, nn.Container.getHiddenState(self, step)}
 end
 
+function InputCouplerRecurrent:updateOutput(input)
+    -- output(t-1)
+    local prevOutput = self:getHiddenState(self.step-1, input)[1]
+
+    -- output(t) = recurrentModule{input(t), output(t-1)}
+    local output
+    if self.train ~= false then
+        self:recycle()
+        local recurrentModule = self:getStepModule(self.step)
+        -- the actual forward propagation
+        output = recurrentModule:updateOutput{input, prevOutput}
+    else
+        output = self.recurrentModule:updateOutput{input, prevOutput}
+    end
+
+    -- Note that the inputs at time t may change by time t + 1!
+    -- For example, if the module in the layer below ours at time t was re-used
+    -- at time t+1 (as with an nn.Recursor @ nn.Sequential object during
+    -- evaluation), then input(t) will be equal to input(t+1)! Thus, we need to
+    -- copy the outputs instead of simply selecting it.
+    output = rnn.recursiveCopy(nil, output)
+    self.outputs[self.step] = output
+
+    self.output = output
+
+    self.step = self.step + 1
+    self.gradPrevOutput = nil
+    self.updateGradInputStep = nil
+    self.accGradParametersStep = nil
+
+    return self.output
+end
+
 function InputCouplerRecurrent:_updateGradInput(input, gradOutput)
     --[[
     -- Args:
     --     input
     --     gradOutput: Table containing two elements of same size as input.
     --]]
-    assert(self.updateGradInputStep >= self.step - self.rho,
-           string.format('Called backward more than rho+1=%d times',
-                         self.rho+1))
     assert(self.step > 1, "expecting at least one updateOutput")
+    assert(self.step - self.updateGradInputStep + 1 <= self.rho,
+           string.format('Called backward more than rho=%d times',
+                         self.rho))
     local step = self.updateGradInputStep - 1
     assert(step >= 1)
 
@@ -186,6 +219,10 @@ function CCumSumRecurrent:getHiddenState(step, input)
     return {prevOutput, nn.Container.getHiddenState(self, step)}
 end
 
+function CCumSumRecurrent:updateOutput(input)
+    return InputCouplerRecurrent.updateOutput(self, input)
+end
+
 function CCumSumRecurrent:_updateGradInput(input, gradOutput)
     return InputCouplerRecurrent._updateGradInput(self, input, gradOutput)
 end
@@ -196,7 +233,6 @@ local PredictiveCorrectiveRecurrent, parent = torch.class(
 function PredictiveCorrectiveRecurrent:__init(
         init, update, reinitialize_rate, rho)
     parent.__init(self)
-
     self.modules = {
         nn.CRollingDiffRecurrent(reinitialize_rate, rho),
         nn.InitUpdateRecurrent(init, update, reinitialize_rate, rho),
