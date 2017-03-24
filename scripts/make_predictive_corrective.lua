@@ -1,5 +1,5 @@
 --[[
-Create a hierarchical network consisting of blocks that are updated residually.
+Create a Predictive-Corrective network.
 
 Below is an example of a `residual block` that computes z1 from z0, with a
 reinitialization rate of 2.
