@@ -72,7 +72,8 @@ function Trainer:_init(args)
     if torch.isTypeOf(self.cleared_model, 'nn.DataParallelTable') then
         self.cleared_model = self.cleared_model:get(1)
     end
-    self.cleared_model = self.cleared_model:sharedClone():clearState()
+    self.cleared_model = self.cleared_model:sharedClone()
+    self.cleared_model:clearState()
 
     self.gradient_clip = args.gradient_clip
     self.criterion = args.criterion
