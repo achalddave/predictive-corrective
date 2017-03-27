@@ -119,7 +119,6 @@ def main(predictions_hdf5, groundtruth_without_images_lmdb):
 
     predictions = {}
     groundtruth = {}
-    mean_ap = 0
     for video_name in groundtruth_by_video.keys():
         for label in range(len(label_names)):
             if label not in predictions:
@@ -131,7 +130,6 @@ def main(predictions_hdf5, groundtruth_without_images_lmdb):
                 groundtruth[label] = np.hstack((groundtruth[
                     label], groundtruth_by_video[video_name][:, label]))
 
-    mean_ap = 0.0
     aps = np.zeros(len(label_names))
     for label in range(len(label_names)):
         aps[label] = compute_average_precision(groundtruth[label], predictions[label])
