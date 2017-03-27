@@ -134,9 +134,7 @@ def main(predictions_hdf5, groundtruth_without_images_lmdb):
     mean_ap = 0.0
     aps = np.zeros(len(label_names))
     for label in range(len(label_names)):
-        ap = compute_average_precision(groundtruth[label], predictions[label])
-        print '{}: {}'.format(label_names[label], ap)
-        aps[label] = ap
+        aps[label] = compute_average_precision(groundtruth[label], predictions[label])
     return aps
 
 
@@ -148,7 +146,10 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('predictions_hdf5')
     parser.add_argument('groundtruth_without_images_lmdb')
+    parser.add_argument('--output_aps')
 
     args = parser.parse_args()
     aps = main(args.predictions_hdf5, args.groundtruth_without_images_lmdb)
+    if args.output_aps is not None:
+        np.save(args.output_aps, aps)
     print 'mAP:', aps.mean()
