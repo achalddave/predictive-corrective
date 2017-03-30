@@ -212,7 +212,7 @@ function BalancedSampler:_init(
         valid_keys = PermutedSampler.filter_boundary_frames(
             self.video_keys, sequence_length, -step_size)
     else
-        local valid_keys = __.flatten(self.video_keys)
+        valid_keys = __.flatten(self.video_keys)
     end
     self.num_keys = #valid_keys
 
