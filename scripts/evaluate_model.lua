@@ -450,6 +450,13 @@ local function evaluate_model(options)
     local pixel_mean = options.pixel_mean
     local c3d_input = options.c3d_input
 
+    if torch.isTypeOf(model, 'nn.DataParallelTable') then
+        -- https://github.com/Element-Research/rnn/issues/404
+        model.impl:exec(function(m) m:remember('neither') end)
+    else
+        model:forget('neither')
+    end
+
     -- Open database.
     local sampler = data_loader.PermutedSampler(
         source, sequence_length, step_size, true --[[use_boundary_frames]])
