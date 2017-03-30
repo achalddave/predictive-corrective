@@ -418,8 +418,6 @@ function Trainer:_forward_backward(images, labels, train_mode)
     else
         self.model:forget()
     end
-    collectgarbage()
-    collectgarbage()
 
     -- The loss is averaged by the computational batch size; we want to
     -- average by the actual batch size.
