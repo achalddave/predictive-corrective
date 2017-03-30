@@ -225,6 +225,10 @@ output2 = nil
 test_input = nil
 collectgarbage(); collectgarbage()
 
+local function closest_multiple(target, divisor)
+    return torch.round(target / divisor) * divisor
+end
+
 local function crop_and_zero_center_images(
     images_table, crops, crop_size, image_mean)
     --[[
@@ -390,16 +394,19 @@ local function evaluate_model_sequential(options)
             end
         end
 
-        local log_string = string.format(
-            'Finished %d/%d.', #all_keys, loader:num_samples())
         if num_iter % 10 == 0 then
-            local map_so_far = evaluator.compute_mean_average_precision(
-                all_predictions, all_labels)
-            local thumos_map_so_far = evaluator.compute_mean_average_precision(
-                all_predictions[{{}, {1, 20}}], all_labels[{{}, {1, 20}}])
-            log_string = log_string ..
-                string.format(' mAP: %.5f, THUMOS mAP: %.5f',
-                                map_so_far, thumos_map_so_far)
+            local log_string = string.format(
+                'Finished %d/%d.', #all_keys, loader:num_samples())
+            if num_iter % 100 == 0 then
+                local map_so_far = evaluator.compute_mean_average_precision(
+                    all_predictions, all_labels)
+                local thumos_map_so_far =
+                    evaluator.compute_mean_average_precision(
+                        all_predictions[{{}, {1, 20}}],
+                        all_labels[{{}, {1, 20}}])
+                log_string = string.format('%s mAP: %.5f, THUMOS mAP: %.5f',
+                    log_string, map_so_far, thumos_map_so_far)
+            end
             log.info(log_string)
         end
 
@@ -538,15 +545,24 @@ local function evaluate_model(options)
         end
 
         samples_complete = samples_complete + to_load
-        if samples_complete / max_batch_size_images % 10 == 0 then
-            local map_so_far = evaluator.compute_mean_average_precision(
-                all_predictions, all_labels)
-            local thumos_map_so_far = evaluator.compute_mean_average_precision(
-                all_predictions[{{}, {1, 20}}], all_labels[{{}, {1, 20}}])
-            log.info(string.format(
-                'Finished %d/%d mAP: %.5f, THUMOS mAP: %.5f',
-                samples_complete, loader:num_samples(),
-                map_so_far, thumos_map_so_far))
+        if samples_complete %
+                closest_multiple(100, max_batch_size_images) == 0 then
+            local log_string = string.format(
+                'Finished %d/%d', samples_complete, loader:num_samples())
+            if samples_complete %
+                    closest_multiple(
+                        10000, closest_multiple(100, max_batch_size_images)
+                     ) == 0 then
+                local map_so_far = evaluator.compute_mean_average_precision(
+                    all_predictions, all_labels)
+                local thumos_map_so_far =
+                    evaluator.compute_mean_average_precision(
+                        all_predictions[{{}, {1, 20}}],
+                        all_labels[{{}, {1, 20}}])
+                log_string = string.format('%s mAP: %.5f, THUMOS mAP: %.5f',
+                    log_string, map_so_far, thumos_map_so_far)
+            end
+            log.info(log_string)
         end
         collectgarbage()
         collectgarbage()
