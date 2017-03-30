@@ -584,9 +584,9 @@ local function evaluate_model(options)
             end
             log.info(log_string)
         end
-        collectgarbage()
-        collectgarbage()
     end
+    collectgarbage()
+    collectgarbage()
     return all_predictions, all_labels, all_keys
 end
 
