@@ -24,6 +24,7 @@ local cutorch = require 'cutorch'
 require 'cunn'
 local hdf5 = require 'hdf5'
 local image = require 'image'
+local __ = require 'moses'
 local nn = require 'nn'
 local torch = require 'torch'
 require 'rnn'
@@ -100,7 +101,6 @@ local GPUS = {1, 2, 3, 4}
 local PIXEL_MEAN = {96.8293, 103.073, 101.662}
 local CROP_SIZE = 224
 local CROPS = {'c'}
-local FRAME_TO_PREDICT = args.sequence_length
 
 local max_batch_size_images = math.floor(args.batch_size / #CROPS)
 
@@ -128,7 +128,6 @@ log.info('===')
 
 log.info('Evaluating model. Args:')
 log.info(args)
-log.info('FRAME_TO_PREDICT: ', FRAME_TO_PREDICT)
 log.info('CROPS: ', CROPS)
 
 local experiment_id = experiment_saver.read_and_increment_experiment_id(
@@ -537,19 +536,33 @@ local function evaluate_model(options)
                string.format('Unknown output predictions shape: %s',
                              predictions:size()))
 
-        labels = labels[FRAME_TO_PREDICT]
-        batch_keys = batch_keys[sequence_length]
-
-        -- Concat batch_keys to all_keys.
-        for i = 1, batch_size_images do table.insert(all_keys, batch_keys[i]) end
-
         if all_predictions == nil then
             all_predictions = predictions
-            all_labels = labels
+            all_labels = labels[sequence_length]
         else
             all_predictions = torch.cat(all_predictions, predictions, 1)
-            all_labels = torch.cat(all_labels, labels, 1)
+            all_labels = torch.cat(all_labels, labels[sequence_length], 1)
         end
+
+        -- The first (sequence_length - 1) frames of a video do not get
+        -- predictions from the network. If these frames are in our batch,
+        -- collect their labels and set their predictions to a large negative
+        -- value.
+        for batch_index, key in ipairs(batch_keys[1]) do
+            local _, frame_number = source:frame_video_offset(key)
+            if frame_number == 1 then
+                local batch_labels = labels[
+                    {{1, sequence_length-1}, batch_index}]
+                local batch_predictions = torch.zeros(
+                    sequence_length-1, NUM_LABELS) - 1e9
+                all_labels = torch.cat(all_labels, batch_labels, 1)
+                all_predictions = torch.cat(
+                    all_predictions, batch_predictions, 1)
+            end
+        end
+
+        -- Concat batch_keys to all_keys.
+        all_keys = __.append(all_keys, batch_keys[sequence_length])
 
         samples_complete = samples_complete + to_load
         if samples_complete %
@@ -682,14 +695,6 @@ if args.output_hdf5 ~= nil then
         predictions_by_filename[filename][frame_number] = prediction
     end
     for filename, predictions_table in pairs(predictions_by_filename) do
-        if not args.recurrent then
-            -- We don't have predictions for the first `FRAME_TO_PREDICT-1`
-            -- frames.  So, set them to be -1.
-            for i = 1, FRAME_TO_PREDICT-1 do
-                predictions_by_filename[filename][i] =
-                    torch.zeros(NUM_LABELS) - 1
-            end
-        end
         predictions_by_filename[filename] = torch.cat(predictions_table, 2):t()
     end
 
