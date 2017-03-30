@@ -571,7 +571,7 @@ function SequentialTrainer:_train_or_evaluate_batch(train_mode)
         -- Updates self.model_parameters (and, in turn, the parameters of
         -- self.model) in place.
         optim.sgd(model_forward_backward, self.model_parameters,
-                self.optimization_config, self.optimization_state)
+                  self.optimization_config, self.optimization_state)
     else
         -- Should be of shape (sequence_length, batch_size, num_classes)
         outputs = self.model:forward(self.gpu_inputs)
