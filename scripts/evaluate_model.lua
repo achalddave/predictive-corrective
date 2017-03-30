@@ -21,6 +21,7 @@ package.path = package.path .. ";layers/?.lua"
 
 local argparse = require 'argparse'
 local cutorch = require 'cutorch'
+require 'cunn'
 local hdf5 = require 'hdf5'
 local image = require 'image'
 local nn = require 'nn'
