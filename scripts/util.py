@@ -1,4 +1,11 @@
+from __future__ import division
+from collections import defaultdict
+
 import lmdb
+import numpy as np
+
+from video_util import video_frames_pb2
+
 
 def parse_frame_key(frame_key):
     """
@@ -8,6 +15,7 @@ def parse_frame_key(frame_key):
     frame_number = int(frame_key.split('-')[-1])
     video_name = '-'.join(frame_key.split('-')[:-1])
     return (video_name, frame_number)
+
 
 # TODO: Share this with predictive_corrective_changes/main.py and
 # prediction_diffs/main.py.
@@ -48,16 +56,20 @@ def read_groundtruth_lmdb(groundtruth_without_images_lmdb):
                 groundtruth_onehot[video][frame_number][label_ids] = 1
     return groundtruth_onehot, label_names
 
+
 def compute_average_precision(groundtruth, predictions):
     """
     Computes average precision for a binary problem. This is based off of the
     PASCAL VOC implementation.
+
     Args:
         groundtruth (array-like): Binary vector indicating whether each sample
             is positive or negative.
         predictions (array-like): Contains scores for each sample.
+
     Returns:
         Average precision.
+
     """
     predictions = np.asarray(predictions)
     groundtruth = np.asarray(groundtruth, dtype=float)
@@ -78,14 +90,14 @@ def compute_average_precision(groundtruth, predictions):
     precisions = tp / np.maximum(tp + fp, np.finfo(np.float64).eps)
     recalls = tp / num_positives
 
-    # Append end points of the precision recall curve.
-    precisions = np.concatenate(([0.], precisions, [0.]))
-    recalls = np.concatenate(([0.], recalls, [1.]))
-
     # Set precisions[i] = max(precisions[j] for j >= i)
     # This is because (for j > i), recall[j] >= recall[i], so we can always use
     # a lower threshold to get the higher recall and higher precision at j.
     precisions = np.maximum.accumulate(precisions[::-1])[::-1]
+
+    # Append end points of the precision recall curve.
+    precisions = np.concatenate(([0.], precisions, [0.]))
+    recalls = np.concatenate(([0.], recalls, [1.]))
 
     # Find points where recall value changes.
     c = np.where(recalls[1:] != recalls[:-1])[0]
@@ -93,5 +105,3 @@ def compute_average_precision(groundtruth, predictions):
     ap = np.sum((recalls[c + 1] - recalls[c]) * precisions[c + 1])
 
     return ap
-
-
