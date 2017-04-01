@@ -549,7 +549,7 @@ local function evaluate_model(options)
         -- collect their labels and set their predictions to a large negative
         -- value.
         for batch_index, key in ipairs(batch_keys[1]) do
-            local _, frame_number = source:frame_video_offset(key)
+            local filename, frame_number = source:frame_video_offset(key)
             if frame_number == 1 then
                 local batch_labels = labels[
                     {{1, sequence_length-1}, batch_index}]
@@ -558,6 +558,10 @@ local function evaluate_model(options)
                 all_labels = torch.cat(all_labels, batch_labels, 1)
                 all_predictions = torch.cat(
                     all_predictions, batch_predictions, 1)
+                local video_keys = source:video_keys()
+                for i = 1, sequence_length - 1 do
+                    table.insert(all_keys, video_keys[filename][i])
+                end
             end
         end
 
