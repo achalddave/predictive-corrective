@@ -699,6 +699,16 @@ if args.output_hdf5 ~= nil then
         predictions_by_filename[filename][frame_number] = prediction
     end
     for filename, predictions_table in pairs(predictions_by_filename) do
+        if not args.recurrent then
+            -- Ensure we have predictions for all the frames. If we don't, print
+            -- a warning and set the prediction to a very small value.
+            for i = 1, args.sequence_length-1 do
+                if predictions_table[i] == nil then
+                    log.warn('Missing prediction for', filename, i)
+                    predictions_table[i] = torch.zeros(NUM_LABELS) - 1e9
+                end
+            end
+        end
         predictions_by_filename[filename] = torch.cat(predictions_table, 2):t()
     end
 
