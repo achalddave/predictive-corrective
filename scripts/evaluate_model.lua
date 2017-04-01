@@ -448,6 +448,9 @@ local function evaluate_model(options)
     local crop_size = options.crop_size
     local pixel_mean = options.pixel_mean
     local c3d_input = options.c3d_input
+    local progress_every = closest_multiple(
+        math.max(100, max_batch_size_images), max_batch_size_images)
+    local average_precision_every = closest_multiple(10000, progress_every)
 
     if torch.isTypeOf(model, 'nn.DataParallelTable') then
         -- https://github.com/Element-Research/rnn/issues/404
@@ -571,14 +574,10 @@ local function evaluate_model(options)
         all_keys = __.append(all_keys, batch_keys[sequence_length])
 
         samples_complete = samples_complete + to_load
-        if samples_complete %
-                closest_multiple(100, max_batch_size_images) == 0 then
+        if samples_complete % progress_every == 0 then
             local log_string = string.format(
                 'Finished %d/%d', samples_complete, loader:num_samples())
-            if samples_complete %
-                    closest_multiple(
-                        10000, closest_multiple(100, max_batch_size_images)
-                     ) == 0 then
+            if samples_complete % average_precision_every then
                 local map_so_far = evaluator.compute_mean_average_precision(
                     all_predictions, all_labels)
                 local thumos_map_so_far =
