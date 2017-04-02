@@ -577,7 +577,7 @@ local function evaluate_model(options)
         if samples_complete % progress_every == 0 then
             local log_string = string.format(
                 'Finished %d/%d', samples_complete, loader:num_samples())
-            if samples_complete % average_precision_every then
+            if samples_complete % average_precision_every == 0 then
                 local map_so_far = evaluator.compute_mean_average_precision(
                     all_predictions, all_labels)
                 local thumos_map_so_far =
