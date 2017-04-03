@@ -88,8 +88,8 @@ function PermutedSampler:sample_keys(num_sequences)
     Sample the next set of keys.
 
     Returns:
-        batch_keys (Array of array of strings): Each element contains
-            num_sequences arrays, each of which contains sequence_length keys.
+        batch_keys (Array of array of strings): Array of length sequence_length,
+            where each element contains num_sequences arrays.
     ]]--
     local batch_keys = {}
     for _ = 1, self.sequence_length do
@@ -207,7 +207,7 @@ function BalancedSampler:_init(
 
     -- List of all valid keys.
     self.video_keys = self.data_source:video_keys()
-    local valid_keys = {}
+    local valid_keys
     if not self.use_boundary_frames then
         valid_keys = PermutedSampler.filter_boundary_frames(
             self.video_keys, sequence_length, -step_size)
@@ -238,8 +238,8 @@ end
 function BalancedSampler:sample_keys(num_sequences)
     --[[
     Returns:
-        batch_keys (Array of array of strings): Each element contains
-            num_sequences arrays, each of which contains sequence_length keys.
+        batch_keys (Array of array of strings): Array of length sequence_length,
+            where each element contains num_sequences arrays.
     ]]--
     local batch_keys = {}
     for _ = 1, self.sequence_length do
@@ -372,8 +372,8 @@ function SequentialSampler:sample_keys(num_sequences)
     Sample the next set of keys.
 
     Returns:
-        batch_keys (Array of array of strings): Each element contains
-            num_sequences arrays, each of which contains sequence_length keys.
+        batch_keys (Array of array of strings): Array of length sequence_length,
+            where each element contains num_sequences arrays.
     ]]--
     local batch_keys = {}
     for _ = 1, self.sequence_length do
