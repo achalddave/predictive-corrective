@@ -599,7 +599,6 @@ function SequentialTrainer:_train_or_evaluate_epoch(
     local epoch_loss = 0
     for sequence = 1, num_sequences do
         batch_timer:reset()
-        collectgarbage()
         local sequence_ended = false
         local sequence_predictions, sequence_groundtruth
         local sequence_loss = 0
