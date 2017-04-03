@@ -77,6 +77,10 @@ parser:option('--reinit_threshold', 'Threshold over which to reinitialize')
 parser:option('--ignore_threshold', 'Threshold under which to ignore frames')
       :convert(tonumber)
       :default(-1)
+parser:option('--charades_submission_out',
+              'Path to output Charades submission file to. If specified, ' ..
+              'evaluate only on 25 frames uniformly spaced over ' ..
+              'the video, as used for Charades evaluation.')
 parser:flag('--decorate_sequencer',
             'If specified, decorate model with nn.Sequencer.' ..
             'This is necessary if the model does not expect a table as ' ..
@@ -94,6 +98,12 @@ parser:flag('--recurrent',
             'sequence_length predictions for sequence_length inputs.')
 
 local args = parser:parse()
+
+if args.charades_submission_out ~= nil and args.recurrent ~= nil then
+    log.info('Disabling recurrent evaluation as ' ..
+             '--charades_submission_out specified.')
+    args.recurrent = nil
+end
 
 -- More config variables.
 local NUM_LABELS = args.num_labels
@@ -448,6 +458,7 @@ local function evaluate_model(options)
     local crop_size = options.crop_size
     local pixel_mean = options.pixel_mean
     local c3d_input = options.c3d_input
+    local uniformly_spaced_eval = options.uniformly_spaced_eval or false
     local progress_every = closest_multiple(
         math.max(100, max_batch_size_images), max_batch_size_images)
     local average_precision_every = closest_multiple(10000, progress_every)
@@ -460,8 +471,16 @@ local function evaluate_model(options)
     end
 
     -- Open database.
-    local sampler = data_loader.PermutedSampler(
-        source, sequence_length, step_size, true --[[use_boundary_frames]])
+    local sampler
+
+    if not uniformly_spaced_eval then
+        sampler = data_loader.PermutedSampler(
+            source, sequence_length, step_size, true --[[use_boundary_frames]])
+    else
+        log.info('Using UniformlySpacedSampler!')
+        sampler = data_loader.UniformlySpacedSampler(
+            source, sequence_length, nil, nil, {num_frames_per_video=25})
+    end
     local loader = data_loader.DataLoader(source, sampler)
     log.info('Initialized sampler.')
 
@@ -554,7 +573,7 @@ local function evaluate_model(options)
         -- predictions from the network. If these frames are in our batch,
         -- collect their labels and set their predictions to a large negative
         -- value.
-        if sequence_length > 1 then
+        if sequence_length > 1 and not uniformly_spaced_eval then
             for batch_index, key in ipairs(batch_keys[1]) do
                 local filename, frame_number = source:frame_video_offset(key)
                 if frame_number == 1 then
@@ -608,7 +627,8 @@ local eval_options = {
     num_labels = NUM_LABELS,
     crops = CROPS,
     crop_size = CROP_SIZE,
-    pixel_mean = PIXEL_MEAN
+    pixel_mean = PIXEL_MEAN,
+    uniformly_spaced_eval = args.charades_submission_out ~= nil
 }
 local all_predictions = nil
 local all_labels = nil
@@ -687,7 +707,40 @@ if args.val_groups ~= '' then -- Compute accuracy across validation groups.
     log.info('Group mAPs STD:', group_mAPs:std())
 end
 
-if args.output_hdf5 ~= nil then
+if args.charades_submission_out ~= nil then
+    -- XXX HACK XXX
+    torch.save('all_keys.t7', all_keys)
+    torch.save('all_predictions.t7', all_predictions)
+    local function tensor2str(x)
+        str = ""
+        for i=1,x:size(1) do
+            if i == x:size(1) then
+                str = str .. x[i]
+            else
+                str = str .. x[i] .. " "
+            end
+        end
+        return str
+    end
+    local output = assert(io.open(args.charades_submission_out, 'w'))
+    local current_filename, current_index
+    for i, key in ipairs(all_keys) do
+        local filename, frame_number = source:frame_video_offset(key)
+        if current_filename == nil or current_filename ~= filename then
+            current_index = 1
+        end
+        if (i - 1) % 1000 == 0 then
+            log.info(string.format(
+                '%s %s %s\n', filename, current_index,
+                tensor2str(all_predictions[{i, {}}])))
+        end
+        output:write(string.format(
+            '%s %s %s\n', filename, current_index,
+            tensor2str(all_predictions[{i, {}}])))
+        current_index = current_index + 1
+    end
+    output:close()
+elseif args.output_hdf5 ~= nil then
     local predictions_by_filename = {}
     for i, key in pairs(all_keys) do
         local prediction = all_predictions[i]
