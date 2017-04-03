@@ -62,3 +62,17 @@ py scripts/plot_correlations.py \
     /scratch/achald/valval.lmdb
     video_validation_0000944,video_validation_0000262,video_validation_0000283,video_validation_0000490,video_validation_0000269,video_validation_0000946,video_validation_0000368,video_validation_0000168,video_validation_0000183,video_validation_0000204
 ````
+
+# Things I've learned
+
+- Don't bother with storing images in LMDBs. Seeking random keys is very slow,
+  and in practice doesn't seem any faster than reading from disks with a few
+  threads.
+
+- Configuration files should be code files. This is contrary to what I've
+  usually heard, but allows for writing functions as part of the config (for
+  example, specifying a "preprocessor" for models, or specifying the DataLoader
+  to use, etc.). With YAML config files, I end up essentially writing these
+  functions in the code, then referring to them using strings in YAML. This
+  might be ideal for public code bases, but heavily slows down tinkering.
+  TODO(achald): Change all configs to be lua code files instead.
