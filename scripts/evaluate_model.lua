@@ -106,7 +106,6 @@ if args.charades_submission_out ~= nil and args.recurrent ~= nil then
 end
 
 -- More config variables.
-local NUM_LABELS = args.num_labels
 local GPUS = {1, 2, 3, 4}
 local PIXEL_MEAN = {96.8293, 103.073, 101.662}
 local CROP_SIZE = 224
@@ -580,7 +579,7 @@ local function evaluate_model(options)
                     local batch_labels = labels[
                         {{1, sequence_length-1}, batch_index}]
                     local batch_predictions = torch.zeros(
-                        sequence_length-1, NUM_LABELS) - 1e9
+                        sequence_length-1, num_labels) - 1e9
                     all_labels = torch.cat(all_labels, batch_labels, 1)
                     all_predictions = torch.cat(
                         all_predictions, batch_predictions, 1)
@@ -617,14 +616,14 @@ end
 local source = data_source.LabeledVideoFramesLmdbSource(
     args.labeled_video_frames_lmdb,
     args.labeled_video_frames_without_images_lmdb,
-    NUM_LABELS)
+    args.num_labels)
 local eval_options = {
     model = model,
     source = source,
     sequence_length = args.sequence_length,
     step_size = args.step_size,
     max_batch_size_images = max_batch_size_images,
-    num_labels = NUM_LABELS,
+    num_labels = args.num_labels,
     crops = CROPS,
     crop_size = CROP_SIZE,
     pixel_mean = PIXEL_MEAN,
@@ -760,7 +759,7 @@ elseif args.output_hdf5 ~= nil then
             for i = 1, args.sequence_length-1 do
                 if predictions_table[i] == nil then
                     log.warn('Missing prediction for', filename, i)
-                    predictions_table[i] = torch.zeros(NUM_LABELS) - 1e9
+                    predictions_table[i] = torch.zeros(args.num_labels) - 1e9
                 end
             end
         end
