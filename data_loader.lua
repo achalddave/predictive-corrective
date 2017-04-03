@@ -445,6 +445,91 @@ function SequentialSampler.static.get_start_frames(keys)
     return start_frame_keys
 end
 
+local UniformlySpacedSampler = classic.class('UniformlySpacedSampler', Sampler)
+function UniformlySpacedSampler:_init(
+        data_source_obj, sequence_length, _ --[[step_size]],
+        _ --[[use_boundary_frames]], options)
+    --[[
+    Sample frames uniformly spaced in a video. This is for evaluation,
+    particularly for Charades.
+
+    For each video, we sample num_frames_per_video uniformly spaced frames. If
+    sequence_length > 1, then the sequence ends in the uniformly spaced frame,
+    *except* if the uniformly spaced does not have sequence_length preceding
+    frames, in which case the sequence starts on the first frame.
+
+    Args:
+        data_source_obj, sequence_length: See PermutedSampler
+        (IGNORED) step_size: Cannot be specified; assumed to be 1 for
+            simplicity.
+        (IGNORED) use_boundary_frames: Cannot be specified.
+        options:
+            num_frames_per_video (int)
+    ]]--
+    assert(options ~= nil and options.num_frames_per_video ~= nil)
+    self.sequence_length = sequence_length == nil and 1 or sequence_length
+
+    self.data_source = data_source_obj
+    self.num_frames_per_video = options.num_frames_per_video
+
+    local video_keys = data_source_obj:video_keys()
+    self.sampled_sequences = {} -- Each element contains sequence_length keys
+    for video, keys in pairs(video_keys) do
+        local num_frames = #keys
+        local frame_indices = torch.cmax(
+            torch.floor(
+                torch.linspace(1, num_frames, self.num_frames_per_video)),
+            self.sequence_length)
+
+        for i = 1, self.num_frames_per_video do
+            local sequence_keys = {}
+            local first_frame = frame_indices[i] - self.sequence_length + 1
+            for step = 1, self.sequence_length do
+                sequence_keys[step] = keys[first_frame + step - 1]
+            end
+            table.insert(self.sampled_sequences, sequence_keys)
+        end
+    end
+    self.key_index = 1
+end
+
+function UniformlySpacedSampler:num_labels()
+    return self.data_source:num_labels()
+end
+
+function UniformlySpacedSampler:num_samples()
+    return #self.sampled_sequences
+end
+
+function UniformlySpacedSampler:sample_keys(num_sequences)
+    --[[
+    Sample the next set of keys.
+
+    Returns:
+        batch_keys (Array of array of strings): Array of length sequence_length,
+            where each element contains num_sequences arrays.
+    ]]--
+    local batch_keys = {}
+    for _ = 1, self.sequence_length do
+        table.insert(batch_keys, {})
+    end
+    if self.key_index > #self.sampled_sequences then
+        log.info('Finished pass through data!')
+        self.key_index = 1
+    end
+
+    -- Take the next num_sequences sequences from self.sampled_sequences, but
+    -- convert it so that it is a (sequence_length, num_sequences) table instead
+    -- of a (num_sequences, sequence_length) table.
+    for i = 1, num_sequences do
+        for step = 1, self.sequence_length do
+            batch_keys[step][i] = self.sampled_sequences[self.key_index][step]
+        end
+        self.key_index = self.key_index + 1
+    end
+    return batch_keys
+end
+
 local DataLoader = classic.class('DataLoader')
 
 function DataLoader:_init(data_source_obj, sampler)
@@ -546,5 +631,6 @@ return {
     BalancedSampler = BalancedSampler,
     PermutedSampler = PermutedSampler,
     SequentialSampler = SequentialSampler,
+    UniformlySpacedSampler = UniformlySpacedSampler,
     END_OF_SEQUENCE = END_OF_SEQUENCE
 }
