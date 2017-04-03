@@ -547,6 +547,9 @@ local function evaluate_model(options)
             all_labels = torch.cat(all_labels, labels[sequence_length], 1)
         end
 
+        -- Concat batch_keys to all_keys.
+        all_keys = __.append(all_keys, batch_keys[sequence_length])
+
         -- The first (sequence_length - 1) frames of a video do not get
         -- predictions from the network. If these frames are in our batch,
         -- collect their labels and set their predictions to a large negative
@@ -569,9 +572,6 @@ local function evaluate_model(options)
                 end
             end
         end
-
-        -- Concat batch_keys to all_keys.
-        all_keys = __.append(all_keys, batch_keys[sequence_length])
 
         samples_complete = samples_complete + to_load
         if samples_complete % progress_every == 0 then
