@@ -728,6 +728,7 @@ if args.charades_submission_out ~= nil then
         local filename, frame_number = source:frame_video_offset(key)
         if current_filename == nil or current_filename ~= filename then
             current_index = 1
+            current_filename = filename
         end
         if (i - 1) % 1000 == 0 then
             log.info(string.format(
