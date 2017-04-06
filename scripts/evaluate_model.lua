@@ -66,17 +66,14 @@ parser:option('--val_groups',
       :count(1)
       :default('/data/achald/MultiTHUMOS/val_split/val_val_groups.txt')
 parser:option('--batch_size', 'Batch size'):convert(tonumber):default(64)
-parser:option('--reinit_rate', 'Reinit rate'):convert(tonumber):default(-1)
+parser:option('--reinit_rate', 'Reinit rate'):convert(tonumber)
 parser:option('--min_reinit_rate',
               'Min reinit rate (for PredictiveCorrectiveBlock)')
       :convert(tonumber)
-      :default(-1)
 parser:option('--reinit_threshold', 'Threshold over which to reinitialize')
       :convert(tonumber)
-      :default(-1)
 parser:option('--ignore_threshold', 'Threshold under which to ignore frames')
       :convert(tonumber)
-      :default(-1)
 parser:option('--charades_submission_out',
               'Path to output Charades submission file to. If specified, ' ..
               'evaluate only on 25 frames uniformly spaced over ' ..
@@ -162,7 +159,7 @@ if args.decorate_sequencer then
     single_model = nn.Sequencer(single_model)
 end
 
-if args.reinit_rate ~= -1 then
+if args.reinit_rate ~= nil then
     log.info('Resetting reinit rate to', args.reinit_rate)
     local reinit_types = {
         'nn.CRollingDiffTable', 'nn.PeriodicResidualTable', 'nn.CCumSumTable'}
@@ -175,17 +172,17 @@ if args.reinit_rate ~= -1 then
 end
 
 local pcbs, _ = single_model:findModules('nn.PredictiveCorrectiveBlock')
-if args.min_reinit_rate ~= -1 then
+if args.min_reinit_rate ~= nil then
     for _, pcb in ipairs(pcbs) do
         pcb.max_update = args.min_reinit_rate
     end
 end
-if args.ignore_threshold ~= -1 then
+if args.ignore_threshold ~= nil then
     for _, pcb in ipairs(pcbs) do
         pcb.ignore_threshold = args.ignore_threshold
     end
 end
-if args.reinit_threshold ~= -1 then
+if args.reinit_threshold ~= nil then
     for _, pcb in ipairs(pcbs) do
         pcb.init_threshold = args.reinit_threshold
     end
