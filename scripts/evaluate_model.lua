@@ -122,13 +122,14 @@ log.info('Git status information:')
 log.info('===')
 
 log.info('Executing command: git --no-pager diff scripts/evaluate_model.lua')
-os.execute('git --no-pager diff scripts/evaluate_model.lua')
+os.execute('git --no-pager diff scripts/evaluate_model.lua | tee -a ' ..
+           args.output_log)
 
 log.info('Executing command: git --no-pager diff layers/')
-os.execute('git --no-pager diff layers/')
+os.execute('git --no-pager diff layers/ | tee -a ' .. args.output_log)
 
 log.info('Executing command: git --no-pager rev-parse HEAD')
-os.execute('git --no-pager rev-parse HEAD')
+os.execute('git --no-pager rev-parse HEAD | tee -a ' .. args.output_log)
 
 log.info('===')
 
