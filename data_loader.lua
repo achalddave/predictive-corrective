@@ -23,8 +23,10 @@ function Sampler.static.permute(list)
     local permuted_list = {}
     local permutation = torch.randperm(#list)
     for i = 1, permutation:nElement() do
-        table.insert(permuted_list, list[permutation[i]])
+        permuted_list[i] = list[permutation[i]]
     end
+    collectgarbage()
+    collectgarbage()
     return permuted_list
 end
 
