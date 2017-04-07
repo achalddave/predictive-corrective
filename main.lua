@@ -450,7 +450,9 @@ function train_eval_loop()
         collectgarbage()
         collectgarbage()
 
-        trainer:evaluate_epoch(epoch, config.val_epoch_size)
+        if epoch % 5 == 0 then
+            trainer:evaluate_epoch(epoch, config.val_epoch_size)
+        end
         collectgarbage()
         collectgarbage()
         epoch = epoch + 1
