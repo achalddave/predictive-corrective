@@ -249,6 +249,10 @@ if not args.debug then
 end
 log.info('Loading model from ' .. config.model_init)
 single_model = torch.load(config.model_init)
+if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
+    log.info('Getting first of DataParallelTable.')
+    single_model = single_model:get(1)
+end
 single_model:clearState()
 if config.criterion_wrapper == nil then
     if torch.isTypeOf(single_model, 'nn.Sequencer') then
@@ -284,10 +288,6 @@ if config.dropout_p ~= nil then
    end
 end
 
-if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
-    log.info('Getting first of DataParallelTable.')
-    single_model = single_model:get(1)
-end
 if config.decorate_sequencer then
     if torch.isTypeOf(single_model, 'nn.Sequencer') then
         log.warn('WARNING: decorating sequencer on model that is already ' ..
