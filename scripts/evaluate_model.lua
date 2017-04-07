@@ -750,6 +750,9 @@ elseif args.output_hdf5 ~= nil then
         end
         predictions_by_filename[filename][frame_number] = prediction
     end
+
+    -- Save predictions to HDF5.
+    local output_file = hdf5.open(args.output_hdf5, 'w')
     for filename, predictions_table in pairs(predictions_by_filename) do
         if not args.recurrent then
             -- Ensure we have predictions for all the frames. If we don't, print
@@ -761,12 +764,6 @@ elseif args.output_hdf5 ~= nil then
                 end
             end
         end
-        predictions_by_filename[filename] = torch.cat(predictions_table, 2):t()
-    end
-
-    -- Save predictions to HDF5.
-    local output_file = hdf5.open(args.output_hdf5, 'w')
-    for filename, file_predictions in pairs(predictions_by_filename) do
-        output_file:write(filename, file_predictions)
+        output_file:write(filename, torch.cat(predictions_table, 2):t())
     end
 end
