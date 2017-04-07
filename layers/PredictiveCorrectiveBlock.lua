@@ -1,3 +1,4 @@
+local log = require 'util/log'
 local nn = require 'nn'
 local torch = require 'torch'
 require 'dpnn'
@@ -114,7 +115,6 @@ function PredictiveCorrectiveBlock:_get_init_clone()
             return self.init_clones[i]
         end
     end
-    print('Creating new init clone')
     table.insert(self.init_clones, self.init:sharedClone())
     self.init_clones_usable[#self.init_clones] = false
     return self.init_clones[#self.init_clones]
@@ -127,7 +127,6 @@ function PredictiveCorrectiveBlock:_get_update_clone()
             return self.update_clones[i]
         end
     end
-    print('Creating new update clone')
     table.insert(self.update_clones, self.update:sharedClone())
     self.update_clones_usable[#self.update_clones] = false
     return self.update_clones[#self.update_clones]
@@ -212,9 +211,10 @@ function PredictiveCorrectiveBlock:updateOutput(input)
         end
     end
     if ignored > 0 then
-        print(string.format('Ignored %d out of %d times.', ignored, #input))
+        log.info(string.format('Ignored %d out of %d times.', ignored, #input))
     end
-    print(string.format('Reinitialized %d out of %d times.', num_init, #input))
+    log.info(string.format(
+        'Reinitialized %d out of %d times.', num_init, #input))
     self:type(self._type)
     if self._training then self:training() else self:evaluate() end
 
