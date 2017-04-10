@@ -222,6 +222,7 @@ do -- Write normalized config to file
     local normalized_config_out = io.open(
         paths.concat(cache_dir, 'normalized-config.yaml'), 'w')
     normalized_config_out:write(lyaml.dump(config))
+    normalized_config:close()
 end
 
 local experiment_id = experiment_saver.read_and_increment_experiment_id(
