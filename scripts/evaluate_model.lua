@@ -669,6 +669,7 @@ if args.val_groups ~= '' then -- Compute accuracy across validation groups.
 
     local group_predictions = {}
     local group_labels = {}
+    local groups_valid = true
     for key_index, key in ipairs(all_keys) do
         local key_group = nil
         for group, group_keys in ipairs(file_groups) do
@@ -679,6 +680,11 @@ if args.val_groups ~= '' then -- Compute accuracy across validation groups.
                 end
             end
             if key_group ~= nil then break end
+        end
+        if key_group == nil then
+            log.warn('Key missing from val group, not evaluating groups')
+            groups_valid = false
+            break
         end
         if group_predictions[key_group] == nil then
             group_predictions[key_group] = all_predictions[{{key_index}}]
@@ -691,12 +697,17 @@ if args.val_groups ~= '' then -- Compute accuracy across validation groups.
         end
     end
 
-    group_mAPs = torch.zeros(#file_groups)
-    for group_index = 1, #file_groups do
-        if group_predictions[group_index] ~= nil then
-            group_mAPs[group_index] = evaluator.compute_mean_average_precision(
-                group_predictions[group_index],
-                group_labels[group_index])
+    if groups_valid then
+        group_mAPs = torch.zeros(#file_groups)
+        for group_index = 1, #file_groups do
+            if group_predictions[group_index] ~= nil then
+                group_mAPs[group_index] =
+                    evaluator.compute_mean_average_precision(
+                        group_predictions[group_index],
+                        group_labels[group_index])
+            end
+            log.info(string.format(
+                'Group %d mAP:', group_index), group_mAPs[group_index])
         end
         log.info(string.format(
             'Group %d mAP:', group_index), group_mAPs[group_index])
