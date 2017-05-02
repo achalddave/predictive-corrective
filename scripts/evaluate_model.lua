@@ -85,9 +85,6 @@ parser:flag('--decorate_sequencer',
 parser:flag('--c3d_input',
             'If specified, use C3D input format, which is of size ' ..
             '(batch_size, num_channels, sequence_length, width, height)')
--- TODO(achald): Describe this flag better. Essentially, this allows for
--- evaluating recurrently instead of with a sliding window with a stride of 1,
--- which is the efault.
 parser:flag('--recurrent',
             'If specified, evaluate "recurrently"; i.e. with a sliding ' ..
             'window with a stride = sequence_length instead of stride = 1, ' ..
