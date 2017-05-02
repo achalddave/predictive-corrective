@@ -2,6 +2,7 @@
 
 local argparse = require 'argparse'
 local torch = require 'torch'
+local gnuplot = require 'gnuplot'
 
 local data_source = require 'data_source'
 local data_loader = require 'data_loader'
@@ -13,23 +14,38 @@ local parser = argparse() {
 parser:argument('groundtruth_without_images_lmdb')
 parser:option('--num_labels'):default(65):convert(tonumber)
 parser:option('--num_samples'):default(100):convert(tonumber)
-parser:option('--background_weight'):default(20)
 parser:option('--output_counts')
 
 local args = parser:parse()
 
+log.info('Creating source')
 local source = data_source.LabeledVideoFramesLmdbSource(
     args.groundtruth_without_images_lmdb,
     args.groundtruth_without_images_lmdb,
     args.num_labels)
-local sampler = data_loader.BalancedSampler(
+log.info('Created source')
+
+-- local sampler = data_loader.BalancedSampler(
+--     source,
+--     1 --[[sequence_length]],
+--     1 --[[step_size]],
+--     true --[[use_boundary_frames]],
+--     {background_weight = 20})
+local sampler = data_loader.PermutedSampler(
     source,
     1 --[[sequence_length]],
     1 --[[step_size]],
     true --[[use_boundary_frames]],
-    {background_weight = args.background_weight})
+    {replace = False})
+-- local sampler = data_loader.UniformlySpacedSampler(
+--     source,
+--     1 --[[sequence_length]],
+--     nil --[[step_size]],
+--     nil --[[use_boundary_frames]],
+--     {num_frames_per_video = 25})
 
-local sampled_keys = sampler:sample_keys(args.num_samples)
+log.info('Created sampler')
+local sampled_keys = sampler:sample_keys(sampler:num_samples())
 log.info('Sampled keys')
 local _, sampled_labels = source:load_data(sampled_keys)
 log.info('Loaded labels')
