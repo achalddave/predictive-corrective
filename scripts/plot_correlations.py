@@ -58,11 +58,11 @@ if __name__ == "__main__":
     parser.add_argument('videos', help='Comma separated list of videos')
     parser.add_argument('output', help='Output image name')
     parser.add_argument('--frames', help='Comma separated frames')
-    parser.add_argument('--num-frames',
+    parser.add_argument('--num_frames',
                         help='Number of random frames to plot.',
                         type=int,
                         default=100)
-    parser.add_argument('--num-pixels',
+    parser.add_argument('--num_pixels',
                         help='Number of random pixels to plot.',
                         type=int,
                         default=500)
@@ -148,5 +148,5 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.subplots_adjust(top=0.85)
     # plt.suptitle("Blue channel correlations", fontsize=40)
-    plt.show()
-    # plt.savefig(args.output, bbox_inches='tight')
+    # plt.show()
+    plt.savefig(args.output, bbox_inches='tight')
