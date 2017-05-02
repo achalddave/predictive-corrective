@@ -433,12 +433,18 @@ if not args.debug then
 
     signal.signal(signal.SIGINT, function(signum)
         log.info('Caught ctrl-c, saving model')
-        save_intermediate(epoch - 1)
+        save_intermediate(epoch)
         os.exit(signum)
     end)
 end
 
 function train_eval_loop()
+    -- -- XXX HACK XXX
+    -- log.warn('=========================')
+    -- log.warn('Using PCA augmentation!!!')
+    -- log.warn('=========================')
+    -- assert(string.match(config.data_paths_config,
+    --                     'config/local_data_paths_charades.yaml'))
     while epoch <= config.num_epochs do
         log.info(('Training epoch %d'):format(epoch))
         trainer:train_epoch(epoch, config.epoch_size)

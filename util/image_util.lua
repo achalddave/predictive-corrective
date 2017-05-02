@@ -70,6 +70,37 @@ local function subtract_pixel_mean(img, pixel_mean)
      return img
 end
 
+-- Lighting noise (AlexNet-style PCA-based noise). Only used for Charades.
+-- TODO(achald): Make this more general, allow specifying eigen vectors/values
+-- from config.
+local function charades_pca_augment(img, alpha)
+    -- XXX HACK XXX Magic numbers from Gunnar.
+    local eigenvalues = torch.Tensor({ 0.2175, 0.0188, 0.0045 })*256.0
+    local eigenvectors = torch.Tensor({
+        { -0.5675,  0.7192,  0.4009 },
+        { -0.5808, -0.0045, -0.8140 },
+        { -0.5836, -0.6948,  0.4203 },
+    })
+    local alphastd = 0.1
+
+    if alphastd == 0 then
+        return input
+    end
+
+    alpha = alpha or torch.Tensor(3):normal(0, alphastd)
+    local rgb = eigenvectors:clone()
+        :cmul(alpha:view(1, 3):expand(3, 3))
+        :cmul(eigenvalues:view(1, 3):expand(3, 3))
+        :sum(2)
+        :squeeze()
+
+    img = img:clone()
+    for i=1,3 do
+        img[i]:add(rgb[i])
+    end
+    return img, alpha
+end
+
 local function augment_image(
     img, crop_width, crop_height, pixel_mean, mode, state)
     --[[ Process image by cropping, mirroring, and subtracting mean.
@@ -106,6 +137,9 @@ local function augment_image(
 
     -- Mirror horizontally with probability 0.5.
     if mode == AUGMENT_MODE.TRAIN then
+        -- XXX HACK XXX
+        -- If you uncomment this, uncomment the warning in main.lua, too!
+        -- img, state.alpha = charades_pca_augment(img, state.alpha)
         img, state.mirror_state = random_mirror(img, state.mirror_state)
     end
 
