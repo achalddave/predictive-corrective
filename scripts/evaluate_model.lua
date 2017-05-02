@@ -101,7 +101,12 @@ end
 
 -- More config variables.
 local GPUS = {1, 2, 3, 4}
-local PIXEL_MEAN = {96.8293, 103.073, 101.662}
+-- TODO(achald): Allow specifying dataset from cmd line; use this to determine
+-- pixel mean, num labels, etc.
+-- local PIXEL_MEAN = {103.939, 116.779, 123.68} -- Gunnar's Charades model mean
+-- local PIXEL_MEAN = {86.18377069, 93.74071911, 105.4525389} -- Charades
+-- local PIXEL_MEAN = {92.4318769, 99.46975121, 100.62499024} -- train+val MultiTHUMOS
+local PIXEL_MEAN = {96.8293, 103.073, 101.662} -- train MultiTHUMOS
 local CROP_SIZE = 224
 local CROPS = {'c'}
 
