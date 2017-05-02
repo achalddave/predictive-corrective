@@ -1,7 +1,6 @@
 """Compute mAP with predictions in HDF5 file and a groundtruth LMDB."""
 from __future__ import division
 import argparse
-from collections import defaultdict
 
 import h5py
 import matplotlib
@@ -34,7 +33,19 @@ def main(predictions_hdf5, groundtruth_without_images_lmdb):
 
     aps = np.zeros(len(label_names))
     for label in range(len(label_names)):
-        aps[label] = compute_average_precision(groundtruth[label], predictions[label])
+        # Old code used to set the first few frames' prediction to be exactly
+        # -1. Set these values to be a much smaller negative value instead
+        # (since we are dealing with the predictions before the sigmoid).
+        #
+        # We can safely assume that we are only changing the values that were
+        # artificially set to -1, since the output of the network for any frame
+        # will basically never be exactly -1.
+        # predictions[label][predictions[label] == -1] = -1e9
+        accuracies[label] = (
+            groundtruth[label] ==
+            (predictions[label] > 0)).sum() / groundtruth[label].shape[0]
+        aps[label] = compute_average_precision(groundtruth[label],
+                                               predictions[label])
     return aps
 
 
