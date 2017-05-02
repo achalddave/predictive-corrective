@@ -215,6 +215,7 @@ log.info('Loaded model.')
 -- Ensure that dropout is properly turned off. Sometimes with modules such as
 -- nn.MapTable and nn.PeriodicResidualTable, we have issues where dropout is not
 -- properly turned off even when :evaluate() is called.
+log.info('Testing that dropout is properly turned off.')
 local test_input = torch.rand(
     args.sequence_length, 1, 3, CROP_SIZE, CROP_SIZE):cuda()
 local output1 = model:forward(test_input):clone()
@@ -226,6 +227,7 @@ assert(torch.all(torch.eq(output1, output2)),
 output1 = nil
 output2 = nil
 test_input = nil
+log.info('Successfully tested dropout.')
 collectgarbage(); collectgarbage()
 
 local function closest_multiple(target, divisor)
@@ -747,6 +749,7 @@ if args.charades_submission_out ~= nil then
     end
     output:close()
 elseif args.output_hdf5 ~= nil then
+    log.info('Saving to output hdf5')
     local predictions_by_filename = {}
     for i, key in pairs(all_keys) do
         local prediction = all_predictions[i]
