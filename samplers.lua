@@ -401,8 +401,6 @@ function SequentialSampler:sample_keys(num_sequences)
                 sampled_key = self.video_keys[video][offset]
             end
         end
-        local last_video, last_offset = self.data_source:frame_video_offset(
-            batch_keys[#batch_keys][sequence])
         if sequence_valid then
             -- The sequence filled the batch with valid keys, so we want to
             -- output the sampled_key as the next sample.
@@ -424,7 +422,6 @@ end
 function SequentialSampler:num_labels()
     return self.data_source:num_labels()
 end
-
 
 function SequentialSampler:num_samples()
     return self.data_source:num_samples()
@@ -470,7 +467,7 @@ function UniformlySpacedSampler:_init(
 
     local video_keys = data_source_obj:video_keys()
     self.sampled_sequences = {} -- Each element contains sequence_length keys
-    for video, keys in pairs(video_keys) do
+    for _, keys in pairs(video_keys) do
         local num_frames = #keys
         local frame_indices = torch.cmax(
             torch.floor(
