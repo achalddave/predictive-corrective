@@ -35,6 +35,7 @@ local evaluator = require 'evaluator'
 local experiment_saver = require 'util/experiment_saver'
 local image_util = require 'util/image_util'
 local log = require 'util/log'
+local samplers = require 'samplers'
 local string_util = require 'util/strings'
 require 'layers/init'
 
@@ -258,7 +259,7 @@ local function crop_and_zero_center_images(
         for batch_index, img in ipairs(step_images) do
             -- Process image after converting to the default Tensor type.
             -- (Originally, it is a ByteTensor).
-            if img == data_loader.END_OF_SEQUENCE then
+            if img == samplers.END_OF_SEQUENCE then
                 for i, _ in ipairs(crops) do
                     local crop_index = ((batch_index - 1) * #crops) + i
                     images[{step, crop_index}] = torch.zeros(
@@ -328,7 +329,7 @@ local function evaluate_model_sequential(options)
         batch_size = batch_size_sequences,
         sample_once = true
     }
-    local sampler = data_loader.SequentialSampler(
+    local sampler = samplers.SequentialSampler(
         source, sequence_length, step_size,
         nil --[[ use boundary frames]], sampler_options)
     local loader = data_loader.DataLoader(source, sampler)
@@ -361,7 +362,7 @@ local function evaluate_model_sequential(options)
         for sequence = 1, batch_size_sequences do
             valid_up_to_step[sequence] = 0
             for step = 1, sequence_length do
-                if batch_keys[step][sequence] ~= data_loader.END_OF_SEQUENCE
+                if batch_keys[step][sequence] ~= samplers.END_OF_SEQUENCE
                     then
                     valid_up_to_step[sequence] = step
                     table.insert(all_keys, batch_keys[step][sequence])
@@ -475,11 +476,11 @@ local function evaluate_model(options)
     local sampler
 
     if not uniformly_spaced_eval then
-        sampler = data_loader.PermutedSampler(
+        sampler = samplers.PermutedSampler(
             source, sequence_length, step_size, true --[[use_boundary_frames]])
     else
         log.info('Using UniformlySpacedSampler!')
-        sampler = data_loader.UniformlySpacedSampler(
+        sampler = samplers.UniformlySpacedSampler(
             source, sequence_length, nil, nil, {num_frames_per_video=25})
     end
     local loader = data_loader.DataLoader(source, sampler)

@@ -7,6 +7,7 @@ local gnuplot = require 'gnuplot'
 local data_source = require 'data_source'
 local data_loader = require 'data_loader'
 local log = require 'util/log'
+local samplers = require 'samplers'
 
 local parser = argparse() {
     description = 'Compute distribution of labels from samples.'
@@ -25,19 +26,19 @@ local source = data_source.LabeledVideoFramesLmdbSource(
     args.num_labels)
 log.info('Created source')
 
--- local sampler = data_loader.BalancedSampler(
+-- local sampler = samplers.BalancedSampler(
 --     source,
 --     1 --[[sequence_length]],
 --     1 --[[step_size]],
 --     true --[[use_boundary_frames]],
 --     {background_weight = 20})
-local sampler = data_loader.PermutedSampler(
+local sampler = samplers.PermutedSampler(
     source,
     1 --[[sequence_length]],
     1 --[[step_size]],
     true --[[use_boundary_frames]],
     {replace = False})
--- local sampler = data_loader.UniformlySpacedSampler(
+-- local sampler = samplers.UniformlySpacedSampler(
 --     source,
 --     1 --[[sequence_length]],
 --     nil --[[step_size]],

@@ -18,6 +18,7 @@ require 'layers/init'
 
 local data_source = require 'data_source'
 local data_loader = require 'data_loader'
+local samplers = require 'samplers'
 
 local parser = argparse() {
     description = 'Computes activations for a given video for a VGG network.'
@@ -65,7 +66,7 @@ torch.setdefaulttensortype('torch.FloatTensor')
 ---
 -- Load list of frame keys for video.
 ---
-local VideoSampler = classic.class('VideoSampler', data_loader.Sampler)
+local VideoSampler = classic.class('VideoSampler', samplers.Sampler)
 function VideoSampler:_init(
     data_source_obj, sequence_length, step_size, use_boundary_frames, options)
     --[[ Return consecutive frames from a given video.
@@ -79,7 +80,7 @@ function VideoSampler:_init(
     self.all_video_keys = self.data_source:video_keys()
     if not use_boundary_frames then
         self.all_video_keys =
-            data_loader.PermutedSampler.filter_boundary_frames(
+            samplers.PermutedSampler.filter_boundary_frames(
                 self.all_video_keys, sequence_length, step_size)
     end
     self.video_keys = self.all_video_keys[self.video_name]

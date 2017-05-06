@@ -110,6 +110,7 @@ local data_loader = require 'data_loader'
 local data_source = require 'data_source'
 local experiment_saver = require 'util/experiment_saver'
 local log = require 'util/log'
+local samplers = require 'samplers'
 local trainer = require 'trainer'
 require 'last_step_criterion'
 require 'layers/init'
@@ -329,9 +330,9 @@ end
 log.info('Loaded model')
 
 local sampling_strategies = {
-    permuted = data_loader.PermutedSampler,
-    balanced = data_loader.BalancedSampler,
-    sequential = data_loader.SequentialSampler
+    permuted = samplers.PermutedSampler,
+    balanced = samplers.BalancedSampler,
+    sequential = samplers.SequentialSampler
 }
 
 local train_source = data_source[config.data_source_class](
@@ -362,14 +363,14 @@ end
 
 local val_sampler
 if config.sampling_strategy:lower() == 'sequential' then
-    val_sampler = data_loader.SequentialSampler(
+    val_sampler = samplers.SequentialSampler(
         val_source,
         config.sequence_length,
         config.step_size,
         config.use_boundary_frames,
         config.sampling_strategy_options)
 else
-    val_sampler = data_loader.PermutedSampler(
+    val_sampler = samplers.PermutedSampler(
         val_source,
         config.sequence_length,
         config.step_size,

@@ -2,6 +2,7 @@
 
 local data_loader = require 'data_loader'
 local data_source = require 'data_source'
+local samplers = require 'samplers'
 local lyaml = require 'lyaml'
 
 local data_paths = lyaml.load(io.open('config/data_paths.yaml', 'r'):read('*a'))
@@ -12,7 +13,7 @@ local source = data_source.PositiveVideosLmdbSource(
     65 --[[num_labels]],
     {labels = {'VolleyballSpiking'}})
 
-local sampler = data_loader.PermutedSampler(source, 1, 1, false)
+local sampler = samplers.PermutedSampler(source, 1, 1, false)
 local keys = sampler:sample_keys(5)
 print(keys)
 

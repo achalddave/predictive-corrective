@@ -5,9 +5,10 @@ require 'classic.torch'
 
 local data_loader = require 'data_loader'
 local log = require 'util/log'
+local samplers = require 'samplers'
 
-local Sampler = data_loader.Sampler
-local BalancedSampler = data_loader.BalancedSampler
+local Sampler = samplers.Sampler
+local BalancedSampler = samplers.BalancedSampler
 
 -- TODO(achald): Implement greedy balancing sampler.
 local GreedyBalancingSampler, GreedyBalancingSamplerSuper =
@@ -232,5 +233,5 @@ function MarkSeenBalancingSampler:_advance_label_index(label)
     end
 end
 
-data_loader.GreedyBalancingSampler = GreedyBalancingSampler
-data_loader.MarkSeenBalancingSampler = MarkSeenBalancingSampler
+samplers.GreedyBalancingSampler = GreedyBalancingSampler
+samplers.MarkSeenBalancingSampler = MarkSeenBalancingSampler
