@@ -293,17 +293,17 @@ function BalancedSampler:_permute_keys()
     end
 end
 
--- TODO(achald): Implement sequential sampler. This will choose
--- `batch_size` videos, and then emit consecutive sequences from these videos.
--- So each batch will contain sequence_length frames from batch_size videos.
--- If a video has less than batch_size frames left, the batch will be padded
--- with 'nil' keys.
 local SequentialSampler = classic.class('SequentialSampler', Sampler)
 function SequentialSampler:_init(
         data_source_obj, sequence_length, step_size,
         _ --[[use_boundary_frames]], options)
     --[[
     Returns consecutives sequences of frames from videos.
+
+    This chooses `batch_size` videos, and then emits consecutive sequences from
+    these videos.  Each batch will contain sequence_length frames from batch_size
+    videos.  If a video has less than batch_size frames left, the batch will be
+    padded with 'nil' keys.
 
     Args:
         data_source_obj (DataSource)
