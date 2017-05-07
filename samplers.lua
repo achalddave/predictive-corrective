@@ -328,7 +328,6 @@ function SequentialSampler:_init(
     self.video_keys = data_source_obj:video_keys()
     self.data_source = data_source_obj
 
-    -- TODO(achald): Should we sort these by length of videos?
     self.video_start_keys = Sampler.permute(__.pluck(self.video_keys, 1))
 
     self.next_frames = __.first(self.video_start_keys, self.batch_size)
