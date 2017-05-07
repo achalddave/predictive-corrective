@@ -437,6 +437,115 @@ function SequentialSampler.static.get_start_frames(keys)
     return start_frame_keys
 end
 
+local SequentialBatchSampler = classic.class('SequentialBatchSampler', Sampler)
+function SequentialBatchSampler:_init(
+        data_source_obj, sequence_length, step_size, use_boundary_frames,
+        options)
+    --[[
+    Returns consecutives sequences of frames from videos.
+
+    Selects a video, then fills the batch with sequences of frames from the
+    video. If sequence_length > 1, consecutive batch elements will be separated
+    by options.stride frames.
+
+    Args:
+        data_source_obj (DataSource)
+        sequence_length (num): If provided, sample sequences of length
+            sequence_length for each training sample.
+        step_size (num): If provided, elements in the sequence should be
+            separated by this step_size. If step_size is 2, a sequence of length
+            5 starting at x_1 is {x_1, x_3, x_5, x_7, x_9}.
+        use_boundary_frames (bool): Default false. If false, avoid sequences
+            that go outside the video temporally. Otherwise, for sequences at
+            the boundary, we replicate the first or last frame of the video.
+        options (table):
+            stride (num): If sequence_length > 1, then separate consecutive
+                batch sequences with this many frames. For example, if
+                sequence_length = 2 and stride = 1, then the first two elements
+                of the batch will be:
+                    batch index 1: [frame 1, frame 2]
+                    batch index 2: [frame 2, frame 3]
+                Default: sequence_length
+    ]]--
+    options = options == nil and {} or options
+    self.sequence_length = sequence_length == nil and 1 or sequence_length
+    self.step_size = step_size == nil and 1 or step_size
+    self.stride = options.stride == nil and 1 or self.sequence_length
+
+    self.video_keys = data_source_obj:video_keys()
+    self.data_source = data_source_obj
+    self.use_boundary_frames = use_boundary_frames == nil and
+                               false or use_boundary_frames
+
+    self.videos = Sampler.permute(__.keys(self.video_keys))
+    self.video_index = 1
+    self.frame_index = 1
+end
+
+function SequentialBatchSampler:_is_valid_start()
+    local video = self.videos[self.video_index]
+    if self.use_boundary_frames then
+        return self.frame_index <= #self.video_keys[video]
+    else
+        return self.frame_index <= #self.video_keys[video] - (
+            self.sequence_length - 1) * self.step_size
+    end
+end
+
+function SequentialBatchSampler:sample_keys(batch_size)
+    local batch_keys = {}
+    for _ = 1, self.sequence_length do
+        table.insert(batch_keys, {})
+    end
+    for _ = 1, batch_size do
+        if not self:_is_valid_start() then
+            self:advance_video()
+            assert(self:_is_valid_start())
+        end
+        local video = self.videos[self.video_index]
+        local offset = self.frame_index
+        local sampled_key = self.video_keys[video][offset]
+        local last_valid_key = sampled_key
+        for step = 1, self.sequence_length do
+            if self.video_keys[video][offset] then
+                last_valid_key = sampled_key
+            elseif not self.use_boundary_frames then
+                -- If we aren't using boundary frames, we shouldn't run into
+                -- missing keys!
+                error('Missing key:', sampled_key)
+            end
+            table.insert(batch_keys[step], last_valid_key)
+            offset = offset + self.step_size
+            sampled_key = self.video_keys[video][offset]
+        end
+        self.frame_index = self.frame_index + self.stride
+    end
+    return batch_keys
+end
+
+function SequentialBatchSampler:advance_video()
+    log.info(self.videos[self.video_index],
+             #self.video_keys[self.videos[self.video_index]])
+    self.frame_index = 1
+    self.video_index = self.video_index + 1
+    if self.video_index > #self.videos then
+        if not self.sample_once then
+            log.info(string.format(
+                '%s: Finished pass through videos, repermuting!',
+                os.date('%X')))
+            self.video_index = 1
+        end
+    end
+end
+
+function SequentialBatchSampler:num_labels()
+    return self.data_source:num_labels()
+end
+
+function SequentialBatchSampler:num_samples()
+    return self.data_source:num_samples()
+end
+
 local UniformlySpacedSampler = classic.class('UniformlySpacedSampler', Sampler)
 function UniformlySpacedSampler:_init(
         data_source_obj, sequence_length, _ --[[step_size]],
@@ -527,6 +636,7 @@ return {
     BalancedSampler = BalancedSampler,
     PermutedSampler = PermutedSampler,
     SequentialSampler = SequentialSampler,
+    SequentialBatchSampler = SequentialBatchSampler,
     UniformlySpacedSampler = UniformlySpacedSampler,
     END_OF_SEQUENCE = END_OF_SEQUENCE
 }
