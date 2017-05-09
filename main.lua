@@ -59,6 +59,10 @@
 -- use_boundary_frames (bool): Whether to use sequences
 --     that go beyond video boundaries. See data_loader.lua for
 --     details. (Default: false)
+-- checkpoint_every: Save a model checkpoint every `checkpoint_every` epoch.
+--     (Default: 1)
+-- evaluate_every: Evaluate the model every `evaluate_every` epoch.
+--     (Default: 1)
 --
 -- # Optimization options
 -- momentum (float)
@@ -183,6 +187,12 @@ function normalize_config(config)
     end
     if config.use_boundary_frames == nil then
         config.use_boundary_frames = false
+    end
+    if config.checkpoint_every == nil then
+        config.checkpoint_every = 1
+    end
+    if config.evaluate_every == nil then
+        config.evaluate_every = 1
     end
 
     if config.computational_batch_size == nil then
@@ -452,13 +462,14 @@ function train_eval_loop()
         collectgarbage()
         collectgarbage()
 
-        if not args.debug and (epoch % 5 == 0 or epoch == config.init_epoch) then
+        if not args.debug and (epoch % config.checkpoint_every == 0 or
+                               epoch == config.init_epoch) then
             save_intermediate(epoch)
         end
         collectgarbage()
         collectgarbage()
 
-        if epoch % 5 == 0 then
+        if epoch % config.evaluate_every == 0 then
             trainer:evaluate_epoch(epoch, config.val_epoch_size)
         end
         collectgarbage()
