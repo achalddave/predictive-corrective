@@ -509,8 +509,6 @@ function SequentialBatchSampler:sample_keys(batch_size)
 end
 
 function SequentialBatchSampler:advance_video()
-    log.info(self.videos[self.video_index],
-             #self.video_keys[self.videos[self.video_index]])
     self.frame_index = 1
     self.video_index = self.video_index + 1
     if self.video_index > #self.videos then
