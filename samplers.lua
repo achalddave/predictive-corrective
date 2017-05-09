@@ -529,6 +529,100 @@ function SequentialBatchSampler:num_samples()
     return self.data_source:num_samples()
 end
 
+local ReplayMemorySampler, super = classic.class('ReplayMemorySampler',
+                                                 SequentialBatchSampler)
+function ReplayMemorySampler:_init(
+        data_source_obj, sequence_length, step_size, use_boundary_frames,
+        options)
+    --[[
+    Iteratively build and sample from a 'replay' memory.
+
+    This sampler works as follows. At each call to sample_keys():
+    1. Sample sequential frames from the current video. (If the video ends,
+       start sampling frames from the next video.)
+    2. Store sampled frames to a 'replay' memory.
+    3. Randomly sample frames from the replay memory.
+    Similar to SequentialBatchSampler, this sampler samples sequential frames in
+    a video at each call to sample_keys(). Instead of returning these sequential
+    frames, we then save them in a 'replay' memory. Fin
+
+    Args:
+        data_source_obj (DataSource)
+        sequence_length (num): See PermutedSampler:_init.
+        step_size (num): See PermutedSampler:_init.
+        use_boundary_frames (bool): See PermutedSampler:_init.
+        options (table):
+            stride (num): As with SequentialBatchSampler.
+            memory_size (num)
+    ]]--
+    options = options == nil and {} or options
+    super._init(self, data_source_obj, sequence_length, step_size,
+                use_boundary_frames, options)
+    -- Contains lists of sequences that have been seen before.
+    self.memory = {}
+    self.memory_size = options.memory_size == nil and
+        math.huge or options.memory_size
+    self.memory_index = 1
+    self.memory_hash = {}
+end
+
+function ReplayMemorySampler:sample_keys(batch_size)
+    --[[
+    Add batch_size sequences to memory, sample batch_size sequences from memory.
+
+    Args:
+        batch_size (num)
+    Returns:
+        batch_keys (Array of array of strings): See PermutedSampler:sample_keys.
+    ]]--
+
+    -- Get the next batch_size sequences, add them to the memory.
+    -- sequential_keys[step][sequence] contains frame at `step` for `sequence`.
+    local sequential_keys = super.sample_keys(self, batch_size)
+    for sequence = 1, #sequential_keys[1] do
+        self:_remember_sequence(__.pluck(sequential_keys, sequence))
+    end
+
+    -- Sample batch_size sequences from memory.
+    local sampled_indices = torch.multinomial(torch.ones(#self.memory),
+                                              batch_size,
+                                              false --[[replace]])
+    -- sampled_sequences[sequence][step] contains frame at `step` for
+    -- `sequence`.
+    local sampled_sequences = __.at(self.memory,
+                                    unpack(torch.totable(sampled_indices)))
+    -- sampled_keys[step][sequence] = sampled_sequences[sequence][step]
+    local sampled_keys = {}
+    for step = 1, #sampled_sequences[1] do
+        sampled_keys[step] = __.pluck(sampled_sequences, step)
+    end
+    return sampled_keys
+end
+
+function ReplayMemorySampler:_remember_sequence(sequence)
+    --[[
+    Args:
+        sequence (table): Contains keys for one sequence to add to memory.
+    ]]--
+    if self.memory_hash[sequence[1]] ~= nil then return end
+
+    local removed_sequence = self.memory[self.memory_index]
+    if removed_sequence ~= nil then
+        self.memory_hash[removed_sequence[1]] = false
+    end
+
+    self.memory[self.memory_index] = sequence
+    self.memory_hash[sequence[1]] = true
+
+    self.memory_index = self.memory_index + 1
+    -- We can't just do (memory_index + 1) % (memory_size + 1) because if
+    -- memory_size is infinite, the modulus returns NaN.
+    if self.memory_index > self.memory_size then
+        self.memory_index = 1
+    end
+end
+
+
 local UniformlySpacedSampler = classic.class('UniformlySpacedSampler', Sampler)
 function UniformlySpacedSampler:_init(
         data_source_obj, sequence_length, _ --[[step_size]],
@@ -617,6 +711,7 @@ return {
     Sampler = Sampler,
     BalancedSampler = BalancedSampler,
     PermutedSampler = PermutedSampler,
+    ReplayMemorySampler = ReplayMemorySampler,
     SequentialSampler = SequentialSampler,
     SequentialBatchSampler = SequentialBatchSampler,
     UniformlySpacedSampler = UniformlySpacedSampler,

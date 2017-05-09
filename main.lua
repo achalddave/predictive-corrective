@@ -44,7 +44,7 @@
 --     'last_step_criterion', which will wrap the criterion with
 --     nn.SequencerCriterion or nn.LastStepCriterion.
 -- sampling_strategy (string): Which sampling strategy to use. One of
---     'permuted', 'balanced', or 'sequential'. (Default: {})
+--     'permuted', 'balanced', 'sequential', or 'replay'. (Default: {})
 -- sampling_strategy_options (list): Options to be passed to the
 --     sampler. See sampler documentation in data_loader.lua.
 -- sequence_length (int): Number of steps in a sequence. See Trainer
@@ -342,7 +342,9 @@ log.info('Loaded model')
 local sampling_strategies = {
     permuted = samplers.PermutedSampler,
     balanced = samplers.BalancedSampler,
-    sequential = samplers.SequentialSampler
+    replay = samplers.ReplayMemorySampler,
+    sequential = samplers.SequentialSampler,
+    sequential_batch = samplers.SequentialBatchSampler
 }
 
 local train_source = data_source[config.data_source_class](
