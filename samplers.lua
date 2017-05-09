@@ -174,14 +174,9 @@ function BalancedSampler:_init(
 
     Args:
         data_source_obj (DataSource)
-        sequence_length (num): If provided, sample sequences of length
-            sequence_length for each training sample.
-        step_size (num): If provided, elements in the sequence should be
-            separated by this step_size. If step_size is 2, a sequence of length
-            5 starting at x_1 is {x_1, x_3, x_5, x_7, x_9}.
-        use_boundary_frames (bool): Default false. If false, avoid sequences
-            that go outside the video temporally. Otherwise, for sequences at
-            the boundary, we replicate the first or last frame of the video.
+        sequence_length (num): See PermutedSampler:_init.
+        step_size (num): See PermutedSampler:_init.
+        use_boundary_frames (bool): See PermutedSampler:_init.
         options (table):
             background_weight (int): Indicates weight for sampling background frames.
                 If this is 1, for example, , we sample background frames as
@@ -234,8 +229,7 @@ end
 function BalancedSampler:sample_keys(num_sequences)
     --[[
     Returns:
-        batch_keys (Array of array of strings): Array of length sequence_length,
-            where each element contains num_sequences arrays.
+        batch_keys (Array of array of strings): See PermutedSampler:sample_keys.
     ]]--
     local batch_keys = {}
     for _ = 1, self.sequence_length do
@@ -307,11 +301,8 @@ function SequentialSampler:_init(
 
     Args:
         data_source_obj (DataSource)
-        sequence_length (num): If provided, sample sequences of length
-            sequence_length for each training sample.
-        step_size (num): If provided, elements in the sequence should be
-            separated by this step_size. If step_size is 2, a sequence of length
-            5 starting at x_1 is {x_1, x_3, x_5, x_7, x_9}.
+        sequence_length (num): See PermutedSampler:_init.
+        step_size (num): See PermutedSampler:_init.
         use_boundary_frames (bool): Ignored for SequentialSampler.
         options:
             batch_size (int): Must be specified a-priori and cannot be changed.
@@ -367,8 +358,7 @@ function SequentialSampler:sample_keys(num_sequences)
     Sample the next set of keys.
 
     Returns:
-        batch_keys (Array of array of strings): Array of length sequence_length,
-            where each element contains num_sequences arrays.
+        batch_keys (Array of array of strings): See PermutedSampler:sample_keys.
     ]]--
     local batch_keys = {}
     for _ = 1, self.sequence_length do
@@ -450,14 +440,9 @@ function SequentialBatchSampler:_init(
 
     Args:
         data_source_obj (DataSource)
-        sequence_length (num): If provided, sample sequences of length
-            sequence_length for each training sample.
-        step_size (num): If provided, elements in the sequence should be
-            separated by this step_size. If step_size is 2, a sequence of length
-            5 starting at x_1 is {x_1, x_3, x_5, x_7, x_9}.
-        use_boundary_frames (bool): Default false. If false, avoid sequences
-            that go outside the video temporally. Otherwise, for sequences at
-            the boundary, we replicate the first or last frame of the video.
+        sequence_length (num): See PermutedSampler:_init.
+        step_size (num): See PermutedSampler:_init.
+        use_boundary_frames (bool): See PermutedSampler:_init.
         options (table):
             stride (num): If sequence_length > 1, then separate consecutive
                 batch sequences with this many frames. For example, if
@@ -607,8 +592,7 @@ function UniformlySpacedSampler:sample_keys(num_sequences)
     Sample the next set of keys.
 
     Returns:
-        batch_keys (Array of array of strings): Array of length sequence_length,
-            where each element contains num_sequences arrays.
+        batch_keys (Array of array of strings): See PermutedSampler:sample_keys.
     ]]--
     local batch_keys = {}
     for _ = 1, self.sequence_length do
