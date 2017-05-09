@@ -12,6 +12,8 @@ local data_source = require 'data_source'
 local log = require 'util/log'
 local samplers = require 'samplers'
 
+local DataLoader = classic.class('DataLoader')
+
 function DataLoader:_init(data_source_obj, sampler)
     --[[
     Args:
