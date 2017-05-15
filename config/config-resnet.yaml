@@ -37,8 +37,8 @@ init_epoch: 1
 # Number of examples in batch.
 batch_size: 128
 # One of 'permuted', 'balanced' (case-insensitive)
-sampling_strategy: 'permuted'
-sampling_strategy_options: {
+sampler_class: 'PermutedSampler'
+sampler_options: {
 }
 sequence_length: 1
 

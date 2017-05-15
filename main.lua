@@ -43,9 +43,9 @@
 -- criterion_wrapper (string): Either 'sequencer_criterion' or
 --     'last_step_criterion', which will wrap the criterion with
 --     nn.SequencerCriterion or nn.LastStepCriterion.
--- sampling_strategy (string): Which sampling strategy to use. One of
---     'permuted', 'balanced', 'sequential', or 'replay'. (Default: {})
--- sampling_strategy_options (list): Options to be passed to the
+-- sampler_class (string): Sampler class to use. See samplers.lua for possible
+--     classes. (Default: 'PermutedSampler')
+-- sampler_options (object): Options to be passed to the
 --     sampler. See sampler documentation in data_loader.lua.
 -- sequence_length (int): Number of steps in a sequence. See Trainer
 --     for details. (Default: 1)
@@ -202,12 +202,14 @@ function normalize_config(config)
         config.val_epoch_size = config.epoch_size
     end
 
-    if config.sampling_strategy_options == nil then
-        config.sampling_strategy_options = {}
+    if config.sampler_class == nil then
+        config.sampler_class = 'PermutedSampler'
+        log.info('CONFIG: sampler_class not specified, using ' ..
+                 config.sampler_class)
     end
-    if config.sampling_strategy:lower() == 'sequential' and
-            config.sampling_strategy_options.batch_size == nil then
-        config.sampling_strategy_options.batch_size = config.batch_size
+
+    if config.sampler_options == nil then
+        config.sampler_options = {}
     end
 
     if (config.optim_config == nil) ~= (config.optim_state == nil) then
@@ -339,14 +341,6 @@ elseif config.criterion_wrapper ~= '' then
 end
 log.info('Loaded model')
 
-local sampling_strategies = {
-    permuted = samplers.PermutedSampler,
-    balanced = samplers.BalancedSampler,
-    replay = samplers.ReplayMemorySampler,
-    sequential = samplers.SequentialSampler,
-    sequential_batch = samplers.SequentialBatchSampler
-}
-
 local train_source = data_source[config.data_source_class](
     config.train_lmdb,
     config.train_lmdb_without_images,
@@ -364,24 +358,26 @@ if config.train_sampler_init then
     train_sampler = torch.load(config.train_sampler_init)
     log.info('Loaded train sampler from disk.')
 else
-    train_sampler = sampling_strategies[config.sampling_strategy:lower()](
+    train_sampler = samplers[config.sampler_class](
         train_source,
         config.sequence_length,
         config.step_size,
         config.use_boundary_frames,
-        config.sampling_strategy_options)
+        config.sampler_options)
     log.info('Initialized train sampler')
 end
 
 local val_sampler
-if config.sampling_strategy:lower() == 'sequential' then
+if config.sampler_class == 'SequentialSampler' then
+    log.warn('CONFIG: Using SequentialSampler for evaluation.')
     val_sampler = samplers.SequentialSampler(
         val_source,
         config.sequence_length,
         config.step_size,
         config.use_boundary_frames,
-        config.sampling_strategy_options)
+        config.sampler_options)
 else
+    log.info('CONFIG: Using PermutedSampler for evaluation.')
     val_sampler = samplers.PermutedSampler(
         val_source,
         config.sequence_length,
@@ -403,8 +399,8 @@ if config.optim_config ~= nil and config.optim_state ~= nil then
 end
 
 local trainer_class
-if sampling_strategies[config.sampling_strategy:lower()] ==
-        sampling_strategies.sequential then
+if config.sampler_class == 'SequentialSampler' then
+    log.warn('CONFIG: Using SequentialTrainer for SequentialSampler.')
     trainer_class = trainer.SequentialTrainer
 else
     trainer_class = trainer.Trainer
