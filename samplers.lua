@@ -416,17 +416,6 @@ function SequentialSampler:num_samples()
     return self.data_source:num_samples()
 end
 
-function SequentialSampler.static.get_start_frames(keys)
-    local start_frame_keys = {}
-    for _, key in ipairs(keys) do
-        local _, frame_number = Sampler.parse_frame_key(key)
-        if frame_number == 1 then
-            table.insert(start_frame_keys, key)
-        end
-    end
-    return start_frame_keys
-end
-
 local SequentialBatchSampler = classic.class('SequentialBatchSampler', Sampler)
 function SequentialBatchSampler:_init(
         data_source_obj, sequence_length, step_size, use_boundary_frames,
