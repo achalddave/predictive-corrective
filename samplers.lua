@@ -149,6 +149,7 @@ function PermutedSampler.static.filter_boundary_frames(
             end
         elseif step_size < 0 then
             -- Remove the first ((sequence_length - 1) * step_size) keys.
+            -- Note the minus since step_size is negative.
             for i = 1 - (sequence_length - 1) * step_size, #keys_in_video do
                 local key = keys_in_video[i]
                 table.insert(keys, key)
