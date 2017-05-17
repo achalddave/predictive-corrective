@@ -239,7 +239,7 @@ function LabeledVideoFramesLmdbSource.static.parse_frame_key(frame_key)
     return filename, frame_number
 end
 
-local PositiveVideosLmdbSource, super = classic.class(
+local PositiveVideosLmdbSource, PositiveVideosLmdbSourceSuper = classic.class(
     'PositiveVideosLmdbSource', 'LabeledVideoFramesLmdbSource')
 function PositiveVideosLmdbSource:_init(
         lmdb_path, lmdb_without_images_path, num_labels, options)
@@ -316,12 +316,14 @@ function PositiveVideosLmdbSource:num_labels()
 end
 
 function PositiveVideosLmdbSource:_unfiltered_key_label_map()
+    return PositiveVideosLmdbSourceSuper.key_label_map(
     return super.key_label_map(self, true --[[return_label_map]])
 end
 
 function PositiveVideosLmdbSource:key_label_map(return_label_map)
     -- Remove keys that are not in positive videos.
-    local key_label_map = super.key_label_map(self, return_label_map)
+    local key_label_map = PositiveVideosLmdbSourceSuper.key_label_map(
+        self, return_label_map)
     for key, _ in pairs(key_label_map) do
         local video, _ = self:parse_frame_key(key)
         if self.video_keys_[video] == nil then
@@ -331,7 +333,7 @@ function PositiveVideosLmdbSource:key_label_map(return_label_map)
 end
 
 function PositiveVideosLmdbSource:load_data(keys, load_images)
-    local batch_images, batch_labels = super.load_data(
+    local batch_images, batch_labels = PositiveVideosLmdbSourceSuper.load_data(
         self, keys, load_images)
     if not self.output_all_labels then
         batch_labels = batch_labels[{{}, {}, self.positive_label_ids}]
