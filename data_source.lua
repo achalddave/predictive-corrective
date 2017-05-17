@@ -44,7 +44,7 @@ function LabeledVideoFramesLmdbSource:_init(
     self.video_keys_ = {}
     local key_labels = self:key_label_map()
     for key, _ in pairs(key_labels) do
-        local video, frame = LabeledVideoFramesLmdbSource.parse_frame_key(key)
+        local video, frame = self:frame_video_offset(key)
         if self.video_keys_[video] == nil then
             self.video_keys_[video] = {}
         end
@@ -325,7 +325,7 @@ function PositiveVideosLmdbSource:key_label_map(return_label_map)
     local key_label_map = PositiveVideosLmdbSourceSuper.key_label_map(
         self, return_label_map)
     for key, _ in pairs(key_label_map) do
-        local video, _ = self:parse_frame_key(key)
+        local video, _ = self:frame_video_offset(key)
         if self.video_keys_[video] == nil then
             key_label_map[key] = nil
         end
