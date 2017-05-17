@@ -24,7 +24,83 @@ function Sampler.static.permute(list)
     return permuted_list
 end
 
-local PermutedSampler = classic.class('PermutedSampler', Sampler)
+local VideoSampler = classic.class('VideoSampler', Sampler)
+VideoSampler:mustHave('sample_keys')
+VideoSampler:mustHave('num_samples')
+
+function VideoSampler:_init(data_source_obj, sequence_length, step_size,
+                            use_boundary_frames, options)
+    self.data_source = data_source_obj
+    self.sequence_length = sequence_length == nil and 1 or sequence_length
+    self.step_size = step_size == nil and 1 or step_size
+    self.use_boundary_frames = use_boundary_frames == nil and
+                               false or use_boundary_frames
+    self.options = options == nil and {} or options
+
+    self.video_keys = data_source_obj:video_keys()
+end
+
+function VideoSampler:get_sequence(video, offset)
+    local sequence = {}
+    local sampled_key = self.video_keys[video][offset]
+    local last_valid_key = sampled_key
+    for _ = 1, self.sequence_length do
+        if self.video_keys[video][offset] ~= nil then
+            last_valid_key = sampled_key
+        elseif not self.use_boundary_frames then
+            -- If we aren't using boundary frames, we shouldn't run into
+            -- missing keys!
+            error('Missing key:', sampled_key)
+        end
+        table.insert(sequence, last_valid_key)
+        offset = offset + self.step_size
+        sampled_key = self.video_keys[video][offset]
+    end
+    return sequence
+end
+
+function VideoSampler:num_labels()
+    return self.data_source:num_labels()
+end
+
+function VideoSampler.static.filter_boundary_frames(
+        video_keys, sequence_length, step_size)
+    --[[ Filter out the last sequence_length frames in the video.
+    --
+    -- TODO(achald): This doesn't need to be a static method.
+    --
+    -- Args:
+    --     video_keys (array of arrays): Maps video name to array of keys for
+    --         frames in the video.
+    --
+    --  Returns:
+    --      keys (array): Valid keys after filtering.
+    --]]
+    local keys = {}
+    -- TODO(achald): Use __.initial and __.last to clean up this code. Be sure
+    -- to test this thoroughly!
+    for _, keys_in_video in pairs(video_keys) do
+        if step_size > 0 then
+            -- Remove the last ((sequence_length - 1) * step_size) keys.
+            for i = 1, #keys_in_video - (sequence_length - 1) * step_size do
+                local key = keys_in_video[i]
+                table.insert(keys, key)
+            end
+        elseif step_size < 0 then
+            -- Remove the first ((sequence_length - 1) * step_size) keys.
+            -- Note the minus since step_size is negative.
+            for i = 1 - (sequence_length - 1) * step_size, #keys_in_video do
+                local key = keys_in_video[i]
+                table.insert(keys, key)
+            end
+        end
+    end
+    return keys
+end
+
+
+local PermutedSampler, PermutedSamplerSuper = classic.class('PermutedSampler',
+                                                            VideoSampler)
 function PermutedSampler:_init(
         data_source_obj, sequence_length, step_size, use_boundary_frames,
         options)
@@ -46,21 +122,16 @@ function PermutedSampler:_init(
                 If false, do not re-sample a frame until all other frames have
                 been sampled.
     ]]--
-    options = options == nil and {} or options
-    self.sequence_length = sequence_length == nil and 1 or sequence_length
-    self.step_size = step_size == nil and 1 or step_size
-    self.use_boundary_frames = use_boundary_frames == nil and
-                               false or use_boundary_frames
-
-    self.video_keys = data_source_obj:video_keys()
-    self.data_source = data_source_obj
-    self.replace = options.replace == nil and false or options.replace
+    PermutedSamplerSuper._init(
+        self, data_source_obj, sequence_length, step_size, use_boundary_frames,
+        options)
+    self.replace = self.options.replace == nil and false or self.options.replace
 
     -- TODO: Don't store two copies of keys.
     self.keys = __.flatten(self.video_keys)
 
     if not self.use_boundary_frames then
-        self.keys = PermutedSampler.filter_boundary_frames(
+        self.keys = VideoSampler.filter_boundary_frames(
             self.video_keys, self.sequence_length, self.step_size)
     end
 
@@ -99,67 +170,21 @@ function PermutedSampler:sample_keys(num_sequences)
         end
         local sampled_key = self.keys[self.key_order[self.key_index]]
         local video, offset = self.data_source:frame_video_offset(sampled_key)
-        local last_valid_key
+        local sequence = self:get_sequence(video, offset)
         for step = 1, self.sequence_length do
-            -- If the key exists, use it. Otherwise, use the last frame we have.
-            if self.video_keys[video][offset] ~= nil then
-                last_valid_key = sampled_key
-            elseif not self.use_boundary_frames then
-                -- If we aren't using boundary frames, we shouldn't run into
-                -- missing keys!
-                error('Missing key:', sampled_key)
-            end
-            table.insert(batch_keys[step], last_valid_key)
-            offset = offset + self.step_size
-            sampled_key = self.video_keys[video][offset]
+            table.insert(batch_keys[step], sequence[step])
         end
         self.key_index = self.key_index + 1
     end
     return batch_keys
 end
 
-function PermutedSampler:num_labels()
-    return self.data_source:num_labels()
-end
-
 function PermutedSampler:num_samples()
     return #self.keys
 end
 
-function PermutedSampler.static.filter_boundary_frames(
-        video_keys, sequence_length, step_size)
-    --[[ Filter out the last sequence_length frames in the video.
-    --
-    -- Args:
-    --     video_keys (array of arrays): Maps video name to array of keys for
-    --         frames in the video.
-    --
-    --  Returns:
-    --      keys (array): Valid keys after filtering.
-    --]]
-    local keys = {}
-    -- TODO(achald): Use __.initial and __.last to clean up this code. Be sure
-    -- to test this thoroughly!
-    for _, keys_in_video in pairs(video_keys) do
-        if step_size > 0 then
-            -- Remove the last ((sequence_length - 1) * step_size) keys.
-            for i = 1, #keys_in_video - (sequence_length - 1) * step_size do
-                local key = keys_in_video[i]
-                table.insert(keys, key)
-            end
-        elseif step_size < 0 then
-            -- Remove the first ((sequence_length - 1) * step_size) keys.
-            -- Note the minus since step_size is negative.
-            for i = 1 - (sequence_length - 1) * step_size, #keys_in_video do
-                local key = keys_in_video[i]
-                table.insert(keys, key)
-            end
-        end
-    end
-    return keys
-end
-
-local BalancedSampler = classic.class('BalancedSampler', Sampler)
+local BalancedSampler, BalancedSamplerSuper = classic.class('BalancedSampler',
+                                                            VideoSampler)
 function BalancedSampler:_init(
         data_source_obj,
         sequence_length,
@@ -179,29 +204,25 @@ function BalancedSampler:_init(
         step_size (num): See PermutedSampler:_init.
         use_boundary_frames (bool): See PermutedSampler:_init.
         options (table):
-            background_weight (int): Indicates weight for sampling background frames.
-                If this is 1, for example, , we sample background frames as
-                often as frames from any particular label
+            background_weight (int): Indicates weight for sampling background
+                frames. If this is 1, for example, , we sample background frames
+                as often as frames from any particular label
                 (i.e. with probability 1/(num_labels + 1)).
             DEPRECATED include_bg (bool): If true, background_weight is set to
                 1; if false, background_weight is set to 0.
     ]]--
-    self.data_source = data_source_obj
-    self.num_labels_ = data_source_obj:num_labels()
-    options = options == nil and {} or options
-    self.sequence_length = sequence_length
-    self.step_size = step_size
-    self.use_boundary_frames = use_boundary_frames == nil and
-                               false or use_boundary_frames
+    BalancedSamplerSuper._init(self, data_source_obj, sequence_length,
+                               step_size, use_boundary_frames, options)
+    self.num_labels_ = self.data_source:num_labels()
 
-    assert(options.include_bg == nil,
+    assert(self.options.include_bg == nil,
            'include_bg is deprecated; use background_weight instead.')
 
     -- List of all valid keys.
     self.video_keys = self.data_source:video_keys()
     local valid_keys
     if not self.use_boundary_frames then
-        valid_keys = PermutedSampler.filter_boundary_frames(
+        valid_keys = VideoSampler.filter_boundary_frames(
             self.video_keys, sequence_length, -step_size)
     else
         valid_keys = __.flatten(self.video_keys)
@@ -220,7 +241,8 @@ function BalancedSampler:_init(
 
     self.label_weights = torch.ones(self.num_labels_ + 1)
     self.label_weights[self.num_labels_ + 1] =
-        options.background_weight == nil and 0 or options.background_weight
+        self.options.background_weight == nil and 0 or
+            self.options.background_weight
 
     -- For each label, maintain an index of the next data point to output.
     self.label_indices = {}
@@ -264,10 +286,6 @@ function BalancedSampler:sample_keys(num_sequences)
     return batch_keys
 end
 
-function BalancedSampler:num_labels()
-    return self.data_source:num_labels()
-end
-
 function BalancedSampler:num_samples()
     return self.num_keys
 end
@@ -288,7 +306,8 @@ function BalancedSampler:_permute_keys()
     end
 end
 
-local SequentialSampler = classic.class('SequentialSampler', Sampler)
+local SequentialSampler, SequentialSamplerSuper = classic.class(
+    'SequentialSampler', VideoSampler)
 function SequentialSampler:_init(
         data_source_obj, sequence_length, step_size,
         _ --[[use_boundary_frames]], options)
@@ -310,19 +329,17 @@ function SequentialSampler:_init(
             sample_once (bool): If true, only do one pass through the videos.
                 Useful for evaluating.
     ]]--
-    assert(options.batch_size ~= nil)
-    self.sequence_length = sequence_length == nil and 1 or sequence_length
-    self.step_size = step_size == nil and 1 or step_size
-    self.batch_size = options.batch_size
-    self.sample_once = options.sample_once
+    SequentialSamplerSuper._init(self, data_source_obj, sequence_length,
+                                 step_size, nil, options)
+
+    assert(self.options.batch_size ~= nil)
+    self.batch_size = self.options.batch_size
+    self.sample_once = self.options.sample_once
     self.sampled_all_videos = false
 
-    self.video_keys = data_source_obj:video_keys()
-    self.data_source = data_source_obj
-
     self.video_start_keys = Sampler.permute(__.pluck(self.video_keys, 1))
-
     self.next_frames = __.first(self.video_start_keys, self.batch_size)
+
     -- Set to the last video that we are currently outputting; when a video
     -- ends, this will be advanced by 1 and a new video will be output.
     self.video_index = self.batch_size
@@ -409,15 +426,12 @@ function SequentialSampler:sample_keys(num_sequences)
     return batch_keys
 end
 
-function SequentialSampler:num_labels()
-    return self.data_source:num_labels()
-end
-
 function SequentialSampler:num_samples()
     return self.data_source:num_samples()
 end
 
-local SequentialBatchSampler = classic.class('SequentialBatchSampler', Sampler)
+local SequentialBatchSampler, SequentialBatchSamplerSuper = classic.class(
+    'SequentialBatchSampler', VideoSampler)
 function SequentialBatchSampler:_init(
         data_source_obj, sequence_length, step_size, use_boundary_frames,
         options)
@@ -442,15 +456,10 @@ function SequentialBatchSampler:_init(
                     batch index 2: [frame 2, frame 3]
                 Default: sequence_length
     ]]--
-    options = options == nil and {} or options
-    self.sequence_length = sequence_length == nil and 1 or sequence_length
-    self.step_size = step_size == nil and 1 or step_size
-    self.stride = options.stride == nil and 1 or self.sequence_length
+    SequentialBatchSamplerSuper._init(self, data_source_obj, sequence_length,
+                                      step_size, use_boundary_frames, options)
 
-    self.video_keys = data_source_obj:video_keys()
-    self.data_source = data_source_obj
-    self.use_boundary_frames = use_boundary_frames == nil and
-                               false or use_boundary_frames
+    self.stride = self.options.stride == nil and 1 or self.sequence_length
 
     self.videos = Sampler.permute(__.keys(self.video_keys))
     self.video_index = 1
@@ -477,21 +486,10 @@ function SequentialBatchSampler:sample_keys(batch_size)
             self:advance_video()
             assert(self:_is_valid_start())
         end
-        local video = self.videos[self.video_index]
-        local offset = self.frame_index
-        local sampled_key = self.video_keys[video][offset]
-        local last_valid_key = sampled_key
-        for step = 1, self.sequence_length do
-            if self.video_keys[video][offset] then
-                last_valid_key = sampled_key
-            elseif not self.use_boundary_frames then
-                -- If we aren't using boundary frames, we shouldn't run into
-                -- missing keys!
-                error('Missing key:', sampled_key)
-            end
-            table.insert(batch_keys[step], last_valid_key)
-            offset = offset + self.step_size
-            sampled_key = self.video_keys[video][offset]
+        local sequence = self:get_sequence(self.videos[self.video_index],
+                                           self.frame_index)
+        for step = 1, #sequence do
+            table.insert(batch_keys[step], sequence[step])
         end
         self.frame_index = self.frame_index + self.stride
     end
@@ -511,16 +509,12 @@ function SequentialBatchSampler:advance_video()
     end
 end
 
-function SequentialBatchSampler:num_labels()
-    return self.data_source:num_labels()
-end
-
 function SequentialBatchSampler:num_samples()
     return self.data_source:num_samples()
 end
 
-local ReplayMemorySampler, super = classic.class('ReplayMemorySampler',
-                                                 SequentialBatchSampler)
+local ReplayMemorySampler, ReplayMemorySamplerSuper = classic.class(
+    'ReplayMemorySampler', SequentialBatchSampler)
 function ReplayMemorySampler:_init(
         data_source_obj, sequence_length, step_size, use_boundary_frames,
         options)
@@ -546,8 +540,9 @@ function ReplayMemorySampler:_init(
             memory_size (num)
     ]]--
     options = options == nil and {} or options
-    super._init(self, data_source_obj, sequence_length, step_size,
-                use_boundary_frames, options)
+    ReplayMemorySamplerSuper._init(self, data_source_obj, sequence_length,
+                                   step_size, use_boundary_frames, options)
+
     -- Contains lists of sequences that have been seen before.
     self.memory = {}
     self.memory_size = options.memory_size == nil and
@@ -568,7 +563,8 @@ function ReplayMemorySampler:sample_keys(batch_size)
 
     -- Get the next batch_size sequences, add them to the memory.
     -- sequential_keys[step][sequence] contains frame at `step` for `sequence`.
-    local sequential_keys = super.sample_keys(self, batch_size)
+    local sequential_keys = ReplayMemorySamplerSuper.sample_keys(self,
+                                                                 batch_size)
     for sequence = 1, #sequential_keys[1] do
         self:_remember_sequence(__.pluck(sequential_keys, sequence))
     end
@@ -613,7 +609,8 @@ function ReplayMemorySampler:_remember_sequence(sequence)
 end
 
 
-local UniformlySpacedSampler = classic.class('UniformlySpacedSampler', Sampler)
+local UniformlySpacedSampler = classic.class('UniformlySpacedSampler',
+                                             VideoSampler)
 function UniformlySpacedSampler:_init(
         data_source_obj, sequence_length, _ --[[step_size]],
         _ --[[use_boundary_frames]], options)
@@ -659,10 +656,6 @@ function UniformlySpacedSampler:_init(
         end
     end
     self.key_index = 1
-end
-
-function UniformlySpacedSampler:num_labels()
-    return self.data_source:num_labels()
 end
 
 function UniformlySpacedSampler:num_samples()
