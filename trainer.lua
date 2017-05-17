@@ -1,10 +1,11 @@
 local classic = require 'classic'
-local cudnn = require 'cudnn'
-local cunn = require 'cunn'
-local cutorch = require 'cutorch'
+local nn = require 'nn'
 local optim = require 'optim'
 local paths = require 'paths'
 local torch = require 'torch'
+require 'cudnn'
+require 'cunn'
+require 'cutorch'
 require 'nnlr'
 
 local evaluator = require 'evaluator'
@@ -173,6 +174,8 @@ function Trainer:train_epoch(epoch, num_batches)
 end
 
 function Trainer:evaluate_epoch(epoch, num_batches)
+    -- The default for num_batches is as many batches are in the evaluation
+    -- dataset.
     self:_train_or_evaluate_epoch(epoch, num_batches, false --[[train_mode]])
 end
 
@@ -242,6 +245,9 @@ function Trainer:_train_or_evaluate_batch(train_mode)
 end
 
 function Trainer:_train_or_evaluate_epoch(epoch, num_batches, train_mode)
+    --[[
+    -- Train or evaluate for one epoch.
+    --]]
     if train_mode then
         self.model:training()
         self:update_optim_config(epoch)
@@ -306,8 +312,8 @@ function Trainer:_train_or_evaluate_epoch(epoch, num_batches, train_mode)
 
     local mean_average_precision = evaluator.compute_mean_average_precision(
         predictions, groundtruth)
-    predictions = nil
-    groundtruth = nil
+    predictions = nil -- luacheck: no unused
+    groundtruth = nil -- luacheck: no unused
     collectgarbage()
     collectgarbage()
 
@@ -603,7 +609,6 @@ function SequentialTrainer:_train_or_evaluate_epoch(
         local sequence_predictions, sequence_groundtruth
         local sequence_loss = 0
         local num_steps_in_sequence = 0
-        io.write(sequence)
         while not sequence_ended do
             local loss, batch_predictions, batch_groundtruth, sequence_ended_ =
                 self:_train_or_evaluate_batch(train_mode)
@@ -630,10 +635,7 @@ function SequentialTrainer:_train_or_evaluate_epoch(
                 sequence_groundtruth = torch.cat(
                     sequence_groundtruth, batch_groundtruth, 1)
             end
-            io.write('>')
         end
-        io.write('x\n')
-        epoch_loss = epoch_loss + sequence_loss
         if train_mode then
             local sequence_mean_average_precision =
                 evaluator.compute_mean_average_precision(
