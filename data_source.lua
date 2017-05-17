@@ -343,9 +343,87 @@ function PositiveVideosLmdbSource:load_data(keys, load_images)
     return batch_images, batch_labels
 end
 
+local SubsampledLmdbSource, SubsampledLmdbSourceSuper = classic.class(
+    'SubsampledLmdbSource', 'LabeledVideoFramesLmdbSource')
+function SubsampledLmdbSource:_init(
+        lmdb_path, lmdb_without_images_path, num_labels, options)
+    --[[
+    Subsample video to reduce the frame rate.
+
+    Args:
+       lmdb_path (str): Path to LMDB containing LabeledVideoFrames as values,
+           and keys of the form "<video>-<frame_number>".
+       lmdb_without_images_path (str): Path to LMDB of the same form as
+           lmdb_path, but where the images have been stripped from the
+           protobufs.
+        num_labels (int): Total number of labels in the dataset.
+        options:
+            subsample_rate (int): How much to subsample the frames by.
+    ]]--
+    self.lmdb_path = lmdb_path
+    self.lmdb_without_images_path = lmdb_without_images_path
+    self.num_labels_ = num_labels
+    -- The whole point is to set a subsample rate, we should mandate that it is
+    -- specified.
+    assert(options ~= nil and options.subsample_rate ~= nil)
+    self.subsample_rate = options.subsample_rate
+
+    self.num_keys = 0
+    self.video_keys_ = {}
+    local key_labels = self:key_label_map()
+    for key, _ in pairs(key_labels) do
+        local video, frame = self:frame_video_offset(key)
+        if self.video_keys_[video] == nil then
+            self.video_keys_[video] = {}
+        end
+        self.video_keys_[video][frame] = key
+        self.num_keys = self.num_keys + 1
+    end
+end
+
+function SubsampledLmdbSource:use_frame_q(frame_key)
+    local _, frame_index = LabeledVideoFramesLmdbSource.parse_frame_key(
+        frame_key)
+    return ((frame_index - 1) % self.subsample_rate) == 0
+end
+
+function SubsampledLmdbSource:frame_video_offset(frame_key)
+    assert(self:use_frame_q(frame_key))
+    local video, frame_index = LabeledVideoFramesLmdbSource.parse_frame_key(
+        frame_key)
+    return video, (frame_index - 1) / self.subsample_rate + 1
+end
+
+function SubsampledLmdbSource:key_label_map(return_label_map)
+    --[[
+    Load mapping from frame keys to labels array.
+
+    Args:
+        return_label_map (bool): See LabeledVideoFramesLmdbSource:key_label_map.
+
+    Returns:
+        key_labels: See LabeledVideoFramesLmdbSource:key_label_map.
+    ]]--
+    local key_label_map, label_map = SubsampledLmdbSourceSuper.key_label_map(
+        self, return_label_map)
+
+    for key, _ in pairs(key_label_map) do
+        if not self:use_frame_q(key) then
+            key_label_map[key] = nil
+        end
+    end
+
+    if return_label_map then
+        return key_label_map, label_map
+    else
+        return key_label_map
+    end
+end
+
 return {
     DataSource = DataSource,
     VideoDataSource = VideoDataSource,
     LabeledVideoFramesLmdbSource = LabeledVideoFramesLmdbSource,
-    PositiveVideosLmdbSource = PositiveVideosLmdbSource
+    PositiveVideosLmdbSource = PositiveVideosLmdbSource,
+    SubsampledLmdbSource = SubsampledLmdbSource
 }
