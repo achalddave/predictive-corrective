@@ -5,12 +5,10 @@ as values.
 
 local classic = require 'classic'
 local threads = require 'threads'
-local torch = require 'torch'
+require 'torch'
 require 'classic.torch'
 
-local data_source = require 'data_source'
-local log = require 'util/log'
-local samplers = require 'samplers'
+local log = require 'util/log' -- luacheck: no unused
 
 local DataLoader = classic.class('DataLoader')
 
