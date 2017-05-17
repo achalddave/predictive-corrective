@@ -63,6 +63,70 @@ end
 
 function LabeledVideoFramesLmdbSource:num_labels() return self.num_labels_ end
 
+function LabeledVideoFramesLmdbSource:key_label_map(return_label_map)
+    --[[
+    Load mapping from frame keys to labels array.
+
+    Note: This is a giant array, and should be destroyed as soon as it is no
+    longer needed. If this array is stored permanently (e.g. globally or as an
+    object attribute), it will slow down *all* future calls to collectgarbage().
+
+    Args:
+        return_label_map (bool): If true, return a map from label names to label
+            id.
+
+    Returns:
+        key_labels: Table mapping frame keys to array of label indices.
+        (optional) label_map: See doc for return_label_map arg.
+
+    ]]--
+    return_label_map = return_label_map == nil and false or return_label_map
+
+    -- Get LMDB cursor.
+    local db = lmdb.env { Path = self.lmdb_without_images_path }
+    db:open()
+    local transaction = db:txn(true --[[readonly]])
+    local cursor = transaction:cursor()
+
+    -- Create mapping from keys to labels.
+    local key_label_map = {}
+
+    local label_map = {}
+    local num_keys = db:stat().entries
+    for i = 1, num_keys do
+        local key, value = cursor:get('MDB_GET_CURRENT')
+        local video_frame = video_frame_proto.LabeledVideoFrame()
+        video_frame:ParseFromString(value:storage():string())
+        local num_frame_labels = #video_frame.label
+        if num_frame_labels == 0 then
+            -- Add frame to list of background frames.
+            key_label_map[key] = {self.num_labels_ + 1}
+        else
+            local labels = {}
+            for _, label in ipairs(video_frame.label) do
+                -- Label ids start at 0.
+                labels[i] = label.id + 1
+                if label_map[label.name] == nil then
+                    label_map[label.name] = label.id + 1
+                end
+            end
+            key_label_map[key] = labels
+        end
+        if i ~= db:stat().entries then cursor:next() end
+    end
+
+    -- Cleanup.
+    cursor:close()
+    transaction:abort()
+    db:close()
+
+    if return_label_map then
+        return key_label_map, label_map
+    else
+        return key_label_map
+    end
+end
+
 function LabeledVideoFramesLmdbSource:frame_video_offset(key)
     return LabeledVideoFramesLmdbSource.static.parse_frame_key(key)
 end
@@ -164,70 +228,6 @@ function LabeledVideoFramesLmdbSource.static._load_image_labels_from_proto(
     -- Load labels in an array.
     local labels = __.pluck(frame_proto.label, 'id')
     return img, labels
-end
-
-function LabeledVideoFramesLmdbSource:key_label_map(return_label_map)
-    --[[
-    Load mapping from frame keys to labels array.
-
-    Note: This is a giant array, and should be destroyed as soon as it is no
-    longer needed. If this array is stored permanently (e.g. globally or as an
-    object attribute), it will slow down *all* future calls to collectgarbage().
-
-    Args:
-        return_label_map (bool): If true, return a map from label names to label
-            id.
-
-    Returns:
-        key_labels: Table mapping frame keys to array of label indices.
-        (optional) label_map: See doc for return_label_map arg.
-
-    ]]--
-    return_label_map = return_label_map == nil and false or return_label_map
-
-    -- Get LMDB cursor.
-    local db = lmdb.env { Path = self.lmdb_without_images_path }
-    db:open()
-    local transaction = db:txn(true --[[readonly]])
-    local cursor = transaction:cursor()
-
-    -- Create mapping from keys to labels.
-    local key_label_map = {}
-
-    local label_map = {}
-    local num_keys = db:stat().entries
-    for i = 1, num_keys do
-        local key, value = cursor:get('MDB_GET_CURRENT')
-        local video_frame = video_frame_proto.LabeledVideoFrame()
-        video_frame:ParseFromString(value:storage():string())
-        local num_frame_labels = #video_frame.label
-        if num_frame_labels == 0 then
-            -- Add frame to list of background frames.
-            key_label_map[key] = {self.num_labels_ + 1}
-        else
-            local labels = {}
-            for i, label in ipairs(video_frame.label) do
-                -- Label ids start at 0.
-                labels[i] = label.id + 1
-                if label_map[label.name] == nil then
-                    label_map[label.name] = label.id + 1
-                end
-            end
-            key_label_map[key] = labels
-        end
-        if i ~= db:stat().entries then cursor:next() end
-    end
-
-    -- Cleanup.
-    cursor:close()
-    transaction:abort()
-    db:close()
-
-    if return_label_map then
-        return key_label_map, label_map
-    else
-        return key_label_map
-    end
 end
 
 function LabeledVideoFramesLmdbSource.static.parse_frame_key(frame_key)
