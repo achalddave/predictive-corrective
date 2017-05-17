@@ -127,9 +127,11 @@ function LabeledVideoFramesLmdbSource:key_label_map(return_label_map)
     end
 end
 
+-- luacheck: push no unused args
 function LabeledVideoFramesLmdbSource:frame_video_offset(key)
     return LabeledVideoFramesLmdbSource.static.parse_frame_key(key)
 end
+-- luacheck: pop
 
 function LabeledVideoFramesLmdbSource:load_data(keys, load_images)
     --[[
