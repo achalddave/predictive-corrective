@@ -319,7 +319,7 @@ end
 
 function PositiveVideosLmdbSource:_unfiltered_key_label_map()
     return PositiveVideosLmdbSourceSuper.key_label_map(
-    return super.key_label_map(self, true --[[return_label_map]])
+        self, true --[[return_label_map]])
 end
 
 function PositiveVideosLmdbSource:key_label_map(return_label_map)
