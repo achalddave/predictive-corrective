@@ -275,6 +275,8 @@ if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
     single_model = single_model:get(1)
 end
 single_model:clearState()
+
+
 if config.criterion_wrapper == nil then
     if torch.isTypeOf(single_model, 'nn.Sequencer') then
         log.info('Adding LastStepCriterion wrapper for ' ..
