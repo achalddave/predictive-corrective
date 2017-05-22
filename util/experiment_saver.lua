@@ -4,9 +4,18 @@ local function save_git_info(output_dir)
     os.execute('./dump_git_info.sh ' .. output_dir)
 end
 
-local function copy_file(in_path, out_path)
+local function copy_file(in_path, out_path, preserve)
+    --[[
+    -- Args:
+    --    in_path (str)
+    --    out_path (str)
+    --    preserve (bool): If true, pass "--preserve=all" flag to cp.
+    --
     -- TODO(achald): See if there is a portable way to copy a file in lua.
-    local cmd = string.format('cp %s %s', in_path, out_path)
+    ]]--
+    preserve = preserve == nil and false
+    local flags = preserve == true and '-v --preserve=all' or '-v'
+    local cmd = string.format('cp %s %s %s', flags, in_path, out_path)
     log.info('Executing command:', cmd)
     os.execute(cmd)
 end
