@@ -198,9 +198,6 @@ function normalize_config(config)
     if config.computational_batch_size == nil then
         config.computational_batch_size = config.batch_size
     end
-    if config.val_epoch_size == nil then
-        config.val_epoch_size = config.epoch_size
-    end
 
     if config.sampler_class == nil then
         config.sampler_class = 'PermutedSampler'
