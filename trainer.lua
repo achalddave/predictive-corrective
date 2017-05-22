@@ -646,6 +646,8 @@ function SequentialTrainer:_train_or_evaluate_epoch(
                 sequence_groundtruth = torch.cat(
                     sequence_groundtruth, batch_groundtruth, 1)
             end
+            collectgarbage()
+            collectgarbage()
         end
         if train_mode then
             local sequence_mean_average_precision =
