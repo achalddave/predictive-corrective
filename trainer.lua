@@ -258,6 +258,10 @@ function Trainer:_train_or_evaluate_epoch(epoch, num_batches, train_mode)
     local epoch_timer = torch.Timer()
     local batch_timer = torch.Timer()
 
+    if not train_mode and num_batches == nil then
+        num_batches = math.ceil(
+            self.val_data_loader:num_samples() / self.batch_size)
+    end
     local predictions = torch.CudaTensor(
         num_batches * self.batch_size, self.num_labels)
     local groundtruth = torch.ByteTensor(
