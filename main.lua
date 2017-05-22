@@ -187,6 +187,8 @@ function normalize_config(config)
     end
     if config.use_boundary_frames == nil then
         config.use_boundary_frames = false
+        log.info('CONFIG: use_boundary_frames not specified, setting to ' ..
+                 tostring(config.use_boundary_frames))
     end
     if config.checkpoint_every == nil then
         config.checkpoint_every = 1
@@ -211,7 +213,7 @@ function normalize_config(config)
 
     if (config.optim_config == nil) ~= (config.optim_state == nil) then
         error('optim_config and optim_state must either both be specified, ' ..
-            'or both left empty')
+              'or both left empty')
     end
 
     if config.learning_rate_multipliers == nil then
@@ -221,6 +223,8 @@ function normalize_config(config)
     if config.data_source_class == nil then
         config.data_source_class = 'LabeledVideoFramesLmdbSource'
         config.data_source_options = {}
+        log.info('CONFIG: data_source_class not specified, using ' ..
+                 config.data_source_class)
     end
 
     return config
