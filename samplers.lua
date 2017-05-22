@@ -232,7 +232,7 @@ function BalancedSampler:_init(
     -- Map labels to list of keys containing that label.
     local key_label_map = self.data_source:key_label_map()
     self.label_key_map = {}
-    for i = 1, self.num_labels_+1 do self.label_key_map[i] = {} end
+    for i = 1, self.num_labels_ + 1 do self.label_key_map[i] = {} end
     for _, key in ipairs(valid_keys) do
         for _, label in ipairs(key_label_map[key]) do
             table.insert(self.label_key_map[label], key)
