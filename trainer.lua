@@ -556,6 +556,8 @@ function SequentialTrainer:_train_or_evaluate_batch(train_mode)
 
     self.gpu_inputs:resize(images:size()):copy(images)
     self.gpu_labels:resize(labels:size()):copy(labels)
+    collectgarbage()
+    collectgarbage()
 
     local loss, outputs
     if train_mode then
