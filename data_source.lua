@@ -371,6 +371,7 @@ function SubsampledLmdbSource:_init(
     self.num_keys = 0
     self.video_keys_ = {}
     local key_labels = self:key_label_map()
+
     for key, _ in pairs(key_labels) do
         local video, frame = self:frame_video_offset(key)
         if self.video_keys_[video] == nil then
