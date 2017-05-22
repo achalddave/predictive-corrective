@@ -69,10 +69,16 @@ py scripts/plot_correlations.py \
   and in practice doesn't seem any faster than reading from disks with a few
   threads.
 
-- Configuration files should be code files. This is contrary to what I've
-  usually heard, but allows for writing functions as part of the config (for
-  example, specifying a "preprocessor" for models, or specifying the DataLoader
-  to use, etc.). With YAML config files, I end up essentially writing these
-  functions in the code, then referring to them using strings in YAML. This
-  might be ideal for public code bases, but heavily slows down tinkering.
-  TODO(achald): Change all configs to be lua code files instead.
+- I'm still not sure about this, but I think configuration files should be code
+  files. This is contrary to what I've usually heard, but allows for writing
+  functions as part of the config (for example, specifying a "preprocessor" for
+  models, or specifying the DataLoader to use, etc.). With YAML config files, I
+  end up essentially writing these functions in the code, then referring to them
+  using strings in YAML. This might be ideal for public code bases, but heavily
+  slows down tinkering.
+
+  On the other hand, making configuration be YAML files forces config files to
+  specify intent, rather than methodology, which allows the core code to handle
+  the config as it wishes. This makes it easier to change the code, but forces
+  you to add experimental code to your main code, guaraded by config variables,
+  which is slightly frustrating and adds some mental overhead.
