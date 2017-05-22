@@ -651,15 +651,20 @@ function SequentialTrainer:_train_or_evaluate_epoch(
         end
         epoch_loss = epoch_loss + sequence_loss
         if train_mode then
-            local sequence_mean_average_precision =
-                evaluator.compute_mean_average_precision(
-                    sequence_predictions, sequence_groundtruth)
-            log.info(string.format(
-                'Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f ' ..
-                'seq mAP %.4f LR %.0e',
+            local log_string = string.format(
+                'Epoch: [%d] [%d/%d] \t Time %.3f Loss %.4f',
                 epoch, sequence, num_sequences,
-                batch_timer:time().real, sequence_loss,
-                sequence_mean_average_precision, self.epoch_base_learning_rate))
+                batch_timer:time().real, sequence_loss)
+            if sequence % 10 == 0 then
+                local current_mean_average_precision =
+                    evaluator.compute_mean_average_precision(
+                        predictions, groundtruth)
+                log_string = log_string .. string.format(
+                    ' epoch mAP %.4f', current_mean_average_precision)
+            end
+            log_string = log_string .. string.format(
+                ' LR %.0e', self.epoch_base_learning_rate)
+            log.info(log_string)
         end
         if predictions == nil then
             predictions = sequence_predictions
