@@ -649,6 +649,7 @@ function SequentialTrainer:_train_or_evaluate_epoch(
             collectgarbage()
             collectgarbage()
         end
+        epoch_loss = epoch_loss + sequence_loss
         if train_mode then
             local sequence_mean_average_precision =
                 evaluator.compute_mean_average_precision(
