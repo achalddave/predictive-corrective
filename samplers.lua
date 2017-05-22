@@ -571,8 +571,11 @@ function ReplayMemorySampler:sample_keys(batch_size)
     -- sequential_keys[step][sequence] contains frame at `step` for `sequence`.
     local sequential_keys = ReplayMemorySamplerSuper.sample_keys(self,
                                                                  batch_size)
+    local num_new_sequences = 0
     for sequence = 1, #sequential_keys[1] do
-        self:_remember_sequence(__.pluck(sequential_keys, sequence))
+        local is_new_sequence = self:_remember_sequence(
+            sequential_keys[1][sequence])
+        num_new_sequences = num_new_sequences + (is_new_sequence and 1 or 0)
     end
 
     -- Sample batch_size sequences from memory.
@@ -594,7 +597,9 @@ function ReplayMemorySampler:_remember_sequence(sequence)
     Args:
         sequence (table): Contains keys for one sequence to add to memory.
     ]]--
-    if self.memory_hash[sequence[1]] ~= nil then return end
+    if self.memory_hash[sequence[1]] ~= nil then
+        return false
+    end
 
     local removed_sequence = self.memory[self.memory_index]
     if removed_sequence ~= nil then
@@ -610,6 +615,7 @@ function ReplayMemorySampler:_remember_sequence(sequence)
     if self.memory_index > self.memory_size then
         self.memory_index = 1
     end
+    return true
 end
 
 
