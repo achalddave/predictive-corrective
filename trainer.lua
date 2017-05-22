@@ -567,10 +567,15 @@ function SequentialTrainer:_train_or_evaluate_batch(train_mode)
             loss = self.criterion:forward(outputs, self.gpu_labels)
             local criterion_gradients = self.criterion:backward(
                 outputs, self.gpu_labels)
-            if criterion_gradients:norm() <= 1e-5 and loss >= 1e-10 then
+            local gradient_norm = criterion_gradients:norm()
+            if (gradient_norm <= 1e-5 and loss >= 1e-10) then
                 log.info(string.format(
                     'Criterion gradients small: %.2f; Loss: %.2f',
-                    criterion_gradients:norm(), loss))
+                    gradient_norm, loss))
+            elseif gradient_norm >= 1e5 then
+                log.info(string.format(
+                    'Criterion gradients very large: %.2f; Loss: %.2f',
+                    gradient_norm, loss))
             end
             self.model:backward(self.gpu_inputs, criterion_gradients)
             if self.gradient_clip ~= nil then
