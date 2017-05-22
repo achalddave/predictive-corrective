@@ -576,9 +576,7 @@ function ReplayMemorySampler:sample_keys(batch_size)
     end
 
     -- Sample batch_size sequences from memory.
-    local sampled_indices = torch.multinomial(torch.ones(#self.memory),
-                                              batch_size,
-                                              false --[[replace]])
+    local sampled_indices = torch.randperm(#self.memory)[{{1, batch_size}}]
     -- sampled_sequences[sequence][step] contains frame at `step` for
     -- `sequence`.
     local sampled_sequences = __.at(self.memory,
