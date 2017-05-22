@@ -258,8 +258,14 @@ torch.setdefaulttensortype('torch.FloatTensor')
 local single_model
 assert(config.model_init ~= nil, 'Initial model must be specified.')
 if not args.debug then
+    -- HACK: Copy model init, but if it's a link, just copy the link instead of
+    -- the source file. I'm assuming here that if the model is a symlink, then
+    -- it points to some canonical directory of init models that won't be
+    -- deleted or moved, and so the link will not break. Of course, this isn't
+    -- always true, but this saves me 100s of GBs since each model is >1GB.
     experiment_saver.copy_file(config.model_init,
-                               paths.concat(cache_dir, 'model_init.t7'))
+                               paths.concat(cache_dir, 'model_init.t7'),
+                               true --[[preserve]])
 end
 log.info('Loading model from ' .. config.model_init)
 single_model = torch.load(config.model_init)
