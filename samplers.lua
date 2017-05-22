@@ -238,6 +238,12 @@ function BalancedSampler:_init(
             table.insert(self.label_key_map[label], key)
         end
     end
+    for i = 1, self.num_labels_ + 1 do
+        if #self.label_key_map[i] == 0 then
+            error(string.format('No keys for label %d', i))
+        end
+    end
+
 
     self.label_weights = torch.ones(self.num_labels_ + 1)
     self.label_weights[self.num_labels_ + 1] =
