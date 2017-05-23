@@ -580,34 +580,42 @@ function ReplayMemorySampler:sample_keys(batch_size)
 
     -- Sample batch_size sequences from memory.
     local sampled_indices = torch.randperm(#self.memory)[{{1, batch_size}}]
-    -- sampled_sequences[sequence][step] contains frame at `step` for
+    -- sampled_sequences[step][sequence] contains frame at `step` for
     -- `sequence`.
-    local sampled_sequences = __.at(self.memory,
-                                    unpack(torch.totable(sampled_indices)))
-    -- sampled_keys[step][sequence] = sampled_sequences[sequence][step]
-    local sampled_keys = {}
-    for step = 1, #sampled_sequences[1] do
-        sampled_keys[step] = __.pluck(sampled_sequences, step)
+    local sampled_sequences = {}
+    for step = 1, self.sequence_length do
+        sampled_sequences[step] = {}
     end
-    return sampled_keys
+    for i = 1, batch_size do
+        local video, offset = self.data_source:frame_video_offset(
+            self.memory[sampled_indices[i]])
+        local sequence = self:get_sequence(video, offset)
+        for step = 1, self.sequence_length do
+            sampled_sequences[step][i] = sequence[step]
+        end
+    end
+    return sampled_sequences
 end
 
-function ReplayMemorySampler:_remember_sequence(sequence)
+function ReplayMemorySampler:_remember_sequence(start_key)
     --[[
     Args:
-        sequence (table): Contains keys for one sequence to add to memory.
+        start_key (table): Key for the first frame in the sequence.
+
+    Returns:
+        new_sequence (bool): If false, sequence was already in memory.
     ]]--
-    if self.memory_hash[sequence[1]] ~= nil then
+    if self.memory_hash[start_key] ~= nil then
         return false
     end
 
-    local removed_sequence = self.memory[self.memory_index]
-    if removed_sequence ~= nil then
-        self.memory_hash[removed_sequence[1]] = false
+    local removed = self.memory[self.memory_index]
+    if removed ~= nil then
+        self.memory_hash[removed] = false
     end
 
-    self.memory[self.memory_index] = sequence
-    self.memory_hash[sequence[1]] = true
+    self.memory[self.memory_index] = start_key
+    self.memory_hash[start_key] = true
 
     self.memory_index = self.memory_index + 1
     -- We can't just do (memory_index + 1) % (memory_size + 1) because if
