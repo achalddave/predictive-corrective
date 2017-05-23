@@ -626,6 +626,150 @@ function ReplayMemorySampler:_remember_sequence(start_key)
     return true
 end
 
+local AdaptiveMemorySampler, AdaptiveMemorySamplerSuper = classic.class(
+    'AdaptiveMemorySampler', SequentialBatchSampler)
+function AdaptiveMemorySampler:_init(
+        data_source_obj, sequence_length, step_size, use_boundary_frames,
+        options)
+    --[[
+    Create an adaptive memory that makes the memory more sparse as it fills up.
+
+    This sampler stores frames at a sampling rate which starts at 1 and
+    increases as more frames are stored in the memory.
+
+    At each call to sample_keys():
+    1. Check if memory is full. If so, double the sampling rate and mark frames
+       which are not divisible by the sampling rate for deletion.
+    2. Sample sequential frames from the current video. (If the video ends,
+       start sampling frames from the next video.)
+    3. Sample from the replay memory unioned with the sequential frames.
+    4. Add sequential frames divisible by the sampling rate to the memory.
+
+    Note: ReplayMemorySampler samples from the *replay memory* after the
+    sequential frames are added, while AdaptiveReplayMemorySampler samples from
+    the replay memory unioned with the sequential frames. This is because the
+    AdaptiveReplayMemorySampler discards some of the sequential frames and
+    doesn't add them to the memory, so we want to sample before they are
+    discarded.
+
+    Args:
+        data_source_obj (DataSource)
+        sequence_length (num): See PermutedSampler:_init.
+        step_size (num): See PermutedSampler:_init.
+        use_boundary_frames (bool): See PermutedSampler:_init.
+        options (table):
+            stride (num): As with SequentialBatchSampler.
+            memory_size (num)
+    ]]--
+    AdaptiveMemorySamplerSuper._init(self, data_source_obj, sequence_length,
+                                     step_size, use_boundary_frames, options)
+    -- Contains lists of sequences that have been seen before.
+    self.memory = {}
+    self.memory_size = options.memory_size == nil and
+        math.huge or options.memory_size
+    self.memory_hash = {}
+    self.next_index = 1
+
+    self.sample_rate = 1
+end
+
+function AdaptiveMemorySampler:sample_keys(batch_size)
+    local sequential_keys = AdaptiveMemorySamplerSuper.sample_keys(
+        self, batch_size)
+    local sampled_indices = torch.randperm(
+        #self.memory + batch_size)[{{1, batch_size}}]
+
+    -- sampled_sequences[step][sequence] contains frame at `step` for
+    -- `sequence`.
+    local sampled_sequences = {}
+    for step = 1, self.sequence_length do
+        sampled_sequences[step] = {}
+    end
+    for i = 1, batch_size do
+        local index = sampled_indices[i]
+        local frame
+        if index > #self.memory then
+            frame = sequential_keys[1][index - #self.memory]
+        else
+            frame = self.memory[index]
+        end
+        local video, offset = self.data_source:frame_video_offset(frame)
+        local sequence = self:get_sequence(video, offset)
+        for step = 1, self.sequence_length do
+            sampled_sequences[step][i] = sequence[step]
+        end
+    end
+
+    self:make_room(math.ceil(batch_size / self.sample_rate))
+    local num_new_sequences = 0
+    for sequence = 1, #sequential_keys[1] do
+        if self:use_frame_q(sequential_keys[1][sequence]) then
+            local is_new_sequence = self:_remember_sequence(
+                sequential_keys[1][sequence])
+            num_new_sequences = num_new_sequences + (is_new_sequence and 1 or 0)
+        end
+    end
+
+    return sampled_sequences
+end
+
+function AdaptiveMemorySampler:use_frame_q(frame_key)
+    local _, offset = self.data_source:frame_video_offset(frame_key)
+    -- offset is 1-indexed, so the first frame will actually be at index
+    -- sample_rate. This is good: at a very high sample rate, we likely
+    -- prefer a frame in the middle over the very first frame.
+    return (offset % self.sample_rate) == 0
+end
+
+function AdaptiveMemorySampler:make_room(num_sequences)
+    print(string.format('Called make_room for %s items, have %s/%s items.',
+                        num_sequences, self.next_index - 1,
+                        self.memory_size))
+    if self.next_index - 1 + num_sequences <= self.memory_size then
+        print('Not making room')
+        return
+    end
+    print('Making room')
+
+    self.sample_rate = 2 * self.sample_rate
+    -- Move the frames that need to be removed to the end of the memory.
+    -- For most purposes, we pretend the frames are removed; but until they are
+    -- replaced, we'll allow sampling from them.
+    local new_memory = {}
+    local old_memory = {}
+    for _, frame in ipairs(self.memory) do
+        if self:use_frame_q(frame) then
+            table.insert(new_memory, frame)
+        else
+            table.insert(old_memory, frame)
+            self.memory_hash[frame] = nil
+        end
+    end
+    self.memory = __.append(new_memory, old_memory)
+    self.next_index = #new_memory + 1
+    print(self.memory)
+    print(self.next_index)
+    print(self.memory[self.next_index])
+end
+
+function AdaptiveMemorySampler:_remember_sequence(start_key)
+    --[[
+    Args:
+        start_key (table): See ReplayMemory:_remember_sequence.
+
+    Returns:
+        new_sequence (bool): See ReplayMemory:_remember_sequence.
+    ]]--
+    if self.memory_hash[start_key] ~= nil then
+        return false
+    end
+
+    self.memory[self.next_index] = start_key
+    self.memory_hash[start_key] = true
+    self.next_index = self.next_index + 1
+    return true
+end
+
 
 local UniformlySpacedSampler = classic.class('UniformlySpacedSampler',
                                              VideoSampler)
@@ -710,6 +854,7 @@ end
 
 return {
     Sampler = Sampler,
+    AdaptiveMemorySampler = AdaptiveMemorySampler,
     BalancedSampler = BalancedSampler,
     PermutedSampler = PermutedSampler,
     ReplayMemorySampler = ReplayMemorySampler,
