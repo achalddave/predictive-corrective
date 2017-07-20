@@ -15,7 +15,7 @@ local DataLoader = classic.class('DataLoader')
 function DataLoader:_init(data_source_obj, sampler)
     --[[
     Args:
-        lmdb_path (str): Path to LMDB containing LabeledVideoFrames as values.
+        data_source: Data source object.
         sampler (Sampler): Sampler used for batches
     ]]--
     self.data_source = data_source_obj
