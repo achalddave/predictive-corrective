@@ -5,14 +5,16 @@
 --
 -- Example usage:
 --  th scripts/evaluate_model.lua \
---      /path/to/model.t7 \
---      /path/to/frames/directory/ \
---      /path/to/labels.hdf5 \
---      /path/to/output.log \
+--      --model /path/to/model.t7 \
+--      --frames /path/to/frames/directory/ \
+--      --output_log /path/to/output.log \
+--      --labels_hdf5 /path/to/label_hdf5
 --      --sequence_length 1 \
 --      --step_size 1 \
 --      --batch_size 128 \
 --      --output_hdf5 /path/to/output_predictions.h5
+--
+-- See --help for more details.
 --]]
 
 package.path = package.path .. ";../?.lua"
@@ -42,13 +44,16 @@ require 'layers/init'
 local parser = argparse() {
     description = 'Evaluate a Torch model on MultiTHUMOS.'
 }
-parser:argument('model', 'Model file.')
-parser:argument('frames_root',
-                'Root directory containing video frames.')
-parser:argument('labels_hdf5',
-                'HDF5 file containing labels for videos.')
-parser:argument('output_log', 'File to log output to')
-parser:option('--output_hdf5', 'HDF5 to output predictions to'):count('?')
+parser:option('--model', 'Model file. Required.'):count(1)
+parser:option('--frames',
+                'Root directory containing video frames. Required.'):count(1)
+parser:option('--output_log', 'File to log output to. Required.'):count(1)
+parser:option('--labels_hdf5',
+                'HDF5 file containing labels for videos. Can be omitted, ' ..
+                'in which case the script does not evaluate the predictions ' ..
+                'but only computes and stores them.'):count('?')
+parser:option('--output_hdf5',
+              'HDF5 to output predictions to. Required.'):count(1)
 parser:option('--num_labels', 'Number of labels')
     :count('?'):default(65):convert(tonumber)
 parser:option('--sequence_length', 'Number of input frames.')
@@ -58,13 +63,13 @@ parser:option('--step_size', 'Size of step between frames.')
 parser:option('--experiment_id_file',
               'Path to text file containing the experiment id for this run.' ..
               'The id in this file will be incremented by this program.')
-              :count(1)
+              :count('?')
               :default('/data/achald/MultiTHUMOS/models/next_experiment_id.txt')
 -- E.g. 'val1\nval2\n\nval3\n\nval4' denotes 3 groups.
 parser:option('--val_groups',
               'Text file denoting groups of validation videos. ' ..
               'Groups are delimited using a blank line.')
-      :count(1)
+      :count('?')
       :default('/data/achald/MultiTHUMOS/val_split/val_val_groups.txt')
 parser:option('--batch_size', 'Batch size'):convert(tonumber):default(64)
 parser:option('--reinit_rate', 'Reinit rate'):convert(tonumber)
@@ -101,7 +106,7 @@ if args.charades_submission_out ~= nil and args.recurrent ~= nil then
 end
 
 local has_labels = true
-if args.labels_hdf5 == "_" then
+if args.labels_hdf5 == nil then
     args.labels_hdf5 = args.num_labels
     has_labels = false
 end
@@ -624,7 +629,7 @@ local function evaluate_model(options)
 end
 
 local source = data_source.DiskFramesHdf5LabelsDataSource(
-    args.frames_root,
+    args.frames,
     args.labels_hdf5)
 local eval_options = {
     model = model,
