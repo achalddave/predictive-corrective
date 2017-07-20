@@ -43,10 +43,10 @@ local parser = argparse() {
     description = 'Evaluate a Torch model on MultiTHUMOS.'
 }
 parser:argument('model', 'Model file.')
-parser:argument('labeled_video_frames_lmdb',
-                'LMDB containing LabeledVideoFrames to evaluate.')
-parser:argument('labeled_video_frames_without_images_lmdb',
-                'LMDB containing LabeledVideoFrames without images.')
+parser:argument('frames_root',
+                'Root directory containing video frames.')
+parser:argument('labels_hdf5',
+                'HDF5 file containing labels for videos.')
 parser:argument('output_log', 'File to log output to')
 parser:option('--output_hdf5', 'HDF5 to output predictions to'):count('?')
 parser:option('--num_labels', 'Number of labels')
@@ -616,10 +616,9 @@ local function evaluate_model(options)
     return all_predictions, all_labels, all_keys
 end
 
-local source = data_source.LabeledVideoFramesLmdbSource(
-    args.labeled_video_frames_lmdb,
-    args.labeled_video_frames_without_images_lmdb,
-    args.num_labels)
+local source = data_source.DiskFramesHdf5LabelsDataSource(
+    args.frames_root,
+    args.labels_hdf5)
 local eval_options = {
     model = model,
     source = source,
