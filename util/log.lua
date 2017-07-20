@@ -1,13 +1,9 @@
 --
--- log.lua
+-- This file is a combination of 'log.lua' and torch's print functionality.
 --
--- Copyright (c) 2016 rxi
---
--- This library is free software; you can redistribute it and/or modify it
--- under the terms of the MIT license. See LICENSE for details.
---
+-- See log_LICENSE and torch_LICENSE for license/copyright information.
 
-local log = { _version = "0.1.0" }
+local log = { _version = "0.2.0" }
 
 log.usecolor = true
 log.outfile = nil
@@ -25,6 +21,27 @@ local modes = {
 local levels = {}
 for i, v in ipairs(modes) do
     levels[v.name] = i
+end
+
+-- Taken from Torch REPL's init.lua
+--
+local function sizestr(x)
+   local strt = {}
+   if _G.torch.typename(x):find('torch.*Storage') then
+      return _G.torch.typename(x):match('torch%.(.+)') .. ' - size: ' .. x:size()
+   end
+   if x:nDimension() == 0 then
+      table.insert(strt, _G.torch.typename(x):match('torch%.(.+)') .. ' - empty')
+   else
+      table.insert(strt, _G.torch.typename(x):match('torch%.(.+)') .. ' - size: ')
+      for i=1,x:nDimension() do
+         table.insert(strt, x:size(i))
+         if i ~= x:nDimension() then
+            table.insert(strt, 'x')
+         end
+      end
+   end
+   return table.concat(strt)
 end
 
 -- Taken from Torch REPL's init.lua; this is the colorize function without
