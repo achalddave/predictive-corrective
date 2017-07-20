@@ -22,24 +22,24 @@ VideoDataSource.END_OF_SEQUENCE = -1
 
 local DiskFramesHdf5LabelsDataSource = classic.class(
     'DiskFramesHdf5LabelsDataSource', 'VideoDataSource')
-function DiskFramesHdf5LabelsDataSource:_init(
-    frames_root, hdf5_labels_path, _ --[[options]])
+function DiskFramesHdf5LabelsDataSource:_init(options)
     --[[
     Data source for loading frames from disk and labels from HDF5.
 
-    Args:
+    Args (in options):
         frames_root (str): Contains subdirectories titled <video_name> for each
             video, which in turn contain frames of the form frame%04d.png
-        hdf5_labels_path (str or num): If str, specifies path to HDF5 file
+        labels_hdf5 (str or num): If str, specifies path to HDF5 file
             containing <video_name> keys, with (num_frames, num_labels) binary
             label matrices as values. If num, specifies number of labels, and
             we will set the labels matrix to be a matrix of all 1s. This is
             useful for running on images without labels.
     ]]--
-    self.frames_root = frames_root
+    self.frames_root = options.frames_root
+    local labels_hdf5 = options.labels_hdf5
 
-    if type(hdf5_labels_path) == "number" then
-        self.num_labels_ = hdf5_labels_path
+    if type(labels_hdf5) == "number" then
+        self.num_labels_ = labels_hdf5
         self.video_keys_ =
             DiskFramesHdf5LabelsDataSource.static.collect_video_frames(
                 self.frames_root)
@@ -50,7 +50,7 @@ function DiskFramesHdf5LabelsDataSource:_init(
             self.labels[video] = torch.ones(#video_keys, self.num_labels_)
         end
     else
-        local hdf5_labels_file = hdf5.open(hdf5_labels_path, 'r')
+        local hdf5_labels_file = hdf5.open(labels_hdf5, 'r')
         self.labels = hdf5_labels_file:all()
         self.num_labels_ = self.labels[__.keys(self.labels)[1]]:size(2)
 
