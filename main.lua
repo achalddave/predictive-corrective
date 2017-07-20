@@ -15,20 +15,24 @@
 -- gpus (list): List of GPUs to use
 --
 -- # Data options
--- data_paths_config (str): Yaml file configuring datasets/splits.
---     Maps keys of dataset/split names to an object containing
---     keys 'with_images' and 'without_images' (whose values are the
---     LMDBs with and without images)
--- train_split (str): Name of dataset/split to use for training. Must
---     be a key in data_paths_config.
--- val_split (str): Name of dataset/split to use for evaluation. Must
---     be a key in data_paths_config.
+-- data_source_class (str): Data source class to use. See data_source.lua for
+--     possible classes. (Default: 'DiskFramesHdf5LabelsDataSource')
+-- train_source_options (object): Options to pass train data source.
+-- val_source_options (object): Options to pass val data source.
 -- num_labels (int): Number of labels.
 -- crop_size (int): Size to crop image to before passing ot network.
 -- pixel_mean (list of floats): Mean pixel to subtract from images.
--- data_source_class (str): Data source class to use. See data_source.lua for
---     possible classes. (Default: 'LabeledVideoFramesLmdbSource')
--- data_source_options (object): Options to pass to data source. (Default: {})
+--
+-- If data_source_class is a data source from lmdb_data_source, the following
+-- options are used to construct the data source:
+--     data_paths_config (str): Yaml file configuring datasets/splits.
+--         Maps keys of dataset/split names to an object containing
+--         keys 'with_images' and 'without_images' (whose values are the
+--         LMDBs with and without images)
+--     train_split (str): Name of dataset/split to use for training. Must
+--         be a key in data_paths_config.
+--     val_split (str): Name of dataset/split to use for evaluation. Must
+--         be a key in data_paths_config.
 --
 -- # Training options
 -- num_epochs (int): Number of epochs to train.
@@ -116,7 +120,6 @@ local experiment_saver = require 'util/experiment_saver'
 local log = require 'util/log'
 local samplers = require 'samplers'
 local trainer = require 'trainer'
-require 'lmdb_data_source'
 require 'last_step_criterion'
 require 'layers/init'
 require 'util/strict'
@@ -222,10 +225,17 @@ function normalize_config(config)
     end
 
     if config.data_source_class == nil then
-        config.data_source_class = 'LabeledVideoFramesLmdbSource'
-        config.data_source_options = {}
+        config.data_source_class = 'DiskFramesHdf5LabelsDataSource'
         log.info('CONFIG: data_source_class not specified, using ' ..
                  config.data_source_class)
+    end
+    if config.train_source_options == nil and config.data_source_options ~= nil
+        then
+        log.info('DEPRECATED: data_source_options is deprecated. Use ' ..
+                 'train/val_source_options instead.')
+        config.train_source_options = config.data_source_options
+        assert(config.val_source_options == nil)
+        config.val_source_options = config.data_source_options
     end
 
     return config
@@ -274,6 +284,17 @@ single_model = torch.load(config.model_init)
 if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
     log.info('Getting first of DataParallelTable.')
     single_model = single_model:get(1)
+end
+-- TODO(achald): XXX HACK! XXX
+if config.reinitialize_rate ~= nil then
+    single_model:apply(function(m)
+        if torch.isTypeOf(m, 'nn.InputCouplerRecurrent') or
+                torch.isTypeOf(m, 'nn.InitUpdateRecurrent') or
+                torch.isTypeOf(m, 'nn.CCumSumRecurrent') then
+            log.info('Updating', torch.type(m), config.reinitialize_rate)
+            m.reinitialize_rate = config.reinitialize_rate
+        end
+    end)
 end
 single_model:clearState()
 
@@ -351,16 +372,28 @@ elseif config.criterion_wrapper ~= '' then
 end
 log.info('Loaded model')
 
-local train_source = data_source[config.data_source_class](
-    config.train_lmdb,
-    config.train_lmdb_without_images,
-    config.num_labels,
-    config.data_source_options)
-local val_source = data_source[config.data_source_class](
-    config.val_lmdb,
-    config.val_lmdb_without_images,
-    config.num_labels,
-    config.data_source_options)
+local train_source, val_source
+if config.data_source_class == 'LabeledVideoFramesLmdbSource' or
+    config.data_source_class == 'PositiveVideosLmdbSource' or
+    config.data_source_class == 'SubsampledLmdbSource' then
+    -- Legacy code
+    require 'lmdb_data_source'
+    train_source = data_source[config.data_source_class](
+        config.train_lmdb,
+        config.train_lmdb_without_images,
+        config.num_labels,
+        config.train_source_options)
+    val_source = data_source[config.data_source_class](
+        config.val_lmdb,
+        config.val_lmdb_without_images,
+        config.num_labels,
+        config.val_source_options)
+else
+    train_source = data_source[config.data_source_class](
+        config.train_source_options)
+    val_source = data_source[config.data_source_class](
+        config.val_source_options)
+end
 log.info('Loaded data sources')
 
 local train_sampler
