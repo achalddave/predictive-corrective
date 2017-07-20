@@ -10,6 +10,9 @@ local DiskFramesHdf5LabelsDataSource =
 
 local video_frame_proto = require 'video_util.video_frames_pb'
 
+-- TODO(achald): Update these older data sources to use an options as input,
+-- then update all callers to pass options instead of separate arguments. This
+-- way we can specify the options generally in a config file.
 local LabeledVideoFramesLmdbSource = classic.class(
     'LabeledVideoFramesLmdbSource', 'VideoDataSource')
 function LabeledVideoFramesLmdbSource:_init(
