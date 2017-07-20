@@ -82,3 +82,8 @@ py scripts/plot_correlations.py \
   the config as it wishes. This makes it easier to change the code, but forces
   you to add experimental code to your main code, guaraded by config variables,
   which is slightly frustrating and adds some mental overhead.
+
+- Pillow changed its resizing function in version 3.3.0, which means that models
+  trained on images that used the older resizing function do worse on the newer
+  resized images. I found the drop to be about 0.5% by using images resized
+  using the newer method.
