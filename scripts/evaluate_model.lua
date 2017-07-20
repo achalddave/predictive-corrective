@@ -100,6 +100,12 @@ if args.charades_submission_out ~= nil and args.recurrent ~= nil then
     args.recurrent = nil
 end
 
+local has_labels = true
+if args.labels_hdf5 == "_" then
+    args.labels_hdf5 = args.num_labels
+    has_labels = false
+end
+
 -- More config variables.
 local GPUS = {1, 2, 3, 4}
 -- TODO(achald): Allow specifying dataset from cmd line; use this to determine
@@ -408,7 +414,7 @@ local function evaluate_model_sequential(options)
         if num_iter % 10 == 0 then
             local log_string = string.format(
                 'Finished %d/%d.', #all_keys, loader:num_samples())
-            if num_iter % 100 == 0 then
+            if num_iter % 100 == 0 and has_labels then
                 local map_so_far = evaluator.compute_mean_average_precision(
                     all_predictions, all_labels)
                 local thumos_map_so_far =
@@ -598,7 +604,8 @@ local function evaluate_model(options)
         if samples_complete % progress_every == 0 then
             local log_string = string.format(
                 'Finished %d/%d', samples_complete, loader:num_samples())
-            if samples_complete % average_precision_every == 0 then
+            if samples_complete % average_precision_every == 0 and has_labels
+                then
                 local map_so_far = evaluator.compute_mean_average_precision(
                     all_predictions, all_labels)
                 local thumos_map_so_far =
@@ -645,25 +652,27 @@ else
 end
 
 -- Compute AP for each class.
-local aps = torch.zeros(all_predictions:size(2))
-for i = 1, all_predictions:size(2) do
-    local ap = evaluator.compute_mean_average_precision(
-        all_predictions[{{}, {i}}], all_labels[{{}, {i}}])
-    aps[i] = ap
-    log.info(string.format('Class %d\t AP: %.5f', i, ap))
+if has_labels then
+    local aps = torch.zeros(all_predictions:size(2))
+    for i = 1, all_predictions:size(2) do
+        local ap = evaluator.compute_mean_average_precision(
+            all_predictions[{{}, {i}}], all_labels[{{}, {i}}])
+        aps[i] = ap
+        log.info(string.format('Class %d\t AP: %.5f', i, ap))
+    end
+
+    assert(torch.all(torch.ne(aps, -1)))
+
+    local thumos_mAP = torch.mean(aps[{{1, 20}}])
+    local mAP = torch.mean(aps)
+    log.info('THUMOS mAP:', thumos_mAP)
+    log.info('MultiTHUMOS mAP:', mAP)
 end
-
-assert(torch.all(torch.ne(aps, -1)))
-
-local thumos_mAP = torch.mean(aps[{{1, 20}}])
-local mAP = torch.mean(aps)
-log.info('THUMOS mAP:', thumos_mAP)
-log.info('MultiTHUMOS mAP:', mAP)
 
 local group_mAPs
 local groups_valid = true
 -- Compute accuracy across validation groups.
-if args.val_groups ~= '' and paths.filep(args.val_groups) then
+if has_labels and args.val_groups ~= '' and paths.filep(args.val_groups) then
     local groups_file = torch.DiskFile(args.val_groups, 'r'):quiet()
     local file_groups = {{}}
     while true do
@@ -731,7 +740,7 @@ if args.val_groups ~= '' and paths.filep(args.val_groups) then
     end
 end
 
-if args.val_groups == '' or not groups_valid then
+if has_labels and args.val_groups == '' or not groups_valid then
     log.info(string.format('%.5f, %.5f, , %s, , %s',
                            mAP, thumos_mAP, os.date('%x'), experiment_id))
 end

@@ -30,26 +30,56 @@ function DiskFramesHdf5LabelsDataSource:_init(
     Args:
         frames_root (str): Contains subdirectories titled <video_name> for each
             video, which in turn contain frames of the form frame%04d.png
-        hdf5_labels_path (str): Path to HDF5 file containing <video_name> keys,
-            with (num_frames, num_labels) binary label matrices as values.
+        hdf5_labels_path (str or num): If str, specifies path to HDF5 file
+            containing <video_name> keys, with (num_frames, num_labels) binary
+            label matrices as values. If num, specifies number of labels, and
+            we will set the labels matrix to be a matrix of all 1s. This is
+            useful for running on images without labels.
     ]]--
     self.frames_root = frames_root
 
-    local hdf5_labels_file = hdf5.open(hdf5_labels_path, 'r')
-    self.labels = hdf5_labels_file:all()
-    self.video_names = __.keys(self.labels)
-    self.num_labels_ = self.labels[self.video_names[1]]:size(2)
-
-    self.video_keys_ = {}
-    self.num_samples_ = 0
-    for video_name, video_labels in pairs(self.labels) do
-        local num_frames = video_labels:size(1)
-        self.video_keys_[video_name] = {}
-        for i = 1, num_frames do
-            table.insert(self.video_keys_[video_name], video_name .. '-' .. i)
+    if type(hdf5_labels_path) == "number" then
+        self.num_labels_ = hdf5_labels_path
+        self.video_keys_ =
+            DiskFramesHdf5LabelsDataSource.static.collect_video_frames(
+                self.frames_root)
+        self.num_samples_ = 0
+        self.labels = {}
+        for video, video_keys in pairs(self.video_keys_) do
+            self.num_samples_ = self.num_samples_ + #video_keys
+            self.labels[video] = torch.ones(#video_keys, self.num_labels_)
         end
-        self.num_samples_ = self.num_samples_ + num_frames
+    else
+        local hdf5_labels_file = hdf5.open(hdf5_labels_path, 'r')
+        self.labels = hdf5_labels_file:all()
+        self.num_labels_ = self.labels[__.keys(self.labels)[1]]:size(2)
+
+        self.video_keys_ = {}
+        self.num_samples_ = 0
+        for video_name, video_labels in pairs(self.labels) do
+            local num_frames = video_labels:size(1)
+            self.video_keys_[video_name] = {}
+            for i = 1, num_frames do
+                table.insert(self.video_keys_[video_name], video_name .. '-' .. i)
+            end
+            self.num_samples_ = self.num_samples_ + num_frames
+        end
     end
+end
+
+function DiskFramesHdf5LabelsDataSource.static.collect_video_frames(path)
+    local paths = require 'paths'
+    local video_keys = {}
+    for video in paths.iterdirs(path) do
+        video_keys[video] = {}
+        for frame in paths.iterfiles(path .. '/' .. video) do
+            if string.match(frame, 'frame[0-9]+') ~= nil then
+                local index = string.match(frame, '[0-9]+')
+                video_keys[video][tonumber(index)] = video .. '-' .. index
+            end
+        end
+    end
+    return video_keys
 end
 
 function DiskFramesHdf5LabelsDataSource:num_labels() return self.num_labels_ end
@@ -57,6 +87,7 @@ function DiskFramesHdf5LabelsDataSource:num_labels() return self.num_labels_ end
 function DiskFramesHdf5LabelsDataSource:video_keys()
     return self.video_keys_
 end
+
 function DiskFramesHdf5LabelsDataSource:key_label_map(return_label_map)
     --[[
     Load mapping from frame keys to labels array.
