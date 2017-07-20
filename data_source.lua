@@ -1,4 +1,6 @@
 local classic = require 'classic'
+local hdf5 = require 'hdf5'
+local image = require 'image'
 local lmdb = require 'lmdb'
 local torch = require 'torch'
 local __ = require 'moses'
@@ -20,6 +22,152 @@ local VideoDataSource = classic.class('VideoDataSource', 'DataSource')
 VideoDataSource:mustHave('video_keys')
 VideoDataSource:mustHave('frame_video_offset')
 VideoDataSource.END_OF_SEQUENCE = -1
+
+local DiskFramesHdf5LabelsDataSource = classic.class(
+    'DiskFramesHdf5LabelsDataSource', 'VideoDataSource')
+function DiskFramesHdf5LabelsDataSource:_init(
+    frames_root, hdf5_labels_path, _ --[[options]])
+    --[[
+    Data source for loading frames from disk and labels from HDF5.
+
+    Args:
+        frames_root (str): Contains subdirectories titled <video_name> for each
+            video, which in turn contain frames of the form frame%04d.png
+        hdf5_labels_path (str): Path to HDF5 file containing <video_name> keys,
+            with (num_frames, num_labels) binary label matrices as values.
+    ]]--
+    self.frames_root = frames_root
+
+    local hdf5_labels_file = hdf5.open(hdf5_labels_path, 'r')
+    self.labels = hdf5_labels_file:all()
+    self.video_names = __.keys(self.labels)
+    self.num_labels_ = self.labels[self.video_names[1]]:size(2)
+
+    self.video_keys_ = {}
+    self.num_samples_ = 0
+    for video_name, video_labels in pairs(self.labels) do
+        local num_frames = video_labels:size(1)
+        self.video_keys_[video_name] = {}
+        for i = 1, num_frames do
+            table.insert(self.video_keys_[video_name], video_name .. '-' .. i)
+        end
+        self.num_samples_ = self.num_samples_ + num_frames
+    end
+end
+
+function DiskFramesHdf5LabelsDataSource:num_labels() return self.num_labels_ end
+
+function DiskFramesHdf5LabelsDataSource:video_keys()
+    return self.video_keys_
+end
+function DiskFramesHdf5LabelsDataSource:key_label_map(return_label_map)
+    --[[
+    Load mapping from frame keys to labels array.
+
+    Note: This is a giant array, and should be destroyed as soon as it is no
+    longer needed. If this array is stored permanently (e.g. globally or as an
+    object attribute), it will slow down *all* future calls to collectgarbage().
+
+    Args:
+        return_label_map (bool): If true, return a map from label names to label
+            id.
+
+    Returns:
+        key_labels: Table mapping frame keys to array of label indices.
+        (optional) label_map: See doc for return_label_map arg.
+
+    ]]--
+    assert(not return_label_map)
+    local key_labels = {}
+    for video_name, video_labels in pairs(self.labels) do
+        for i = 1, video_labels:size(1) do
+            local key = video_name .. '-' .. i
+            local squeezed = video_labels[{i, {}}]:nonzero():squeeze()
+            if torch.isTensor(squeezed) then
+                squeezed = squeezed:totable()
+            else
+                squeezed = {squeezed}
+            end
+            local labels = squeezed
+            key_labels[key] = labels
+        end
+    end
+    return key_labels
+end
+
+function DiskFramesHdf5LabelsDataSource:load_data(keys, load_images)
+    --[[
+    Load images and labels for a set of keys.
+
+    Args:
+        keys (array): Array of array of string keys. Each element must be
+            an array of the same length as every element, and contains keys for
+            one step of the image sequence.
+        load_images (bool): Defaults to true. If false, load only labels,
+            not images. The ByteTensors in batch_images will simply be empty.
+
+    Returns:
+        batch_images: Array of array of ByteTensors
+        batch_labels: ByteTensor of shape (num_steps, batch_size, num_labels)
+    ]]--
+    load_images = load_images == nil and true or load_images
+    local num_steps = #keys
+    local batch_size = #keys[1]
+    local batch_labels = torch.ByteTensor(
+        num_steps, batch_size, self.num_labels_)
+    local batch_images = {}
+    for step = 1, num_steps do
+        batch_images[step] = {}
+    end
+
+    for step, step_keys in ipairs(keys) do
+        for sequence, key in ipairs(step_keys) do
+            if key == VideoDataSource.END_OF_SEQUENCE then
+                table.insert(batch_images[step],
+                             VideoDataSource.END_OF_SEQUENCE)
+                batch_labels[{step, i}]:zero()
+            else
+                local video_name, frame_number = self:frame_video_offset(key)
+                if load_images then
+                    local frame_path = string.format('%s/%s/frame%04d.png',
+                                                    self.frames_root,
+                                                    video_name,
+                                                    frame_number)
+                    local frame = image.load(
+                        frame_path, 3 --[[depth]], 'byte' --[[type]])
+                    -- For backwards compatibility, use BGR images.
+                    frame = frame:index(1, torch.LongTensor{3, 2, 1})
+                    batch_images[step][sequence] = frame
+                else
+                    batch_images[step][sequence] = torch.ByteTensor()
+                end
+                batch_labels[{step, sequence, {}}] =
+                    self.labels[video_name][frame_number]
+            end
+        end
+    end
+    return batch_images, batch_labels
+end
+
+-- luacheck: push no unused args
+function DiskFramesHdf5LabelsDataSource:frame_video_offset(key)
+    return DiskFramesHdf5LabelsDataSource.static.parse_frame_key(key)
+end
+-- luacheck: pop
+
+function DiskFramesHdf5LabelsDataSource:num_samples()
+    return self.num_samples_
+end
+
+function DiskFramesHdf5LabelsDataSource.static.parse_frame_key(frame_key)
+    -- Keys are of the form '<filename>-<frame_number>'.
+    -- Find the index of the '-'
+    local _, split_index = string.find(frame_key, '[^-]*-')
+    local filename = string.sub(frame_key, 1, split_index - 1)
+    local frame_number = tonumber(string.sub(frame_key, split_index + 1, -1))
+    return filename, frame_number
+end
+
 
 local LabeledVideoFramesLmdbSource = classic.class(
     'LabeledVideoFramesLmdbSource', 'VideoDataSource')
@@ -129,7 +277,7 @@ end
 
 -- luacheck: push no unused args
 function LabeledVideoFramesLmdbSource:frame_video_offset(key)
-    return LabeledVideoFramesLmdbSource.static.parse_frame_key(key)
+    return DiskFramesHdf5LabelsDataSource.static.parse_frame_key(key)
 end
 -- luacheck: pop
 
@@ -232,15 +380,6 @@ function LabeledVideoFramesLmdbSource.static._load_image_labels_from_proto(
     return img, labels
 end
 
-function LabeledVideoFramesLmdbSource.static.parse_frame_key(frame_key)
-    -- Keys are of the form '<filename>-<frame_number>'.
-    -- Find the index of the '-'
-    local _, split_index = string.find(frame_key, '[^-]*-')
-    local filename = string.sub(frame_key, 1, split_index - 1)
-    local frame_number = tonumber(string.sub(frame_key, split_index + 1, -1))
-    return filename, frame_number
-end
-
 local PositiveVideosLmdbSource, PositiveVideosLmdbSourceSuper = classic.class(
     'PositiveVideosLmdbSource', 'LabeledVideoFramesLmdbSource')
 function PositiveVideosLmdbSource:_init(
@@ -278,7 +417,7 @@ function PositiveVideosLmdbSource:_init(
     self.label_map = label_map -- Maps label names to ids
 
     for key, _ in pairs(key_labels) do
-        local video, frame = LabeledVideoFramesLmdbSource.parse_frame_key(key)
+        local video, frame = DiskFramesHdf5LabelsDataSource.parse_frame_key(key)
         if self.video_keys_[video] == nil then
             self.video_keys_[video] = {}
         end
@@ -383,14 +522,14 @@ function SubsampledLmdbSource:_init(
 end
 
 function SubsampledLmdbSource:use_frame_q(frame_key)
-    local _, frame_index = LabeledVideoFramesLmdbSource.parse_frame_key(
+    local _, frame_index = DiskFramesHdf5LabelsDataSource.parse_frame_key(
         frame_key)
     return ((frame_index - 1) % self.subsample_rate) == 0
 end
 
 function SubsampledLmdbSource:frame_video_offset(frame_key)
     assert(self:use_frame_q(frame_key))
-    local video, frame_index = LabeledVideoFramesLmdbSource.parse_frame_key(
+    local video, frame_index = DiskFramesHdf5LabelsDataSource.parse_frame_key(
         frame_key)
     return video, (frame_index - 1) / self.subsample_rate + 1
 end
@@ -424,6 +563,7 @@ end
 return {
     DataSource = DataSource,
     VideoDataSource = VideoDataSource,
+    DiskFramesHdf5LabelsDataSource = DiskFramesHdf5LabelsDataSource,
     LabeledVideoFramesLmdbSource = LabeledVideoFramesLmdbSource,
     PositiveVideosLmdbSource = PositiveVideosLmdbSource,
     SubsampledLmdbSource = SubsampledLmdbSource
