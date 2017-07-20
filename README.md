@@ -118,6 +118,13 @@ Note: This is an incomplete list! TODO(achald): Document all required packages.
 - nnlr
 - rnn
 
+## Caution: Other configs/scripts
+
+Please note that there are a number of other scripts and configs in this
+repository that are not well documented. I am sharing them in case any of them
+are useful to look at, to see how I use the model, etc., but beware that they
+may be broken and I may not be able to help you fix them.
+
 ## Extra: Generate labels hdf5 files
 
 For convenience, we provide the labels for the datasets we use as HDF5 files.
