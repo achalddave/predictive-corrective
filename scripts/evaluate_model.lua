@@ -112,7 +112,7 @@ if args.labels_hdf5 == nil then
 end
 
 -- More config variables.
-local GPUS = {1, 2, 3, 4}
+local GPUS = {1}
 -- TODO(achald): Allow specifying dataset from cmd line; use this to determine
 -- pixel mean, num labels, etc.
 -- local PIXEL_MEAN = {103.939, 116.779, 123.68} -- Gunnar's Charades model mean
