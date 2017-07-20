@@ -54,7 +54,10 @@ local args = parser:parse()
 -- arbitrary layer on multiple GPUs easily.
 local GPU = 1
 nn.DataParallelTable.deserializeNGPUs = 1
-local MEANS = {96.8293, 103.073, 101.662}
+-- local MEANS = {103.939, 116.779, 123.68} -- Gunnar's Charades model mean
+-- local MEANS = {86.18377069, 93.74071911, 105.4525389} -- Charades
+local MEANS = {94.57184865, 100.78170151, 101.76892795} -- train+val MultiTHUMOS
+-- local MEANS = {96.8293, 103.073, 101.662} -- train MultiTHUMOS
 local CROP_SIZE = 224
 local output_log = args.output_activations .. '.log'
 print(output_log)
