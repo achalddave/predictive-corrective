@@ -26,6 +26,7 @@ local hdf5 = require 'hdf5'
 local image = require 'image'
 local __ = require 'moses'
 local nn = require 'nn'
+local paths = require 'paths'
 local torch = require 'torch'
 require 'rnn'
 
@@ -655,10 +656,15 @@ end
 
 assert(torch.all(torch.ne(aps, -1)))
 
-log.info('mAP:', torch.mean(aps))
+local thumos_mAP = torch.mean(aps[{{1, 20}}])
+local mAP = torch.mean(aps)
+log.info('THUMOS mAP:', thumos_mAP)
+log.info('MultiTHUMOS mAP:', mAP)
 
 local group_mAPs
-if args.val_groups ~= '' then -- Compute accuracy across validation groups.
+local groups_valid = true
+-- Compute accuracy across validation groups.
+if args.val_groups ~= '' and paths.filep(args.val_groups) then
     local groups_file = torch.DiskFile(args.val_groups, 'r'):quiet()
     local file_groups = {{}}
     while true do
@@ -673,7 +679,6 @@ if args.val_groups ~= '' then -- Compute accuracy across validation groups.
 
     local group_predictions = {}
     local group_labels = {}
-    local groups_valid = true
     for key_index, key in ipairs(all_keys) do
         local key_group = nil
         for group, group_keys in ipairs(file_groups) do
@@ -713,10 +718,23 @@ if args.val_groups ~= '' then -- Compute accuracy across validation groups.
             log.info(string.format(
                 'Group %d mAP:', group_index), group_mAPs[group_index])
         end
+        log.info('Group mAPs STD:', group_mAPs:std())
+
+        log.info('Numbers for copy-pasting into spreadsheet:')
+        -- MultiTHUMOS mAP, THUMOS mAP, Group 1 mAP, Group 2 mAP, Group 3 mAP,
+        -- Group 4 mAP, Group 5 mAP, Group STD, Empty (notes), Date,
+        -- Empty (Train Exp Id), Eval Exp Id
         log.info(string.format(
-            'Group %d mAP:', group_index), group_mAPs[group_index])
+            '%.5f, %.5f, %.5f, %.5f, %.5f, %.5f, %.5f, %.5f, , %s, , %s',
+            mAP, thumos_mAP, group_mAPs[1], group_mAPs[2], group_mAPs[3],
+            group_mAPs[4], group_mAPs[5], group_mAPs:std(), os.date('%x'),
+            experiment_id))
     end
-    log.info('Group mAPs STD:', group_mAPs:std())
+end
+
+if args.val_groups == '' or not groups_valid then
+    log.info(string.format('%.5f, %.5f, , %s, , %s',
+                           mAP, thumos_mAP, os.date('%x'), experiment_id))
 end
 
 if args.charades_submission_out ~= nil then
