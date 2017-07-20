@@ -8,6 +8,7 @@ local data_source = require 'data_source'
 local data_loader = require 'data_loader'
 local log = require 'util/log'
 local samplers = require 'samplers'
+require 'lmdb_data_source'
 
 local parser = argparse() {
     description = 'Compute distribution of labels from samples.'

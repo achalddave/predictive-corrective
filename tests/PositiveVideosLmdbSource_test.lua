@@ -4,6 +4,7 @@ local data_loader = require 'data_loader'
 local data_source = require 'data_source'
 local samplers = require 'samplers'
 local lyaml = require 'lyaml'
+require 'lmdb_data_source
 
 local data_paths = lyaml.load(io.open('config/data_paths.yaml', 'r'):read('*a'))
 
