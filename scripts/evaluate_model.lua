@@ -1,19 +1,18 @@
---[[ Evaluate a trained torch model on an LMDB.
+--[[ Evaluate a trained torch model on images.
 --
 -- Note that this should be run from the root directory, not from within
 -- scripts/.
 --
 -- Example usage:
 --  th scripts/evaluate_model.lua \
---      /data/achald/MultiTHUMOS/models/balanced_without_bg_sampling_vgg_new/from_scratch/model_30.t7 \
---      /data/achald/MultiTHUMOS/frames@10fps/labeled_video_frames/valval.lmdb/ \
---      /data/achald/MultiTHUMOS/frames@10fps/labeled_video_frames/valval_without_images.lmdb \
---      /data/achald/MultiTHUMOS/models/balanced_without_bg_sampling_vgg_new/from_scratch/model_30_valval_evaluation.log \
+--      /path/to/model.t7 \
+--      /path/to/frames/directory/ \
+--      /path/to/labels.hdf5 \
+--      /path/to/output.log \
 --      --sequence_length 1 \
 --      --step_size 1 \
 --      --batch_size 128 \
---      --val_groups /data/achald/MultiTHUMOS/val_split/val_val_groups.txt \
---      --output_hdf5 /data/achald/MultiTHUMOS/models/balanced_without_bg_sampling_vgg_new/from_scratch/model_30_valval_predictions.h5
+--      --output_hdf5 /path/to/output_predictions.h5
 --]]
 
 package.path = package.path .. ";../?.lua"
