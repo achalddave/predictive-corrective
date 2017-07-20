@@ -1,0 +1,78 @@
+# Example config for training model.
+
+###
+# General options
+###
+seed: 0
+gpus: [1, 2, 3, 4]
+
+###
+# Data options
+###
+data_source_class: 'DiskFramesHdf5LabelsDataSource'
+train_source_options:
+    frames_root: '/data/achald/THUMOS/2014/frames@10fps/resized/test_temporal'
+    labels_hdf5: 'data/labels/multithumos/test.h5'
+
+train_source_options:
+    frames_root: '/data/achald/THUMOS/2014/frames@10fps/resized/trainval_temporal'
+    labels_hdf5: 'data/labels/multithumos/trainval.h5'
+
+# Points to keys in data_paths_config
+train_split: 'train_val_split'
+val_split: 'test_split'
+
+# Number of labels
+num_labels: 65
+
+# Size to crop image to before passing to network.
+crop_size: 224
+
+# Mean pixel.
+pixel_mean: [92.4318769, 99.46975121, 100.62499024]
+
+###
+# Training options
+###
+# Number of total epochs to run.
+num_epochs: 50
+# Number of batches in epoch.
+epoch_size: 500
+# Specify epoch to start at (e.g. if we are continuing to train a model from
+# earlier).
+# Number of examples in batch. This is how many examples we use to compute
+# a gradient update.
+batch_size: 50
+# The computational batch size. This is how many examples we forward/backward at
+# a time computationally.
+computational_batch_size: 4
+criterion_wrapper: 'sequencer_criterion'
+
+# One of 'permuted', 'balanced' (case-insensitive)
+sampler_class: 'PermutedSampler'
+sampler_options: {
+    replace: False
+}
+sequence_length: 8
+use_boundary_frames: False
+
+###
+# Optimization options
+###
+momentum: 0.9
+weight_decay: 5.e-4
+learning_rates: [
+    { start_epoch:  1, learning_rate: 2.5e-3 },
+    { start_epoch: 11, learning_rate: 2.5e-4 },
+    { start_epoch: 21, learning_rate: 2.5e-5 },
+    { start_epoch: 31, learning_rate: 2.5e-6 },
+    { start_epoch: 41, learning_rate: 2.5e-7 }
+]
+dropout_p: 0.9
+
+###
+# Model options
+###
+# Torch model to start training with.
+model_init: 'data/models/multithumos/pc_c33_1-fc7_8-init.t7'
+init_epoch: 1
