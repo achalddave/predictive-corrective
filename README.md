@@ -50,7 +50,7 @@ Store frames from your videos in one directory `frames_root`, with frames at
 
 To evaluate the predictive-corrective model, run
 
-```lua
+```bash
 th scripts/evaluate_model.lua \
     --model data/multithumos/models/pc_c33-1_fc7-8.t7 \
     --frames /path/to/frames_root \
