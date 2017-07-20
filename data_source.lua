@@ -153,7 +153,7 @@ function DiskFramesHdf5LabelsDataSource:load_data(keys, load_images)
             if key == VideoDataSource.END_OF_SEQUENCE then
                 table.insert(batch_images[step],
                              VideoDataSource.END_OF_SEQUENCE)
-                batch_labels[{step, i}]:zero()
+                batch_labels[{step, sequence}]:zero()
             else
                 local video_name, frame_number = self:frame_video_offset(key)
                 if load_images then
