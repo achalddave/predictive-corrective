@@ -629,8 +629,8 @@ local function evaluate_model(options)
 end
 
 local source = data_source.DiskFramesHdf5LabelsDataSource(
-    args.frames,
-    args.labels_hdf5)
+    {frames_root = args.frames,
+     labels_hdf5 = args.labels_hdf5})
 local eval_options = {
     model = model,
     source = source,
