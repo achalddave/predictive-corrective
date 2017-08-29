@@ -657,6 +657,7 @@ else
 end
 
 -- Compute AP for each class.
+local mAP, thumos_mAP
 if has_labels then
     local aps = torch.zeros(all_predictions:size(2))
     for i = 1, all_predictions:size(2) do
@@ -668,8 +669,8 @@ if has_labels then
 
     assert(torch.all(torch.ne(aps, -1)))
 
-    local thumos_mAP = torch.mean(aps[{{1, 20}}])
-    local mAP = torch.mean(aps)
+    thumos_mAP = torch.mean(aps[{{1, 20}}])
+    mAP = torch.mean(aps)
     log.info('THUMOS mAP:', thumos_mAP)
     log.info('MultiTHUMOS mAP:', mAP)
 end
