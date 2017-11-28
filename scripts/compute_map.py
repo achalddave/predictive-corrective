@@ -32,6 +32,7 @@ def main(predictions_hdf5, groundtruth_without_images_lmdb):
                     label], groundtruth_by_video[video_name][:, label]))
 
     aps = np.zeros(len(label_names))
+    accuracies = np.zeros(len(label_names))
     for label in range(len(label_names)):
         # Old code used to set the first few frames' prediction to be exactly
         # -1. Set these values to be a much smaller negative value instead
@@ -46,6 +47,7 @@ def main(predictions_hdf5, groundtruth_without_images_lmdb):
             (predictions[label] > 0)).sum() / groundtruth[label].shape[0]
         aps[label] = compute_average_precision(groundtruth[label],
                                                predictions[label])
+    print('Average accuracy: %s' % accuracies.mean())
     return aps
 
 
