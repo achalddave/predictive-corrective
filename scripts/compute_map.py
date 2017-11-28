@@ -11,7 +11,9 @@ from sklearn.metrics import precision_recall_curve
 from scripts.util import compute_average_precision, read_groundtruth_lmdb
 
 
-def main(predictions_hdf5, groundtruth_without_images_lmdb):
+def main(predictions_hdf5,
+         groundtruth_without_images_lmdb,
+         selected_frames=None):
     groundtruth_by_video, label_names = read_groundtruth_lmdb(
         groundtruth_without_images_lmdb)
 
@@ -59,10 +61,24 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('predictions_hdf5')
     parser.add_argument('groundtruth_without_images_lmdb')
+    parser.add_argument('--selected_frames')
     parser.add_argument('--output_aps')
 
     args = parser.parse_args()
-    aps = main(args.predictions_hdf5, args.groundtruth_without_images_lmdb)
+
+    selected_frames = None
+    if args.selected_frames is not None:
+        import collections
+        import csv
+        with open(args.selected_frames, 'rb') as f:
+            reader = csv.reader(f)
+            selected_frames = collections.defaultdict(list)
+            for video, frame in reader:
+                selected_frames[video].append(int(frame))
+            print(selected_frames)
+
+    aps = main(args.predictions_hdf5, args.groundtruth_without_images_lmdb,
+               selected_frames)
     if args.output_aps is not None:
         np.save(args.output_aps, aps)
     print 'mAP:', aps.mean()
