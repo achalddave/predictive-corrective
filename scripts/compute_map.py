@@ -40,7 +40,7 @@ def main(predictions_hdf5, groundtruth_without_images_lmdb):
         # We can safely assume that we are only changing the values that were
         # artificially set to -1, since the output of the network for any frame
         # will basically never be exactly -1.
-        # predictions[label][predictions[label] == -1] = -1e9
+        predictions[label][predictions[label] == -1] = -1e9
         accuracies[label] = (
             groundtruth[label] ==
             (predictions[label] > 0)).sum() / groundtruth[label].shape[0]
