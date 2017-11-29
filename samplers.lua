@@ -465,7 +465,8 @@ function SequentialBatchSampler:_init(
     SequentialBatchSamplerSuper._init(self, data_source_obj, sequence_length,
                                       step_size, use_boundary_frames, options)
 
-    self.stride = self.options.stride == nil and 1 or self.sequence_length
+    self.stride = self.options.stride == nil and
+        self.sequence_length or self.options.stride
 
     self.videos = Sampler.permute(__.keys(self.video_keys))
     self.video_index = 1
