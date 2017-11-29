@@ -108,6 +108,7 @@ parser:flag('--recurrent',
             'sequence_length predictions for sequence_length inputs.')
 
 local args = parser:parse()
+log.level = 'info'
 
 if args.charades_submission_out ~= nil and args.recurrent ~= nil then
     log.info('Disabling recurrent evaluation as ' ..
@@ -375,7 +376,6 @@ local function evaluate_model_sequential(options)
     local sequence_length = options.sequence_length
     local step_size = options.step_size
     local batch_size_sequences = options.max_batch_size_images
-    local num_labels = options.num_labels
     local crops = options.crops
     local crop_size = options.crop_size
     local pixel_mean = options.pixel_mean
@@ -509,7 +509,6 @@ local function evaluate_model(options)
     local source = options.source
     local sequence_length = options.sequence_length
     local step_size = options.step_size
-    local max_batch_size_images = options.max_batch_size_images
     local num_labels = options.num_labels
     local crops = options.crops
     local crop_size = options.crop_size
@@ -800,7 +799,7 @@ if args.charades_submission_out ~= nil then
     torch.save('all_keys.t7', all_keys)
     torch.save('all_predictions.t7', all_predictions)
     local function tensor2str(x)
-        str = ""
+        local str = ""
         for i=1,x:size(1) do
             if i == x:size(1) then
                 str = str .. x[i]
@@ -813,7 +812,9 @@ if args.charades_submission_out ~= nil then
     local output = assert(io.open(args.charades_submission_out, 'w'))
     local current_filename, current_index
     for i, key in ipairs(all_keys) do
-        local filename, frame_number = source:frame_video_offset(key)
+        -- We ignore the frame number because we only output 25 frames for a
+        -- video, which we keep track of using 'current_index'.
+        local filename, _ = source:frame_video_offset(key)
         if current_filename == nil or current_filename ~= filename then
             current_index = 1
             current_filename = filename
