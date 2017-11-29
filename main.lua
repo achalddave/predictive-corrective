@@ -258,7 +258,7 @@ config = normalize_config(config)
 do -- Write normalized config to file
     local normalized_config_out = io.open(
         paths.concat(cache_dir, 'normalized-config.yaml'), 'w')
-    normalized_config_out:write(lyaml.dump(config))
+    normalized_config_out:write(lyaml.dump({config}))
     normalized_config_out:close()
 end
 
