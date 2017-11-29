@@ -23,6 +23,11 @@ def main(predictions_hdf5,
     predictions = {}
     groundtruth = {}
     for video_name in groundtruth_by_video.keys():
+        if selected_frames is not None:
+            predictions_by_video[video_name] = predictions_by_video[
+                video_name][selected_frames[video_name], :]
+            groundtruth_by_video[video_name] = groundtruth_by_video[
+                video_name][selected_frames[video_name], :]
         for label in range(len(label_names)):
             if label not in predictions:
                 predictions[label] = predictions_by_video[video_name][:, label]
