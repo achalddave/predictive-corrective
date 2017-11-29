@@ -8,8 +8,9 @@ local data_source = require 'data_source'
 local DiskFramesHdf5LabelsDataSource =
     data_source.DiskFramesHdf5LabelsDataSource
 
-local video_frame_proto = require 'video_util.video_frames_pb'
+local video_frame_proto = require 'video_util.util.video_frames_pb'
 
+local VideoDataSource = data_source.VideoDataSource
 -- TODO(achald): Update these older data sources to use an options as input,
 -- then update all callers to pass options instead of separate arguments. This
 -- way we can specify the options generally in a config file.

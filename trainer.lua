@@ -11,7 +11,7 @@ require 'nnlr'
 local evaluator = require 'evaluator'
 local image_util = require 'util/image_util'
 local log = require 'util/log'
-local END_OF_SEQUENCE = require('data_loader').END_OF_SEQUENCE
+local END_OF_SEQUENCE = require('data_source').END_OF_SEQUENCE
 
 local Trainer = classic.class('Trainer')
 
@@ -513,7 +513,7 @@ function SequentialTrainer:_train_or_evaluate_batch(train_mode)
         -- The sequence ended at the end of the last batch; reset the model and
         -- start loading the next sequence in the next batch.
         for step = 1, #images_table do
-            -- The rest of the batch should be filled with END_OF_SEQUENCe.
+            -- The rest of the batch should be filled with END_OF_SEQUENCE.
             assert(images_table[step][1] == END_OF_SEQUENCE)
         end
         self.model:forget()
@@ -549,7 +549,7 @@ function SequentialTrainer:_train_or_evaluate_batch(train_mode)
         labels = labels[{{1, num_valid_steps}}]
         images = images[{{1, num_valid_steps}}]
         for step = num_valid_steps + 1, #images_table do
-            -- The rest of the batch should be filled with END_OF_SEQUENCe.
+            -- The rest of the batch should be filled with END_OF_SEQUENCE.
             assert(images_table[step][1] == END_OF_SEQUENCE)
         end
     end
