@@ -53,6 +53,7 @@ parser:option('--labels_hdf5',
               'but only computes and stores them.'):count('?')
 
 parser:option('--model', 'Model file. Required.'):count(1)
+parser:option('--output_log', 'File to log output to. Required.'):count(1)
 parser:option('--output_hdf5',
               'HDF5 to output predictions to. Required.'):count(1)
 parser:option('--num_labels', 'Number of labels.'):count('?')
