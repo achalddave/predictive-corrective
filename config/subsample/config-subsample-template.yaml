@@ -1,0 +1,85 @@
+###
+# General options
+###
+seed: 0
+gpus: [1]
+
+###
+# Data options
+###
+data_paths_config: 'config/local_data_paths.yaml'
+
+# Points to keys in data_paths_config
+train_split: 'train_val_split'
+val_split: 'test_split'
+
+data_source_class: 'SubsampledLmdbSource'
+data_source_options: {
+    subsample_rate: {{SUBSAMPLE_RATE}}
+}
+
+# Number of labels
+num_labels: 65
+
+# Size to crop image to before passing to network.
+crop_size: 224
+
+# Mean pixel.
+# Mean pixel for train and val set:
+pixel_mean: [94.57184865, 100.78170151, 101.76892795]
+
+###
+# Training options
+###
+# Number of total epochs to run.
+num_epochs: {{NUM_EPOCHS}}
+# Number of batches in epoch.
+# # For train
+# # Images in train:     459806
+# epoch_size: 3593  # ~= 459806 / 64 / 2 (Approximately half of train data)
+
+# For train+val
+# Images in train+val: 556241
+epoch_size: {{EPOCH_SIZE}}  # ~= 556241 / 64 / 2 (Approximately half of train+val data)
+
+# Specify epoch to start at (e.g. if we are continuing to train a model from
+# earlier).
+init_epoch: 1
+# Number of examples in batch.
+batch_size: 64
+sampler_class: 'SequentialBatchSampler'
+sampler_options: {
+}
+
+# If sampling_strategy is 'sequential', this is the length of the backprop
+# sequence.
+sequence_length: 1
+# One of 'sequencer_criterion', 'last_step_criterion', or the empty string. Only
+# used if the model for training is nn.Sequencer.
+criterion_wrapper: 'sequencer_criterion'
+
+checkpoint_every: 2
+evaluate_every: {{EVALUATE_EVERY}}
+
+###
+# Optimization options
+###
+momentum: 0.9
+weight_decay: 5.e-4
+learning_rates: [
+    { start_epoch:  {{LR_EPOCH1}}, learning_rate: 1.e-3 },
+    { start_epoch:  {{LR_EPOCH2}}, learning_rate: 1.e-4 },
+    { start_epoch:  {{LR_EPOCH3}}, learning_rate: 1.e-5 },
+    { start_epoch:  {{LR_EPOCH4}}, learning_rate: 1.e-6 },
+    { start_epoch:  {{LR_EPOCH5}}, learning_rate: 1.e-7 }
+]
+learning_rate_multipliers: [
+    { name: 'nn.Linear', index: 3, weight: 10, bias: 10 }
+]
+
+###
+# Model options
+###
+# Torch model to start training with.
+model_init: '/data/achald/MultiTHUMOS/models/pretrained/vgg_pretrained_last_layer_updated/vgg16_ilsvrc_2014_pretrained_updated_for_multithumos.t7'
+decorate_sequencer: True

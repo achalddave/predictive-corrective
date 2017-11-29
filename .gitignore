@@ -2,6 +2,8 @@
 *.log
 *.pyc
 config/*.yaml
+config/subsample/*.yaml
+!config/subsample/config-subsample-template.yaml
 !config/config-predictive-corrective.yaml
 !config/config-c3d.yaml
 !config/config-resnet.yaml
