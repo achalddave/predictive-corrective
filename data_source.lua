@@ -199,5 +199,6 @@ end
 return {
     DataSource = DataSource,
     VideoDataSource = VideoDataSource,
-    DiskFramesHdf5LabelsDataSource = DiskFramesHdf5LabelsDataSource
+    DiskFramesHdf5LabelsDataSource = DiskFramesHdf5LabelsDataSource,
+    END_OF_SEQUENCE = VideoDataSource.END_OF_SEQUENCE
 }
