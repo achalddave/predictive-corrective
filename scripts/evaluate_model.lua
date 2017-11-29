@@ -56,6 +56,14 @@ parser:option('--model', 'Model file. Required.'):count(1)
 parser:option('--output_log', 'File to log output to. Required.'):count(1)
 parser:option('--output_hdf5',
               'HDF5 to output predictions to. Required.'):count(1)
+parser:option('--config',
+              'Config file used for training this model. Used to ' ..
+              'automatically set --pixel_mean, --crop_size and --num_labels.')
+    :count('?')
+
+parser:option('--pixel_mean', 'Mean pixel values. Should be 3 ' ..
+              'comma-separated float values.'):count('?')
+parser:option('--crop_size', 'Size for image to input to network.'):count('?')
 parser:option('--num_labels', 'Number of labels.'):count('?')
 
 parser:option('--sequence_length', 'Number of input frames.')
@@ -107,22 +115,56 @@ if args.charades_submission_out ~= nil and args.recurrent ~= nil then
     args.recurrent = nil
 end
 
-local has_labels = true
-if args.labels_hdf5 == nil then
-    args.labels_hdf5 = args.num_labels
-    has_labels = false
-end
-
 -- More config variables.
 local GPUS = {1}
--- TODO(achald): Allow specifying dataset from cmd line; use this to determine
--- pixel mean, num labels, etc.
--- local PIXEL_MEAN = {103.939, 116.779, 123.68} -- Gunnar's Charades model mean
--- local PIXEL_MEAN = {86.18377069, 93.74071911, 105.4525389} -- Charades
--- local PIXEL_MEAN = {92.4318769, 99.46975121, 100.62499024} -- train+val MultiTHUMOS
-local PIXEL_MEAN = {96.8293, 103.073, 101.662} -- train MultiTHUMOS
-local CROP_SIZE = 224
 local CROPS = {'c'}
+local PIXEL_MEAN = args.pixel_mean
+local CROP_SIZE = args.crop_size
+local NUM_LABELS = args.num_labels
+
+if args.config ~= nil then
+    local config = lyaml.load(io.open(args.config, 'r'):read('*a'))
+    if PIXEL_MEAN == nil then
+        PIXEL_MEAN = config.pixel_mean
+        log.info('Using pixel mean', PIXEL_MEAN)
+    end
+    if CROP_SIZE == nil then
+        CROP_SIZE = config.crop_size
+        log.info('Using crop size', CROP_SIZE)
+    end
+    if NUM_LABELS == nil then
+        NUM_LABELS = config.num_labels
+        log.info('Using num labels', NUM_LABELS)
+    end
+end
+
+if PIXEL_MEAN == nil then
+    -- Charades mean from Gunnar
+    -- PIXEL_MEAN = {103.939, 116.779, 123.68}
+    -- Charades:
+    -- PIXEL_MEAN = {86.18377069, 93.74071911, 105.4525389}
+    -- train+val MultiTHUMOS:
+    -- PIXEL_MEAN = {92.4318769, 99.46975121, 100.62499024}
+    -- Train MultiTHUMOS:
+    -- PIXEL_MEAN = {96.8293, 103.073, 101.662} -- train MultiTHUMOS
+    -- Another train+val MultiTHUMOS mean?
+    PIXEL_MEAN = {94.57184865, 100.78170151, 101.76892795}
+    log.warn(string.format('--pixel_mean not specified; using %s', PIXEL_MEAN))
+end
+if CROP_SIZE == nil then
+    CROP_SIZE = 224
+    log.warn(string.format('--crop_size not specified, using %s', CROP_SIZE))
+end
+if NUM_LABELS == nil then
+    NUM_LABELS = 65
+    log.warn(string.format('--num_labels not specified, using %s', NUM_LABELS))
+end
+
+local has_labels = true
+if args.labels_hdf5 == nil then
+    args.labels_hdf5 = NUM_LABELS
+    has_labels = false
+end
 
 local max_batch_size_images = math.floor(args.batch_size / #CROPS)
 
@@ -639,7 +681,7 @@ local eval_options = {
     sequence_length = args.sequence_length,
     step_size = args.step_size,
     max_batch_size_images = max_batch_size_images,
-    num_labels = args.num_labels,
+    num_labels = NUM_LABELS,
     crops = CROPS,
     crop_size = CROP_SIZE,
     pixel_mean = PIXEL_MEAN,
@@ -810,7 +852,7 @@ elseif args.output_hdf5 ~= nil then
             for i = 1, args.sequence_length-1 do
                 if predictions_table[i] == nil then
                     log.warn('Missing prediction for', filename, i)
-                    predictions_table[i] = torch.zeros(args.num_labels) - 1e9
+                    predictions_table[i] = torch.zeros(NUM_LABELS) - 1e9
                 end
             end
         end
