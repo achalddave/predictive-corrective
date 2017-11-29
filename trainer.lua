@@ -200,11 +200,13 @@ function Trainer:_train_or_evaluate_batch(train_mode)
     local images, labels = self:_load_batch(data, train_mode)
     local loss = 0
     local outputs
+
     local function forward_backward()
         if train_mode then
             self.model:zeroGradParameters()
         end
-        for i = 1, math.ceil(self.batch_size / self.computational_batch_size) do
+        local num_images = images:size(2)
+        for i = 1, math.ceil(num_images / self.computational_batch_size) do
             local start_index = (i - 1) * self.computational_batch_size + 1
             local end_index = math.min(
                 i * self.computational_batch_size, self.batch_size)

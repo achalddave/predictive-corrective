@@ -440,6 +440,10 @@ end
 
 local SequentialBatchSampler, SequentialBatchSamplerSuper = classic.class(
     'SequentialBatchSampler', VideoSampler)
+SequentialBatchSampler.ON_VIDEO_END = {
+    NEW = 'new',
+    PAD = 'pad'
+}
 function SequentialBatchSampler:_init(
         data_source_obj, sequence_length, step_size, use_boundary_frames,
         options)
@@ -463,12 +467,29 @@ function SequentialBatchSampler:_init(
                     batch index 1: [frame 1, frame 2]
                     batch index 2: [frame 2, frame 3]
                 Default: sequence_length
+            on_video_end (string): One of "new" or "pad". This
+                determines how to fill a batch if the current video ends before
+                the batch is full.
+                "new" (default): Fill batch with frames from a new video
+                "pad": Fill batch with copies of the last frame of the current
+                    video.
     ]]--
     SequentialBatchSamplerSuper._init(self, data_source_obj, sequence_length,
                                       step_size, use_boundary_frames, options)
 
     self.stride = self.options.stride == nil and
         self.sequence_length or self.options.stride
+    if self.options.on_video_end == self.ON_VIDEO_END.NEW or
+            self.options.on_video_end == self.ON_VIDEO_END.PAD then
+        log.debug('on_video_end set to', self.options.on_video_end)
+        self.on_video_end = self.options.on_video_end
+    elseif self.options.on_video_end == nil then
+        log.debug('on_video_end was nil, setting to "new"')
+        self.on_video_end = self.ON_VIDEO_END.NEW
+    else
+        error(string.format('Unrecognized "on_video_end" option: %s',
+                            self.options.on_video_end))
+    end
 
     self.videos = Sampler.permute(__.keys(self.video_keys))
     self.video_index = 1
@@ -490,11 +511,20 @@ function SequentialBatchSampler:sample_keys(batch_size)
     for _ = 1, self.sequence_length do
         table.insert(batch_keys, {})
     end
-    for _ = 1, batch_size do
+    for batch_index = 1, batch_size do
         if not self:_is_valid_start() then
-            self:advance_video()
-            assert(self:_is_valid_start())
+            -- If the batch just started, or the sampler is configured to start
+            -- a new video on end of old video.
+            if batch_index == 1 or self.on_video_end == self.ON_VIDEO_END.NEW
+                    then
+                self:advance_video()
+                assert(self:_is_valid_start())
+            elseif self.on_video_end == self.ON_VIDEO_END.PAD then
+                self.frame_index = self.frame_index - self.stride
+                assert(self:_is_valid_start())
+            end
         end
+
         local sequence = self:get_sequence(self.videos[self.video_index],
                                            self.frame_index)
         for step = 1, #sequence do
