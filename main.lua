@@ -100,7 +100,6 @@
 --]]
 
 local argparse = require 'argparse'
-local cudnn = require 'cudnn'
 local cutorch = require 'cutorch'
 local lyaml = require 'lyaml'
 local nn = require 'nn'
@@ -109,6 +108,7 @@ local torch = require 'torch'
 local signal = require 'posix.signal'
 local __ = require 'moses'
 
+require 'cudnn'
 require 'nnlr'
 require 'rnn'
 require 'classic'
@@ -139,6 +139,10 @@ parser:flag('--debug', "Indicates that we are only debugging; " ..
             "Speeds up some things, such as not saving models to disk.")
 
 local args = parser:parse()
+if not paths.filep(args.config) then
+    log.error(string.format('Config file %s does not exist', args.config))
+    os.exit()
+end
 local config = lyaml.load(io.open(args.config, 'r'):read('*a'))
 
 -- Create cache_base
@@ -169,7 +173,7 @@ if config.data_paths_config ~= nil then
         paths.concat(cache_dir, paths.basename(config.data_paths_config)))
 end
 
-function normalize_config(config)
+local function normalize_config(config)
     -- Normalize config files.
     if config.data_paths_config ~= nil then
         local data_paths = lyaml.load(
@@ -191,7 +195,7 @@ function normalize_config(config)
     end
     if config.use_boundary_frames == nil then
         config.use_boundary_frames = false
-        log.info('CONFIG: use_boundary_frames not specified, setting to ' ..
+        log.warn('CONFIG: use_boundary_frames not specified, setting to ' ..
                  tostring(config.use_boundary_frames))
     end
     if config.checkpoint_every == nil then
@@ -207,7 +211,7 @@ function normalize_config(config)
 
     if config.sampler_class == nil then
         config.sampler_class = 'PermutedSampler'
-        log.info('CONFIG: sampler_class not specified, using ' ..
+        log.warn('CONFIG: sampler_class not specified, using ' ..
                  config.sampler_class)
     end
 
@@ -226,12 +230,12 @@ function normalize_config(config)
 
     if config.data_source_class == nil then
         config.data_source_class = 'DiskFramesHdf5LabelsDataSource'
-        log.info('CONFIG: data_source_class not specified, using ' ..
+        log.warn('CONFIG: data_source_class not specified, using ' ..
                  config.data_source_class)
     end
     if config.train_source_options == nil and config.data_source_options ~= nil
         then
-        log.info('DEPRECATED: data_source_options is deprecated. Use ' ..
+        log.warn('DEPRECATED: data_source_options is deprecated. Use ' ..
                  'train/val_source_options instead.')
         config.train_source_options = config.data_source_options
         assert(config.val_source_options == nil)
@@ -282,7 +286,7 @@ end
 log.info('Loading model from ' .. config.model_init)
 single_model = torch.load(config.model_init)
 if torch.isTypeOf(single_model, 'nn.DataParallelTable') then
-    log.info('Getting first of DataParallelTable.')
+    log.debug('Getting first of DataParallelTable.')
     single_model = single_model:get(1)
 end
 -- TODO(achald): XXX HACK! XXX
@@ -301,7 +305,7 @@ single_model:clearState()
 
 if config.criterion_wrapper == nil then
     if torch.isTypeOf(single_model, 'nn.Sequencer') then
-        log.info('Adding LastStepCriterion wrapper for ' ..
+        log.warn('Adding LastStepCriterion wrapper for ' ..
                  'nn.Sequencer model since config.criterion_wrapper is unset.')
         config.criterion_wrapper = 'last_step_criterion'
     else
@@ -309,7 +313,7 @@ if config.criterion_wrapper == nil then
     end
 end
 
--- Increase learning rate of last nn.Linear layer.
+-- Increase learning rate of specified layers.
 for _, multiplier_spec in ipairs(config.learning_rate_multipliers) do
     local layers = single_model:findModules(multiplier_spec.name)
     layers[multiplier_spec.index]:learningRate('weight', multiplier_spec.weight)
@@ -342,7 +346,7 @@ if config.decorate_sequencer then
 end
 if config.sequencer_remember ~= nil then
     single_model:remember(config.sequencer_remember)
-    log.info('Calling :remember with "' .. config.sequencer_remember .. '"')
+    log.debug('Calling :remember with "' .. config.sequencer_remember .. '"')
 end
 local batch_dimension = 2 -- by default
 for i = 1, 5 do
@@ -420,7 +424,7 @@ if config.sampler_class == 'SequentialSampler' then
         config.use_boundary_frames,
         config.sampler_options)
 else
-    log.info('CONFIG: Using PermutedSampler for evaluation.')
+    log.warn('CONFIG: Using PermutedSampler for evaluation.')
     val_sampler = samplers.PermutedSampler(
         val_source,
         config.sequence_length,
@@ -471,7 +475,7 @@ local trainer = trainer_class {
 log.info('Initialized trainer.')
 
 local epoch = config.init_epoch
-function save_intermediate(epoch)
+local function save_intermediate(epoch)
     trainer:save(cache_dir, epoch)
     torch.save(paths.concat(cache_dir, 'sampler_' .. epoch .. '.t7'),
                train_sampler)
@@ -490,7 +494,7 @@ if not args.debug then
     end)
 end
 
-function train_eval_loop()
+local function train_eval_loop()
     -- -- XXX HACK XXX
     -- log.warn('=========================')
     -- log.warn('Using PCA augmentation!!!')
