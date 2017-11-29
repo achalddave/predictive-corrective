@@ -42,6 +42,8 @@ end
 
 function VideoSampler:get_sequence(video, offset)
     local sequence = {}
+    assert(self.video_keys[video][offset] ~= nil,
+           string.format('Invalid offset %d for video %s', offset, video))
     local sampled_key = self.video_keys[video][offset]
     local last_valid_key = sampled_key
     for _ = 1, self.sequence_length do
