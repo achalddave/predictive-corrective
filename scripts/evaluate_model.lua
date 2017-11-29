@@ -25,6 +25,7 @@ local cutorch = require 'cutorch'
 require 'cunn'
 local hdf5 = require 'hdf5'
 local image = require 'image'
+local lyaml = require 'lyaml'
 local __ = require 'moses'
 local nn = require 'nn'
 local paths = require 'paths'
@@ -44,18 +45,18 @@ require 'layers/init'
 local parser = argparse() {
     description = 'Evaluate a Torch model on MultiTHUMOS.'
 }
-parser:option('--model', 'Model file. Required.'):count(1)
 parser:option('--frames',
-                'Root directory containing video frames. Required.'):count(1)
-parser:option('--output_log', 'File to log output to. Required.'):count(1)
+              'Root directory containing video frames. Required.'):count(1)
 parser:option('--labels_hdf5',
-                'HDF5 file containing labels for videos. Can be omitted, ' ..
-                'in which case the script does not evaluate the predictions ' ..
-                'but only computes and stores them.'):count('?')
+              'HDF5 file containing labels for videos. Can be omitted, ' ..
+              'in which case the script does not evaluate the predictions ' ..
+              'but only computes and stores them.'):count('?')
+
+parser:option('--model', 'Model file. Required.'):count(1)
 parser:option('--output_hdf5',
               'HDF5 to output predictions to. Required.'):count(1)
-parser:option('--num_labels', 'Number of labels')
-    :count('?'):default(65):convert(tonumber)
+parser:option('--num_labels', 'Number of labels.'):count('?')
+
 parser:option('--sequence_length', 'Number of input frames.')
     :count('?'):default(1):convert(tonumber)
 parser:option('--step_size', 'Size of step between frames.')
