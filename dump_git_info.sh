@@ -11,6 +11,7 @@
 # git-log.txt   : Output of
 #     git log --graph --pretty='format:%h -%d %s (%cd) <%an>'
 # git-diff.txt  : Output of git diff --patch --color=never
+# git-head.txt  : Output of git rev-parse HEAD
 
 function usage {
     echo "Usage: "
@@ -31,4 +32,5 @@ fi
 git diff --patch --color=never > "${OUTPUT_DIR}/git-diff.patch"
 git log --graph --pretty='format:%h -%d %s (%cd) <%an>' \
     > "${OUTPUT_DIR}/git-log.txt"
+git rev-parse HEAD > "${OUTPUT_DIR}/git-head.txt"
 git status -sb > "${OUTPUT_DIR}/git-status.txt"
