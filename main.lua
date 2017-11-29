@@ -209,6 +209,14 @@ local function normalize_config(config)
         config.computational_batch_size = config.batch_size
     end
 
+    if config.sampling_strategy ~= nil then
+        error('config.sampling_strategy[_options] no longer supported. ' ..
+              'Please use sampler_class and sampler_options instead.')
+    end
+    if config.sampling_strategy_options ~= nil then
+        error('config.sampling_strategy no longer supported. Please use ' ..
+              'sampler_class and sampler_options instead.')
+    end
     if config.sampler_class == nil then
         config.sampler_class = 'PermutedSampler'
         log.warn('CONFIG: sampler_class not specified, using ' ..
