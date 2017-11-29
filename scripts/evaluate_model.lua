@@ -431,7 +431,7 @@ local function evaluate_model_sequential(options)
         -- calls cause excessive memory usage that is not cleared unless
         -- collectgarbage() is called twice in every step of the inner loop
         -- above; doing this slows down the code drastically.
-        local batch_predictions, batch_groundtruth
+        local batch_predictions, batch_labels
         for sequence = 1, batch_size_sequences do
             if valid_up_to_step[sequence] >= 1 then
                 if batch_predictions == nil then
